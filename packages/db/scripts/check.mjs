@@ -19,9 +19,10 @@ const expectedTables = [
   'record_authors',
   // operations
   'audit_events',
-  // drizzle bookkeeping
-  '__drizzle_migrations',
 ]
+
+/** Drizzle bookkeeping lives in its own schema in current drizzle-orm. */
+const expectedDrizzleTables = ['drizzle.__drizzle_migrations']
 
 const expectedEnums = {
   role: ['USER', 'REPOSITORY_MANAGER', 'ADMIN'],
@@ -39,6 +40,21 @@ try {
   const present = new Set(tables.map((r) => r.table_name))
   for (const t of expectedTables) {
     if (present.has(t)) {
+      console.log(`ok   table ${t}`)
+    } else {
+      console.log(`FAIL table ${t} missing`)
+      failures.push(`table ${t}`)
+    }
+  }
+
+  const { rows: drizzleTables } = await client.query(
+    `select table_schema || '.' || table_name as qualified
+     from information_schema.tables
+     where table_schema = 'drizzle'`,
+  )
+  const drizzlePresent = new Set(drizzleTables.map((r) => r.qualified))
+  for (const t of expectedDrizzleTables) {
+    if (drizzlePresent.has(t)) {
       console.log(`ok   table ${t}`)
     } else {
       console.log(`FAIL table ${t} missing`)

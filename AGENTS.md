@@ -17,7 +17,7 @@ Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alo
 ## Project state (verify before assuming)
 
 - **Stage 0 (local bootstrap) completed 2026-09-30:** npm-workspaces monorepo; `apps/web` is a Vite + React 19 + TypeScript 6 app, plus the frontend-handoff foundation: React Router (`src/app/router.tsx` + `routes.tsx`), Tailwind v4 + shadcn/ui (`src/components/ui/`), and Lucide icons. `apps/worker` (Cloudflare) and `services/processing` (Python) are reserved paths that don't exist yet — create them at their stages rather than stubbing them early. Feature folders (`src/features/*`) arrive with their features, per the handoff's structure.
-- **Stage 1 (Neon DB) in progress 2026-09-30:** `packages/db` holds the Drizzle schema (`identity`, `intake`, `repository`, `operations`) and generated SQL migrations. Migration run against a real dev DB is pending the owner's Neon project + root `.env` (`DATABASE_URL`, direct endpoint).
+- **Stage 1 (Neon DB) done 2026-09-30:** `packages/db` holds the Drizzle schema (`identity`, `intake`, `repository`, `operations`); initial migration applied to the `suluan-dev` Neon project (ap-southeast-1) and verified with `db:check`. Catalog tables ship empty; first-admin provisioning stays TBD.
 - Local prerequisites verified 2026-09-30: Node 22 + npm 10, Git, Python 3.13, global `wrangler` (Cloudflare) and `firebase-tools`. Not installed yet and deferred to their stages: `gcloud` (Cloud Run), a Python venv/`uv` (ingestion), `psql` (optional; Neon is remote). No Docker required by the architecture.
 - Earlier Supabase/prototype assumptions are superseded. Never carry over prototype schemas, auth rules, upload behavior, or infrastructure.
 

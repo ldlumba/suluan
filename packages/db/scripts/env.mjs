@@ -2,9 +2,10 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/** Repo root: two levels up from packages/db/scripts. */
+/** Repo root: three levels up from packages/db/scripts. */
 export const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
+  '..',
   '..',
   '..',
 )
