@@ -9,6 +9,11 @@
   - **PROPOSED / TBD** — never silently promote to locked. Keep TBD items explicit in answers.
 - Do not treat that document as proof that accounts, tables, resources, or tests exist.
 
+## SULUAN frontend architecture
+
+Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alongside the main SULUAN Architecture v1 specification. The handoff locks the approved frontend stack (React Router, Tailwind CSS, shadcn/ui, TanStack Query, React Hook Form, Zod, Lucide, Recharts, React Flow) and browser/backend boundaries; it updates only the frontend — all other Architecture v1 decisions remain in force. Apply its frontend agent rules. Future/TBD items are not authorization to implement.
+  - Assistant quotas (messages/day, prompt length, turns, answer size, 3–5 evidence chunks) are **TBD** — the handoff's numbers are illustrative only. The frontend displays API-reported limits via a single labeled placeholder config until that endpoint exists; never present those figures as approved. Server-side enforcement is authoritative.
+
 ## Project state (verify before assuming)
 
 - **Stage 0 (local bootstrap) completed 2026-09-30:** npm-workspaces monorepo; `apps/web` is a Vite + React 19 + TypeScript 6 app. `apps/worker` (Cloudflare) and `services/processing` (Python) are reserved paths that don't exist yet — create them at their stages rather than stubbing them early.
