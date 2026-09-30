@@ -171,3 +171,7 @@ Complete and verify each dependency before expanding scope. Important checks inc
 Store this file in the repository documentation and reference its actual path from `AGENTS.md`. Tell OpenCode to read it before architecture/schema work, preserve locked decisions, and keep TBD items explicit. Add repository-specific build/test commands only after inspecting the real project. Record approved changes to this baseline with rationale and date.
 
 Do not treat this document as proof that accounts, cloud resources, tables, integrations, or tests already exist. Implement the governed submission workflow before exposing AI features; use the smallest service set that satisfies it.
+
+## 12. Recorded amendments
+
+- **2026-09-30 — ORM/migration library: Drizzle + drizzle-kit.** Resolves the "libraries/ORM" portion of §10's TBD. Rationale: TypeScript monorepo fit, reviewable generated SQL migrations (committed under version control), `node-postgres` driver for local/migration use, and forward compatibility with the Worker stage via Neon's HTTP driver. Does not lock the query-layer style beyond Drizzle, nor any retrieval/pgvector specifics.
