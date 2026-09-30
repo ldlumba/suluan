@@ -1,0 +1,11 @@
+# Local dev only. wrangler dev auto-loads this file; NEVER commit it.
+# Production values become `wrangler secret`s at deploy time, not vars here.
+#
+# DATABASE_URL: Neon HTTP driver accepts the pooled OR direct endpoint.
+# Use the pooled (-pooler) endpoint for serverless runtime efficiency.
+# FIREBASE_PROJECT_ID: must match the Firebase project issuing ID tokens
+# (tokens carry aud = project ID; mismatch means rejection).
+# ALLOWED_DOMAINS: comma-separated; see Architecture v1 §12 (ua.edu.ph only).
+DATABASE_URL=
+FIREBASE_PROJECT_ID=
+ALLOWED_DOMAINS=ua.edu.ph

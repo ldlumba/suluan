@@ -18,6 +18,7 @@ Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alo
 
 - **Stage 0 (local bootstrap) completed 2026-09-30:** npm-workspaces monorepo; `apps/web` is a Vite + React 19 + TypeScript 6 app, plus the frontend-handoff foundation: React Router (`src/app/router.tsx` + `routes.tsx`), Tailwind v4 + shadcn/ui (`src/components/ui/`), and Lucide icons. `apps/worker` (Cloudflare) and `services/processing` (Python) are reserved paths that don't exist yet — create them at their stages rather than stubbing them early. Feature folders (`src/features/*`) arrive with their features, per the handoff's structure.
 - **Stage 1 (Neon DB) done 2026-09-30:** `packages/db` holds the Drizzle schema (`identity`, `intake`, `repository`, `operations`); initial migration applied to the `suluan-dev` Neon project (ap-southeast-1) and verified with `db:check`. Catalog tables ship empty; first-admin provisioning stays TBD.
+- **Stage 2 (auth) done 2026-09-30:** `apps/worker` (Hono) verifies Firebase ID tokens via Google JWKS, enforces the `ua.edu.ph` allowlist, and loads/auto-creates Neon profiles over the HTTP driver. `apps/web` has the Firebase client SDK, auth provider, Google sign-in, and `/signin`. Decisions recorded in the context doc: domain allowlist, dev-only admin promotion. Production admin provisioning, alumni access, and full verification policy stay TBD.
 - Local prerequisites verified 2026-09-30: Node 22 + npm 10, Git, Python 3.13, global `wrangler` (Cloudflare) and `firebase-tools`. Not installed yet and deferred to their stages: `gcloud` (Cloud Run), a Python venv/`uv` (ingestion), `psql` (optional; Neon is remote). No Docker required by the architecture.
 - Earlier Supabase/prototype assumptions are superseded. Never carry over prototype schemas, auth rules, upload behavior, or infrastructure.
 
@@ -35,8 +36,13 @@ Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alo
   - `npm run db:generate` — regenerate SQL migrations from schema (no DB needed).
   - `npm run db:migrate` — apply migrations. Needs root `.env` with `DATABASE_URL` set to the Neon dev **direct** endpoint — pooled endpoints are unsafe for DDL.
   - `npm run db:check` — assert Stage 1 tables/enums/constraints exist in the dev DB.
+  - `npm run db:promote-admin -- <email>` — **dev only**: grants ADMIN to an existing profile by email. Never a production mechanism.
   - The db integration test skips automatically when `.env`/`DATABASE_URL` is absent, so `npm run check` stays green on credential-less clones.
-- Cloudflare Workers have no TCP Postgres access: the future `apps/worker` must reach Neon via the HTTP driver (`@neondatabase/serverless`, already a transitive dep) or Hyperdrive — never `pg` direct.
+- Worker (`apps/worker`, Hono; decisions recorded in the context doc):
+  - `npm run dev:worker` — local API on http://localhost:8787. Reads `apps/worker/.dev.vars` (copy from `.dev.vars.example`; git-ignored) — NOT the root `.env`. Use the pooled Neon endpoint + real `FIREBASE_PROJECT_ID` there.
+  - Token verification uses Google's public JWKS — no service-account secret needed. Tests inject a local JWKS (`createApp` factory) so no Google network dependency.
+  - Cloudflare Workers have no TCP Postgres access: the Worker reaches Neon via the HTTP driver (`@neondatabase/serverless`) — never `pg` direct. (Supersedes the earlier forward-looking note.)
+- Web auth: Firebase config lives in `apps/web/.env.local` (`VITE_FIREBASE_*`, git-ignored); missing config disables sign-in UI only. `src/setupTests.ts` registers testing-library cleanup manually — Vitest runs without globals so auto-cleanup never fires (renders leak between tests without it).
 
 ## Locked stack (do not add to it casually)
 

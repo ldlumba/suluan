@@ -1,7 +1,10 @@
-import { LibraryBig } from 'lucide-react'
+import { LibraryBig, LogOut } from 'lucide-react'
 import { Link, Outlet } from 'react-router'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/features/auth/useAuth'
 
 export function RootLayout() {
+  const { user, profile, loading, signOut } = useAuth()
   return (
     <div className="flex min-h-svh flex-col bg-background text-foreground">
       <header className="border-b">
@@ -10,13 +13,40 @@ export function RootLayout() {
             <LibraryBig className="h-5 w-5" aria-hidden="true" />
             SULUAN
           </Link>
-          <nav className="ml-auto">
+          <nav className="ml-auto flex items-center gap-3">
             <Link
               to="/"
               className="text-sm text-muted-foreground hover:text-foreground"
             >
               Home
             </Link>
+            {loading ? null : user ? (
+              <>
+                {profile && (
+                  <span className="hidden text-xs text-muted-foreground sm:inline">
+                    {profile.role}
+                  </span>
+                )}
+                <span className="hidden max-w-48 truncate text-sm md:inline">
+                  {user.email}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void signOut()}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Sign out
+                </Button>
+              </>
+            ) : (
+              <Link
+                to="/signin"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Sign in
+              </Link>
+            )}
           </nav>
         </div>
       </header>

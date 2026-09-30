@@ -8,6 +8,12 @@ dist-ssr
 .env.*
 !.env.example
 
+# Wrangler local secrets (never commit)
+.dev.vars
+
+# Wrangler dev/deploy artifacts (never commit)
+.wrangler/
+
 # Logs
 logs
 *.log

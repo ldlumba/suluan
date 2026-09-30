@@ -3,10 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "exports": {
+    "./schema": "./src/schema/index.ts",
+    "./scripts/env.mjs": "./scripts/env.mjs",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "generate": "drizzle-kit generate",
     "migrate": "node ./scripts/migrate.mjs",
     "check:db": "node ./scripts/check.mjs",
+    "promote-admin": "node ./scripts/promote-admin.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"

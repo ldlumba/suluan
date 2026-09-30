@@ -12,6 +12,10 @@ export const profiles = pgTable('profiles', {
   // Firebase UID. Stage 2 wires real verification; until then this is an
   // unverified placeholder populated by whatever the client claims.
   firebaseUid: text('firebase_uid').notNull().unique(),
+  // Verified email from the identity provider (Stage 2+). Nullable because
+  // identity providers are not guaranteed to supply one; unique because one
+  // person holds one account. Used by the dev-only admin promotion script.
+  email: text('email').unique(),
   role: role('role').notNull().default('USER'),
   displayName: text('display_name'),
   createdAt: timestamp('created_at', { withTimezone: true })
