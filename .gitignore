@@ -1,0 +1,19 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment files: placeholders only may be committed
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store

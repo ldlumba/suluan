@@ -1,0 +1,5 @@
+node_modules
+dist
+package-lock.json
+# Documentation is maintained by hand; do not let formatters churn it
+*.md
