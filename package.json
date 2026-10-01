@@ -21,6 +21,7 @@
     "db:migrate": "npm run migrate -w @suluan/db",
     "db:check": "npm run check:db -w @suluan/db",
     "db:promote-admin": "npm run promote-admin -w @suluan/db",
+    "db:seed:dev": "npm run seed:dev -w @suluan/db",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

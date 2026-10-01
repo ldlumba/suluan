@@ -25,6 +25,11 @@ describe('app routing', () => {
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
   })
 
+  it('redirects signed-out visitors away from /submit and /review', async () => {
+    renderAt('/submit')
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+  })
+
   it('renders the not-found screen for unknown routes', () => {
     renderAt('/does-not-exist')
     expect(

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
 import { ApiError, apiFetch } from '@/lib/api'
 import { auth, googleProvider } from '@/lib/firebase'
+import { queryClient } from '@/lib/queryClient'
 import { AuthContext, type ServerProfile } from './AuthContext'
 
 /**
@@ -59,13 +60,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
     setProfile(null)
     setError(null)
-    // Protected server caches (TanStack Query) do not exist yet; when the
-    // query client lands, it must be cleared here (handoff §5).
+    // Drop all protected server state with the session (handoff §5).
+    queryClient.clear()
   }, [])
 
+  const getIdToken = useCallback(async () => {
+    if (!user) return null
+    try {
+      return await user.getIdToken()
+    } catch {
+      return null
+    }
+  }, [user])
+
   const value = useMemo(
-    () => ({ user, profile, loading, error, signIn, signOut }),
-    [user, profile, loading, error, signIn, signOut],
+    () => ({ user, profile, loading, error, signIn, signOut, getIdToken }),
+    [user, profile, loading, error, signIn, signOut, getIdToken],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

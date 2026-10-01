@@ -13,6 +13,7 @@
     "migrate": "node ./scripts/migrate.mjs",
     "check:db": "node ./scripts/check.mjs",
     "promote-admin": "node ./scripts/promote-admin.mjs",
+    "seed:dev": "node ./scripts/seed-dev.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"

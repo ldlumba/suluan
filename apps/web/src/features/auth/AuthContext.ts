@@ -16,6 +16,8 @@ export interface AuthState {
   error: string | null
   signIn: () => Promise<void>
   signOut: () => Promise<void>
+  /** Fresh ID token for API calls (refreshes when expired). Null when signed out. */
+  getIdToken: () => Promise<string | null>
 }
 
 export const AuthContext = createContext<AuthState | null>(null)

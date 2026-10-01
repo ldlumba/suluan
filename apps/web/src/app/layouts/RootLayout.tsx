@@ -20,6 +20,20 @@ export function RootLayout() {
             >
               Home
             </Link>
+            <Link
+              to="/submit"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Submit
+            </Link>
+            {profile && profile.role !== 'USER' && (
+              <Link
+                to="/review"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Review
+              </Link>
+            )}
             {loading ? null : user ? (
               <>
                 {profile && (
