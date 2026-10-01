@@ -1,3 +1,23 @@
+/**
+ * Structural R2 binding surface. Declared locally instead of importing
+ * @cloudflare/workers-types: the Worker only needs these three members,
+ * and structural typing keeps the dependency footprint minimal. The real
+ * runtime binding satisfies this interface.
+ */
+export interface R2BucketLike {
+  head(key: string): Promise<{ size: number } | null>
+  createPresignedUrl(opts: {
+    method: 'put' | 'get'
+    key: string
+    expiration?: number
+  }): Promise<string>
+}
+
+/** Structural queue-producer surface (see R2BucketLike rationale). */
+export interface QueueLike {
+  send(message: unknown): Promise<void>
+}
+
 export interface Env {
   DATABASE_URL: string
   FIREBASE_PROJECT_ID: string
@@ -9,6 +29,17 @@ export interface Env {
    * arbitrary origins.
    */
   ALLOWED_ORIGINS: string
+  DOCUMENTS: R2BucketLike
+  NOTIFICATIONS: QueueLike
+  /** Test/dev REO recipient. Unset until the mailbox decision lands. */
+  REO_MAILBOX?: string
+}
+
+/** Structural queue-consumer message (see R2BucketLike rationale). */
+export interface QueueMessageLike<T> {
+  body: T
+  ack(): void
+  retry(): void
 }
 
 /**

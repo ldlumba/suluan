@@ -19,6 +19,8 @@ const expectedTables = [
   'record_authors',
   // operations
   'audit_events',
+  'outbox_events',
+  'notifications',
 ]
 
 /** Drizzle bookkeeping lives in its own schema in current drizzle-orm. */
@@ -27,6 +29,7 @@ const expectedDrizzleTables = ['drizzle.__drizzle_migrations']
 const expectedEnums = {
   role: ['USER', 'REPOSITORY_MANAGER', 'ADMIN'],
   submission_status: ['PENDING', 'ACCEPTED', 'REJECTED'],
+  notification_status: ['PENDING', 'SENT', 'SKIPPED', 'FAILED'],
 }
 
 const failures = []

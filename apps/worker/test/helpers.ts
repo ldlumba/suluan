@@ -7,7 +7,22 @@ import {
   type JWTVerifyGetKey,
 } from 'jose'
 import { loadRootEnv } from '@suluan/db/scripts/env.mjs'
+import {
+  auditEvents,
+  decisions,
+  notifications,
+  outboxEvents,
+  profiles,
+  recordFiles,
+  researchRecords,
+  submissionFiles,
+  submissions,
+} from '@suluan/db/schema'
+import { inArray } from 'drizzle-orm'
+import { neon } from '@neondatabase/serverless'
+import { drizzle } from 'drizzle-orm/neon-http'
 import { createApp } from '../src/app'
+import { createDb, type Db } from '../src/db'
 import type { Env } from '../src/config'
 
 export const PROJECT_ID = 'test-project'
@@ -36,6 +51,12 @@ export interface TestAuth {
     token: string | null,
     extraHeaders?: Record<string, string>,
   ) => Response | Promise<Response>
+  /** In-memory R2 stand-in: key -> stored size. Tests simulate uploads here. */
+  r2objects: Map<string, { size: number }>
+  /** Queue messages the app tried to send, in order. */
+  sentMessages: unknown[]
+  /** Simulate a completed browser-to-R2 upload. */
+  putObject: (key: string, size: number) => void
 }
 
 export async function setupTestAuth(): Promise<TestAuth> {
@@ -46,6 +67,8 @@ export async function setupTestAuth(): Promise<TestAuth> {
     keys: [{ ...jwk, kid: KID, alg: 'RS256', use: 'sig' }],
   })
   const app = createApp(() => ({ jwks, projectId: PROJECT_ID }))
+  const r2objects = new Map<string, { size: number }>()
+  const sentMessages: unknown[] = []
 
   async function mintToken(
     claims: Record<string, unknown>,
@@ -66,6 +89,16 @@ export async function setupTestAuth(): Promise<TestAuth> {
       FIREBASE_PROJECT_ID: PROJECT_ID,
       ALLOWED_DOMAINS: 'ua.edu.ph',
       ALLOWED_ORIGINS: 'http://localhost:5173',
+      DOCUMENTS: {
+        head: async (key: string) => r2objects.get(key) ?? null,
+        createPresignedUrl: async (opts: { method: string; key: string }) =>
+          `https://r2.test/${opts.method}/${encodeURIComponent(opts.key)}`,
+      },
+      NOTIFICATIONS: {
+        send: async (message: unknown) => {
+          sentMessages.push(message)
+        },
+      },
     }
   }
 
@@ -79,5 +112,115 @@ export async function setupTestAuth(): Promise<TestAuth> {
     return app.request(path, { headers }, testEnv())
   }
 
-  return { app, privateKey, mintToken, testEnv, authed }
+  return {
+    app,
+    privateKey,
+    mintToken,
+    testEnv,
+    authed,
+    r2objects,
+    sentMessages,
+    putObject: (key: string, size: number) => {
+      r2objects.set(key, { size })
+    },
+  }
 }
+
+/** Insert a profile directly (role tests must not depend on the promote script). */
+export async function insertProfile(
+  db: Db,
+  uid: string,
+  email: string,
+  role: 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN',
+) {
+  const [profile] = await db
+    .insert(profiles)
+    .values({ firebaseUid: uid, email, role })
+    .returning()
+  return profile
+}
+
+/**
+ * Remove test submissions and everything reachable from them. Order
+ * matters: text/FK references to submissions first, then repository links
+ * (no cascade there), then intake rows (decisions/files cascade).
+ */
+export async function deleteSubmissions(db: Db, ids: string[]) {
+  if (ids.length === 0) return
+  await db
+    .delete(notifications)
+    .where(inArray(notifications.submissionId, ids))
+  await db.delete(outboxEvents).where(inArray(outboxEvents.aggregateId, ids))
+  const records = await db
+    .select({ id: researchRecords.id })
+    .from(researchRecords)
+    .where(inArray(researchRecords.submissionId, ids))
+  const recordIds = records.map((r) => r.id)
+  if (recordIds.length > 0) {
+    await db.delete(recordFiles).where(inArray(recordFiles.recordId, recordIds))
+  }
+  await db
+    .delete(researchRecords)
+    .where(inArray(researchRecords.submissionId, ids))
+  await db.delete(decisions).where(inArray(decisions.submissionId, ids))
+  await db
+    .delete(submissionFiles)
+    .where(inArray(submissionFiles.submissionId, ids))
+  await db.delete(submissions).where(inArray(submissions.id, ids))
+}
+
+export async function deleteProfiles(db: Db, uids: string[]) {
+  if (uids.length === 0) return
+  await db.delete(profiles).where(inArray(profiles.firebaseUid, uids))
+}
+
+/** Remove every submission (and its reachable rows) for the given submitter uids. */
+export async function deleteSubmissionsForProfiles(db: Db, uids: string[]) {
+  if (uids.length === 0) return
+  const rows = await db
+    .select({ id: submissions.id })
+    .from(submissions)
+    .where(
+      inArray(
+        submissions.submitterId,
+        db
+          .select({ id: profiles.id })
+          .from(profiles)
+          .where(inArray(profiles.firebaseUid, uids)),
+      ),
+    )
+  const ids = rows.map((r) => r.id)
+  await deleteSubmissions(db, ids)
+  await deleteAuditEvents(db, ids, uids)
+}
+
+/** Audit rows reference both actors and entities — clear them before profiles. */
+export async function deleteAuditEvents(
+  db: Db,
+  entityIds: string[],
+  actorUids: string[],
+) {
+  if (entityIds.length > 0) {
+    await db
+      .delete(auditEvents)
+      .where(inArray(auditEvents.entityId, entityIds))
+  }
+  if (actorUids.length > 0) {
+    await db.delete(auditEvents).where(
+      inArray(
+        auditEvents.actorId,
+        db
+          .select({ id: profiles.id })
+          .from(profiles)
+          .where(inArray(profiles.firebaseUid, actorUids)),
+      ),
+    )
+  }
+}
+
+/** Live Db handle for tests that arrange/assert rows directly. */
+export function testDb(): Db {
+  return createDb(process.env.DATABASE_URL!)
+}
+
+export { drizzle, neon }

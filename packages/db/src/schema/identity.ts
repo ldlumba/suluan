@@ -1,3 +1,4 @@
+import { relations } from 'drizzle-orm'
 import { pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 /**
@@ -46,3 +47,14 @@ export const courses = pgTable('courses', {
     .defaultNow()
     .notNull(),
 })
+
+export const schoolsRelations = relations(schools, ({ many }) => ({
+  courses: many(courses),
+}))
+
+export const coursesRelations = relations(courses, ({ one }) => ({
+  school: one(schools, {
+    fields: [courses.schoolId],
+    references: [schools.id],
+  }),
+}))

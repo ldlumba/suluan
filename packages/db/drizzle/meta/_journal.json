@@ -15,6 +15,13 @@
       "when": 1790780068420,
       "tag": "0001_sour_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790820510753,
+      "tag": "0002_green_nextwave",
+      "breakpoints": true
     }
   ]
 }

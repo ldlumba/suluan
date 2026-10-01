@@ -9,3 +9,19 @@ compatibility_date = "2026-09-30"
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"
 ALLOWED_ORIGINS = "http://localhost:5173"
+
+# Private development bucket (recorded 2026-10-01). Never make public.
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "suluan-dev"
+
+# Notification jobs. `wrangler dev` emulates these locally; no Cloudflare
+# account needed until deploy.
+[[queues.producers]]
+binding = "NOTIFICATIONS"
+queue = "suluan-notifications-dev"
+
+[[queues.consumers]]
+queue = "suluan-notifications-dev"
+max_batch_size = 5
+max_retries = 3

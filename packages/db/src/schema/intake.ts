@@ -6,6 +6,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
+import { relations } from 'drizzle-orm'
 import { courses, profiles, schools } from './identity'
 
 /**
@@ -29,6 +30,18 @@ export const submissions = pgTable('submissions', {
   submitterId: uuid('submitter_id')
     .notNull()
     .references(() => profiles.id),
+  /**
+   * Authoritative review state, owned by the submission itself. A PENDING
+   * submission has no decisions row yet; ACCEPTED/REJECTED mirror the
+   * recorded decision. Never derive this client-side.
+   */
+  status: submissionStatus('status').notNull().default('PENDING'),
+  /**
+   * Client-generated UUID per submission attempt. Retried finalizations
+   * with the same key return the existing submission instead of creating
+   * a duplicate.
+   */
+  idempotencyKey: text('idempotency_key').notNull().unique(),
   title: text('title').notNull(),
   authors: text('authors'),
   schoolId: uuid('school_id').references(() => schools.id),
@@ -81,3 +94,36 @@ export const decisions = pgTable('decisions', {
     .defaultNow()
     .notNull(),
 })
+
+export const submissionsRelations = relations(submissions, ({ one, many }) => ({
+  submitter: one(profiles, {
+    fields: [submissions.submitterId],
+    references: [profiles.id],
+  }),
+  files: many(submissionFiles),
+  decision: one(decisions, {
+    fields: [submissions.id],
+    references: [decisions.submissionId],
+  }),
+}))
+
+export const submissionFilesRelations = relations(
+  submissionFiles,
+  ({ one }) => ({
+    submission: one(submissions, {
+      fields: [submissionFiles.submissionId],
+      references: [submissions.id],
+    }),
+  }),
+)
+
+export const decisionsRelations = relations(decisions, ({ one }) => ({
+  submission: one(submissions, {
+    fields: [decisions.submissionId],
+    references: [submissions.id],
+  }),
+  reviewer: one(profiles, {
+    fields: [decisions.reviewerId],
+    references: [profiles.id],
+  }),
+}))
