@@ -449,9 +449,11 @@ needsDb('semantic search', () => {
     )
   })
 
-  it('returns only records at or below the provisional relevance floor', async () => {
+  it('applies the distance guardrail to controlled vector geometry', async () => {
     // Isolate the daily budget from earlier semantic tests; the quota itself is
-    // tested separately below. This test controls vector geometry, not usage.
+    // tested separately below. This proves the SQL boundary and visibility
+    // composition only. Synthetic unit vectors cannot validate whether 0.7
+    // separates relevant from irrelevant Gemini results in a real corpus.
     await testDb().execute(sql`delete from embedding_usage`)
     const close = await paper('PUBLIC', `threshold-close ${tag}`)
     const boundary = await paper('PUBLIC', `threshold-boundary ${tag}`)

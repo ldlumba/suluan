@@ -153,6 +153,11 @@ describe('semantic search', () => {
     })
     renderPage('ADMIN', '/search?q=humidity&mode=semantic')
     expect(await screen.findByText(semanticItem.title)).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Semantic search' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/embedded papers by meaning/i)).toBeInTheDocument()
+    expect(screen.queryByText(/not enabled yet/i)).not.toBeInTheDocument()
     expect(apiFetch).toHaveBeenCalledWith(
       '/api/search/semantic?q=humidity&page=1',
       'test-token',
@@ -220,6 +225,9 @@ describe('semantic search', () => {
     })
     renderPage('USER', '/search?q=humidity&mode=semantic')
     expect(await screen.findByText(/not configured/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Semantic search' }),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 

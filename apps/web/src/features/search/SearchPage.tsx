@@ -146,10 +146,13 @@ export function SearchPage() {
   return (
     <Card>
       <CardHeader>
-        <h1 className="text-2xl font-semibold">Keyword search</h1>
+        <h1 className="text-2xl font-semibold">
+          {mode === 'semantic' ? 'Semantic search' : 'Keyword search'}
+        </h1>
         <CardDescription>
-          Accepted papers, searchable by title, author, year, and full text.
-          Semantic search is not enabled yet.
+          {mode === 'semantic'
+            ? 'Search accepted, embedded papers by meaning. Availability and limits are reported after a query runs.'
+            : 'Accepted papers, searchable by title, author, year, and full text.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

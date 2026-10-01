@@ -28,12 +28,11 @@ const querySchema = z.object({
 const indexSchema = z.object({ recordId: z.string().uuid().optional() })
 const PAGE_SIZE = 10
 /**
- * Provisional relevance floor for cosine distance (0 = identical, 2 =
- * opposite). Nearest-neighbour search always has a "closest" row even when it
- * is unrelated, so without a floor every query returns papers. 0.7 is a
- * conservative development starting point, not an approved institutional
- * tuning value; revise it against real SULUAN relevance judgments as the
- * corpus grows.
+ * Defensive cosine-distance guardrail (0 = identical, 2 = opposite), not a
+ * calibrated relevance decision. In the initial two-paper development corpus,
+ * relevant and unrelated probes both landed around 0.47-0.50, so 0.7 excluded
+ * nothing. Keep it for pathological vectors or model drift; select a real
+ * relevance method only after evaluation against a labeled SULUAN corpus.
  */
 export const MAX_SEMANTIC_DISTANCE = 0.7
 /** Bounded per-call batch; the production pipeline prepares per paper. */
@@ -245,7 +244,10 @@ export function searchRoutes(
       }
 
       // Best distance per record: chunks of the same paper are not separate
-      // results, they are evidence for one result.
+      // results, they are evidence for one result. This MIN aggregation is not
+      // yet a calibrated relevance method: longer papers get more chances for
+      // one spuriously close chunk, so corpus evaluation must compare it with
+      // margin/relative scoring and hybrid keyword + vector retrieval.
       const queryVector = toVectorLiteral(vector)
       const rows = await db.execute(sql`
         with best as (
