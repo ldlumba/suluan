@@ -34,6 +34,7 @@ const expectedEnums = {
   submission_status: ['PENDING', 'ACCEPTED', 'REJECTED'],
   notification_status: ['PENDING', 'SENT', 'SKIPPED', 'FAILED'],
   extraction_status: ['QUEUED', 'PROCESSING', 'EXTRACTED', 'FAILED'],
+  record_visibility: ['PUBLIC', 'UA_ONLY', 'RESTRICTED'],
 }
 
 const failures = []

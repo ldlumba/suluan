@@ -1,5 +1,25 @@
-import { integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import {
+  date,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core'
 import { submissions } from './intake'
+
+/**
+ * Per-record visibility (owner-approved 2026-10-01). PUBLIC is the default so
+ * an accepted paper is discoverable; UA_ONLY requires a signed-in UA account
+ * for text/downloads; RESTRICTED is manager-only everywhere. Rejected
+ * submissions never get a record row at all, so no value here can expose them.
+ */
+export const recordVisibility = pgEnum('record_visibility', [
+  'PUBLIC',
+  'UA_ONLY',
+  'RESTRICTED',
+])
 
 /**
  * Published repository domain — SEPARATE from intake. A record exists only
@@ -16,6 +36,14 @@ export const researchRecords = pgTable('research_records', {
     .references(() => submissions.id),
   title: text('title').notNull(),
   abstract: text('abstract'),
+  /** Managers set this at review time; PUBLIC is the default. */
+  visibility: recordVisibility('visibility').notNull().default('PUBLIC'),
+  /**
+   * Optional auto-lift date for time-bound restrictions (journal embargo,
+   * patent, funder agreement). Null means the restriction is indefinite.
+   * The date only applies to UA_ONLY/RESTRICTED; PUBLIC is already public.
+   */
+  embargoUntil: date('embargo_until'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),

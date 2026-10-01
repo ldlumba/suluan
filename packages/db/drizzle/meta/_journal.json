@@ -43,6 +43,13 @@
       "when": 1790840101358,
       "tag": "0005_abnormal_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790844011153,
+      "tag": "0006_petite_crystal",
+      "breakpoints": true
     }
   ]
 }

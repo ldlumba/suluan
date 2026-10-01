@@ -106,16 +106,18 @@ needsDb('restricted keyword discovery', () => {
         .where(eq(processingJobs.recordId, record.id))
     return { id, recordId: record.id }
   }
-  it('denies public and ordinary users before returning snippets or indexing', async () => {
-    for (const token of [null, user]) {
-      const status = token ? 403 : 401
-      expect(
-        (await request('/api/search/records?q=private', token)).status,
-      ).toBe(status)
-      expect((await request('/api/search/index', token, {})).status).toBe(
-        status,
-      )
-    }
+  it('allows public reads but keeps preparation manager-only', async () => {
+    // Discovery is public (owner-approved 2026-10-01); only PUBLIC records
+    // with an elapsed embargo are visible, enforced by the visibility filter.
+    expect((await request('/api/search/records?q=private', null)).status).toBe(
+      200,
+    )
+    expect((await request('/api/search/records?q=private', user)).status).toBe(
+      200,
+    )
+    // Preparation writes keyword snapshots, so it stays manager-only.
+    expect((await request('/api/search/index', null, {})).status).toBe(401)
+    expect((await request('/api/search/index', user, {})).status).toBe(403)
   })
   it('indexes idempotently, matches full text and metadata, and excludes pending/rejected/queued records', async () => {
     const accepted = await fixture('ACCEPTED')

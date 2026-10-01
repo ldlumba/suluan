@@ -21,17 +21,23 @@ export function RootLayout() {
               Home
             </Link>
             <Link
+              to="/search"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Search
+            </Link>
+            <Link
               to="/submit"
               className="text-sm text-muted-foreground hover:text-foreground"
             >
               Submit
             </Link>
-            {profile && profile.role !== 'USER' && (
+            {user && (
               <Link
-                to="/search"
+                to="/submissions"
                 className="text-sm text-muted-foreground hover:text-foreground"
               >
-                Search
+                My submissions
               </Link>
             )}
             {profile && profile.role !== 'USER' && (

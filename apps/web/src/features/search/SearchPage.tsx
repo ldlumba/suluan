@@ -27,6 +27,7 @@ interface SearchResult {
     year: string | null
     snippet: string | null
     fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
+    visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
   }[]
   page: number
   hasMore: boolean
@@ -48,7 +49,7 @@ export function SearchPage() {
   const client = useQueryClient()
   const results = useQuery({
     queryKey: ['keyword-search', profile?.id, profile?.role, q, page],
-    enabled: manager && q.length <= 200,
+    enabled: q.length <= 200,
     retry: false,
     queryFn: async () =>
       apiFetch<SearchResult>(
@@ -73,22 +74,19 @@ export function SearchPage() {
   })
 
   if (loading) return <p>Checking permissions…</p>
-  if (!manager)
-    return (
-      <p>Keyword search is currently available to repository managers only.</p>
-    )
 
   return (
     <Card>
       <CardHeader>
         <h1 className="text-2xl font-semibold">Keyword search</h1>
         <CardDescription>
-          Manager-only preview of accepted papers. Titles, authors, and years are
-          searchable while full text is pending. Semantic search is not enabled.
+          Accepted papers, searchable by title, author, year, and full text.
+          Semantic search is not enabled yet.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-2">
+        {manager && (
+          <div className="space-y-2">
           <Button
             variant="outline"
             disabled={prepare.isPending}
@@ -117,7 +115,8 @@ export function SearchPage() {
                 : 'Could not prepare papers.'}
             </p>
           )}
-        </div>
+          </div>
+        )}
         <form
           className="space-y-2"
           onSubmit={form.handleSubmit((values) =>
@@ -171,6 +170,12 @@ export function SearchPage() {
                       : item.fullTextStatus === 'FAILED'
                         ? 'Full-text processing failed — metadata only'
                         : 'Full text pending — metadata only'}
+                    {' · '}
+                    {item.visibility === 'PUBLIC'
+                      ? 'Public'
+                      : item.visibility === 'UA_ONLY'
+                        ? 'University access only'
+                        : 'Repository managers only'}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {item.authors || 'Authors not listed'} ·{' '}

@@ -33,10 +33,13 @@ function renderPage(role: 'USER' | 'ADMIN' = 'ADMIN') {
 
 describe('keyword search', () => {
   beforeEach(() => vi.clearAllMocks())
-  it('does not fetch restricted results for ordinary users', () => {
+  it('lets ordinary UA users search but hides the manager-only prepare action', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
     renderPage('USER')
-    expect(screen.getByText(/managers only/)).toBeInTheDocument()
-    expect(apiFetch).not.toHaveBeenCalled()
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled())
+    expect(
+      screen.queryByRole('button', { name: /prepare extracted papers/i }),
+    ).not.toBeInTheDocument()
   })
   it('uses URL queries and renders uploaded markup as plain text', async () => {
     const snippet = '<script>alert("untrusted")</script>'
@@ -49,6 +52,7 @@ describe('keyword search', () => {
           year: null,
           snippet,
           fullTextStatus: 'READY',
+          visibility: 'PUBLIC',
         },
       ],
       page: 1,
@@ -91,6 +95,7 @@ describe('keyword search', () => {
           year: '2026',
           authors: 'Author',
           fullTextStatus: 'PENDING',
+          visibility: 'PUBLIC',
           snippet: 'Stale pending text',
         },
         {
@@ -99,6 +104,7 @@ describe('keyword search', () => {
           year: '2026',
           authors: 'Author',
           fullTextStatus: 'FAILED',
+          visibility: 'PUBLIC',
           snippet: 'Stale failed text',
         },
       ],
@@ -107,10 +113,10 @@ describe('keyword search', () => {
     })
     renderPage()
     expect(
-      await screen.findByText('Full text pending — metadata only'),
+      await screen.findByText(/Full text pending — metadata only/),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('Full-text processing failed — metadata only'),
+      screen.getByText(/Full-text processing failed — metadata only/),
     ).toBeInTheDocument()
     expect(screen.queryByText('Stale pending text')).not.toBeInTheDocument()
     expect(screen.queryByText('Stale failed text')).not.toBeInTheDocument()

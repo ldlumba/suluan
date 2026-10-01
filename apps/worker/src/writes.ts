@@ -84,6 +84,10 @@ export interface NewDecisionInput {
   fileName: string
   mimeType: string | null
   submitterEmail: string | null
+  /** Managers set visibility on acceptance; ignored for REJECTED. */
+  visibility?: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
+  /** Optional auto-lift date; only meaningful for restricted visibilities. */
+  embargoUntil?: string | null
 }
 
 /**
@@ -96,11 +100,18 @@ export async function recordDecisionAtomic(
   input: NewDecisionInput,
 ): Promise<{ outboxId: string } | null> {
   const accepted = input.status === 'ACCEPTED'
+  // An embargo date on a PUBLIC record is meaningless (already public), and
+  // the schema rejects past dates; the route validates before this point too.
+  const visibility = input.visibility ?? 'PUBLIC'
+  const embargo =
+    visibility === 'PUBLIC' || !input.embargoUntil ? null : input.embargoUntil
   const payload = JSON.stringify({
     status: input.status,
     title: input.title,
     remarks: input.remarks,
     submitterEmail: input.submitterEmail,
+    visibility,
+    embargoUntil: embargo,
   })
   const result = await db.execute(sql`
     WITH upd AS (
@@ -116,8 +127,10 @@ export async function recordDecisionAtomic(
       RETURNING submission_id
     ),
     new_record AS (
-      INSERT INTO research_records (submission_id, title)
-      SELECT id, ${input.title} FROM upd
+      INSERT INTO research_records
+        (submission_id, title, visibility, embargo_until)
+      SELECT id, ${input.title}, ${visibility}, ${embargo}
+      FROM upd
       ${accepted ? sql`` : sql`WHERE false`}
       RETURNING id
     ),

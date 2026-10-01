@@ -10,7 +10,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError, apiDownload, apiFetch } from '@/lib/api'
 import { useAuth } from '@/features/auth/useAuth'
@@ -40,6 +48,24 @@ export function ReviewQueuePage() {
   const [remarks, setRemarks] = useState('')
   const [decideError, setDecideError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  // Visibility defaults to PUBLIC so accepting never silently hides a paper.
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'>(
+    'PUBLIC',
+  )
+  const [embargoUntil, setEmbargoUntil] = useState('')
+
+  const VISIBILITY_OPTIONS = [
+    { value: 'PUBLIC', label: 'Public — anyone can read and download' },
+    { value: 'UA_ONLY', label: 'University access — UA sign-in required' },
+    { value: 'RESTRICTED', label: 'Restricted — repository managers only' },
+  ] as const
+
+  function resetDecisionFields() {
+    setRemarks('')
+    setDecideError(null)
+    setVisibility('PUBLIC')
+    setEmbargoUntil('')
+  }
 
   const isManager = profile !== null && profile.role !== 'USER'
   const queueQuery = useQuery({
@@ -56,6 +82,8 @@ export function ReviewQueuePage() {
       submissionId: string
       status: 'ACCEPTED' | 'REJECTED'
       remarks: string
+      visibility?: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
+      embargoUntil?: string
     }) => {
       const token = await getIdToken()
       return apiFetch<{ id: string; status: string }>('/api/decisions', token, {
@@ -66,8 +94,7 @@ export function ReviewQueuePage() {
     },
     onSuccess: () => {
       setDeciding(null)
-      setRemarks('')
-      setDecideError(null)
+      resetDecisionFields()
       void queryClient.invalidateQueries({ queryKey: ['review-queue'] })
     },
     onError: (err) => {
@@ -168,8 +195,7 @@ export function ReviewQueuePage() {
                 </Button>
                 <Button size="sm" onClick={() => {
                   setDeciding(item)
-                  setRemarks('')
-                  setDecideError(null)
+                  resetDecisionFields()
                 }}>
                   Review
                 </Button>
@@ -195,6 +221,46 @@ export function ReviewQueuePage() {
               onChange={(e) => setRemarks(e.target.value)}
               placeholder="Basis for acceptance or rejection…"
             />
+          </div>
+          {/* Visibility applies to acceptance only; rejection is always
+              REO-only regardless of these fields. */}
+          <div className="space-y-2">
+            <Label htmlFor="visibility">Access if accepted</Label>
+            <Select
+              value={visibility}
+              onValueChange={(value) => {
+                setVisibility(value as 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED')
+                if (value === 'PUBLIC') setEmbargoUntil('')
+              }}
+              items={VISIBILITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            >
+              <SelectTrigger id="visibility">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VISIBILITY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {visibility !== 'PUBLIC' && (
+              <div className="space-y-1">
+                <Label htmlFor="embargo">Auto-lift date (optional)</Label>
+                <Input
+                  id="embargo"
+                  type="date"
+                  value={embargoUntil}
+                  onChange={(e) => setEmbargoUntil(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  For journals, patents, or funder agreements. On this date the
+                  paper becomes public automatically. Leave blank to restrict
+                  indefinitely.
+                </p>
+              </div>
+            )}
           </div>
           {decideError && (
             <p role="alert" className="text-sm text-destructive">
@@ -224,6 +290,10 @@ export function ReviewQueuePage() {
                   submissionId: deciding.id,
                   status: 'ACCEPTED',
                   remarks: remarks.trim(),
+                  visibility,
+                  ...(visibility !== 'PUBLIC' && embargoUntil
+                    ? { embargoUntil }
+                    : {}),
                 })
               }
             >

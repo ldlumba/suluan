@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Hono, type MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
 import { zValidator } from '@hono/zod-validator'
@@ -16,6 +16,11 @@ import {
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
 import { processingRoutes } from './processing'
 import { searchRoutes } from './search'
+import {
+  effectiveVisibility,
+  effectiveVisibilityLevel,
+  viewerRoleFor,
+} from './visibility'
 
 type Role = 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN'
 
@@ -98,6 +103,51 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
     await next()
   }
 
+  /**
+   * Optional identity for publicly readable routes (owner-approved
+   * 2026-10-01). No header, an invalid token, or an expired session all fall
+   * through as an anonymous visitor instead of failing the request, so an
+   * expired session degrades to public results rather than an error.
+   *
+   * A *valid* token for a non-UA domain is rejected outright (403): silently
+   * downgrading a real identity to anonymous would hide a policy violation.
+   */
+  const optionalAuth: MiddlewareHandler<AppContext> = async (c, next) => {
+    const header = c.req.header('authorization')
+    if (!header?.startsWith('Bearer ')) return next()
+    let identity
+    try {
+      identity = await verifyIdToken(
+        header.slice('Bearer '.length),
+        verifierFor(c.env.FIREBASE_PROJECT_ID),
+      )
+    } catch {
+      return next()
+    }
+    if (!isAllowedDomain(identity.email, c.env.ALLOWED_DOMAINS)) {
+      return c.json({ error: 'forbidden' }, 403)
+    }
+    const db = createDb(c.env.DATABASE_URL)
+    const existing = await db.query.profiles.findFirst({
+      where: eq(profiles.firebaseUid, identity.uid),
+    })
+    // Read paths must never auto-create profiles (that is a write); a visitor
+    // with a valid UA token but no profile row is treated as a plain UA user.
+    c.set('identity', identity)
+    if (existing) c.set('profile', existing)
+    else
+      c.set('profile', {
+        id: '',
+        firebaseUid: identity.uid,
+        email: identity.email,
+        role: 'USER',
+        displayName: null,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      } satisfies typeof profiles.$inferSelect)
+    await next()
+  }
+
   /** Any of the listed roles passes. Ordinary USERs never reach management routes. */
   function requireRole(...roles: Role[]): MiddlewareHandler<AppContext> {
     return async (c, next) => {
@@ -113,8 +163,37 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
 
   app.use('/api/processing/*', requireAuth)
   app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))
-  app.use('/api/search/*', requireAuth)
-  app.route('/api/search', searchRoutes(requireRole(...MANAGERS)))
+  // Search reads are public; preparation stays manager-only.
+  app.route(
+    '/api/search',
+    searchRoutes(optionalAuth, requireAuth, requireRole(...MANAGERS)),
+  )
+
+  /**
+   * Submitter status view (owner-approved 2026-10-01): a signed-in submitter
+   * sees ONLY their own submissions, their authoritative status, and the
+   * reviewer remarks for decided ones. Other submitters' rows, rejected-file
+   * downloads, and manager-only data are never included. This resolves the
+   * §4/§10 submitter-status TBD; it does NOT grant document access — the
+   * download routes above remain manager-gated for intake files.
+   */
+  app.get('/api/submissions/mine', requireAuth, async (c) => {
+    const db = createDb(c.env.DATABASE_URL)
+    const me = c.get('profile')
+    const rows = await db.execute(sql`
+      select s.id, s.title, s.authors, s.year, s.research_type as "researchType",
+        s.status, s.created_at as "createdAt", s.updated_at as "updatedAt",
+        d.remarks, d.decided_at as "decidedAt",
+        r.id as "recordId", r.visibility, r.embargo_until as "embargoUntil",
+        ${effectiveVisibilityLevel('r')} as "effectiveVisibility"
+      from submissions s
+      left join decisions d on d.submission_id = s.id
+      left join research_records r on r.submission_id = s.id
+      where s.submitter_id = ${me.id}
+      order by s.created_at desc limit 100
+    `)
+    return c.json(rows.rows)
+  })
 
   app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
@@ -352,6 +431,13 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
       const body = c.req.valid('json')
       const db = createDb(c.env.DATABASE_URL)
       const reviewer = c.get('profile')
+      // Visibility/embargo apply only to acceptance. On rejection they are
+      // ignored so the reviewer flow stays simple; the schema refine already
+      // rejects an embargo date combined with PUBLIC visibility.
+      const recordVisibility =
+        body.status === 'ACCEPTED' ? body.visibility : undefined
+      const recordEmbargo =
+        body.status === 'ACCEPTED' ? body.embargoUntil : undefined
 
       const submission = await db.query.submissions.findFirst({
         where: eq(submissions.id, body.submissionId),
@@ -383,6 +469,8 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
           fileName: submission.files[0].fileName,
           mimeType: submission.files[0].mimeType,
           submitterEmail: submission.submitter.email,
+          visibility: recordVisibility,
+          embargoUntil: recordEmbargo,
         })
         if (!decided) {
           // Lost a concurrent decision race; re-read the winner.
@@ -412,16 +500,21 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
       } catch (err) {
         console.error('queue send failed', outboxId, err)
       }
-      return c.json({ id: submission.id, status: body.status }, 201)
+      return c.json(
+        {
+          id: submission.id,
+          status: body.status,
+          visibility: recordVisibility ?? null,
+          embargoUntil: recordEmbargo ?? null,
+        },
+        201,
+      )
     },
   )
 
   /**
-   * Authorized file access. Managers only: submitters have no implied
-   * document access (explicit policy required), and public downloads arrive
-   * with the discovery stage. The Worker streams the private R2 bytes back
-   * after authorization — the browser never touches R2, so no signed URLs
-   * or bucket CORS are involved.
+   * Reviewer access to any submission, PENDING or decided. Kept separate from
+   * the public record download: REO must read papers before deciding.
    */
   app.get(
     '/api/submissions/:id/download',
@@ -437,33 +530,104 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
         return c.json({ error: 'not_found' }, 404)
       }
       const file = submission.files[0]
-      const obj = await c.env.DOCUMENTS.get(file.r2Key)
-      if (!obj) {
-        return c.json({ error: 'file_missing' }, 410)
-      }
-      // Reviewers get the paper named after the study, not the submitter's
-      // local file name. The quoted part stays ASCII-safe; the filename*
-      // part carries the full UTF-8 name.
-      const downloadName = buildDownloadFileName(
-        submission.title,
-        file.fileName,
+      return streamR2Object(
+        c.env,
+        {
+          r2Key: file.r2Key,
+          fileName: file.fileName,
+          mimeType: file.mimeType,
+          downloadName: buildDownloadFileName(submission.title, file.fileName),
+        },
+        // Reviewer access is always private: never let caches store it.
+        'private, no-store',
       )
-      const asciiName = downloadName.replace(/[^\x20-\x7E]/g, '_')
-      const headers = new Headers()
-      headers.set(
-        'content-type',
-        file.mimeType ?? obj.contentType ?? 'application/octet-stream',
-      )
-      headers.set(
-        'content-disposition',
-        `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
-      )
-      headers.set('content-length', String(obj.size))
-      // Authorized content: never let caches store it.
-      headers.set('cache-control', 'private, no-store')
-      return new Response(obj.body, { headers })
     },
   )
 
+  /**
+   * Public accepted-paper download (owner-approved 2026-10-01). Visibility is
+   * enforced from Neon on every request: PUBLIC is open to anonymous
+   * visitors, UA_ONLY requires a signed-in UA account, RESTRICTED is
+   * manager-only. The Worker streams the private R2 bytes — the browser never
+   * touches R2, so no signed URLs or bucket CORS are involved.
+   *
+   * Rejected submissions have no record row, so they cannot be resolved here.
+   */
+  app.get('/api/records/:id/download', optionalAuth, async (c) => {
+    const db = createDb(c.env.DATABASE_URL)
+    const profile = c.get('profile')
+    const viewer = viewerRoleFor(profile?.role ?? null)
+    const found = await db.execute(sql`
+      select f.r2_key as "r2Key", f.file_name as "fileName",
+        f.mime_type as "mimeType", r.title
+      from research_records r
+      join submissions s on s.id = r.submission_id
+      join record_files f on f.record_id = r.id
+      where r.id = ${c.req.param('id')} and s.status = 'ACCEPTED'
+        and ${effectiveVisibility(viewer, 'r').rowVisible}
+      limit 1
+    `)
+    if (found.rows.length === 0) {
+      // One 404 shape for every viewer so restricted records are not
+      // discoverable by probing IDs (no 403 that confirms existence).
+      return c.json({ error: 'not_found' }, 404)
+    }
+    const row = found.rows[0] as {
+      r2Key: string
+      fileName: string
+      mimeType: string | null
+      title: string
+    }
+    return streamR2Object(
+      c.env,
+      {
+        r2Key: row.r2Key,
+        fileName: row.fileName,
+        mimeType: row.mimeType,
+        downloadName: buildDownloadFileName(row.title, row.fileName),
+      },
+      // Anonymous caching is safe for PUBLIC papers (identical for everyone);
+      // signed-in requests are role-dependent and must not be stored.
+      viewer === 'PUBLIC' ? 'public, max-age=300' : 'private, no-store',
+    )
+  })
+
   return app
+}
+
+/**
+ * Stream one R2 object back as an attachment, named after the study title.
+ * The quoted filename stays ASCII-safe; the `filename*` parameter carries the
+ * full UTF-8 name so browsers can read it cross-origin.
+ */
+async function streamR2Object(
+  env: Env,
+  file: {
+    r2Key: string
+    fileName: string
+    mimeType: string | null
+    downloadName: string
+  },
+  cacheControl: string,
+): Promise<Response> {
+  const obj = await env.DOCUMENTS.get(file.r2Key)
+  if (!obj) {
+    return new Response(JSON.stringify({ error: 'file_missing' }), {
+      status: 410,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+  const asciiName = file.downloadName.replace(/[^\x20-\x7E]/g, '_')
+  const headers = new Headers()
+  headers.set(
+    'content-type',
+    file.mimeType ?? obj.contentType ?? 'application/octet-stream',
+  )
+  headers.set(
+    'content-disposition',
+    `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(file.downloadName)}`,
+  )
+  headers.set('content-length', String(obj.size))
+  headers.set('cache-control', cacheControl)
+  return new Response(obj.body, { headers })
 }
