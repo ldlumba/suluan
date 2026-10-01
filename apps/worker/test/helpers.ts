@@ -51,12 +51,10 @@ export interface TestAuth {
     token: string | null,
     extraHeaders?: Record<string, string>,
   ) => Response | Promise<Response>
-  /** In-memory R2 stand-in: key -> stored size. Tests simulate uploads here. */
-  r2objects: Map<string, { size: number }>
+  /** In-memory R2 stand-in: key -> stored bytes and content type. */
+  r2objects: Map<string, { size: number; bytes: Uint8Array; contentType?: string }>
   /** Queue messages the app tried to send, in order. */
   sentMessages: unknown[]
-  /** Simulate a completed browser-to-R2 upload. */
-  putObject: (key: string, size: number) => void
 }
 
 export async function setupTestAuth(): Promise<TestAuth> {
@@ -67,8 +65,51 @@ export async function setupTestAuth(): Promise<TestAuth> {
     keys: [{ ...jwk, kid: KID, alg: 'RS256', use: 'sig' }],
   })
   const app = createApp(() => ({ jwks, projectId: PROJECT_ID }))
-  const r2objects = new Map<string, { size: number }>()
+  const r2objects = new Map<
+    string,
+    { size: number; bytes: Uint8Array; contentType?: string }
+  >()
   const sentMessages: unknown[] = []
+
+  /** Read any supported R2 put value into bytes for the in-memory stand-in. */
+  async function toBytes(
+    value:
+      | ReadableStream
+      | ArrayBuffer
+      | ArrayBufferView
+      | string
+      | Blob
+      | null,
+  ): Promise<Uint8Array> {
+    if (value === null) return new Uint8Array(0)
+    if (typeof value === 'string') return new TextEncoder().encode(value)
+    if (value instanceof Blob) {
+      return new Uint8Array(await value.arrayBuffer())
+    }
+    if (value instanceof ArrayBuffer) return new Uint8Array(value)
+    if (ArrayBuffer.isView(value)) {
+      return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+    }
+    const chunks: Uint8Array[] = []
+    const reader = (
+      value as ReadableStream<Uint8Array>
+    ).getReader() as ReadableStreamDefaultReader<Uint8Array>
+    for (;;) {
+      const { done, value: chunk } = await reader.read()
+      if (done) break
+      chunks.push(
+        chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk as ArrayBuffer),
+      )
+    }
+    const total = chunks.reduce((n, c) => n + c.length, 0)
+    const out = new Uint8Array(total)
+    let offset = 0
+    for (const c of chunks) {
+      out.set(c, offset)
+      offset += c.length
+    }
+    return out
+  }
 
   async function mintToken(
     claims: Record<string, unknown>,
@@ -90,9 +131,47 @@ export async function setupTestAuth(): Promise<TestAuth> {
       ALLOWED_DOMAINS: 'ua.edu.ph',
       ALLOWED_ORIGINS: 'http://localhost:5173',
       DOCUMENTS: {
-        head: async (key: string) => r2objects.get(key) ?? null,
-        createPresignedUrl: async (opts: { method: string; key: string }) =>
-          `https://r2.test/${opts.method}/${encodeURIComponent(opts.key)}`,
+        head: async (key: string) => {
+          const obj = r2objects.get(key)
+          return obj ? { size: obj.size } : null
+        },
+        put: async (
+          key: string,
+          value:
+            | ReadableStream
+            | ArrayBuffer
+            | ArrayBufferView
+            | string
+            | Blob
+            | null,
+          options?: { httpMetadata?: { contentType?: string } },
+        ) => {
+          const bytes = await toBytes(value)
+          r2objects.set(key, {
+            size: bytes.length,
+            bytes,
+            contentType: options?.httpMetadata?.contentType,
+          })
+          return { size: bytes.length }
+        },
+        get: async (key: string) => {
+          const obj = r2objects.get(key)
+          if (!obj) return null
+          const bytes = obj.bytes
+          return {
+            body: new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(bytes)
+                controller.close()
+              },
+            }),
+            size: obj.size,
+            contentType: obj.contentType,
+          }
+        },
+        delete: async (key: string) => {
+          r2objects.delete(key)
+        },
       },
       NOTIFICATIONS: {
         send: async (message: unknown) => {
@@ -120,9 +199,6 @@ export async function setupTestAuth(): Promise<TestAuth> {
     authed,
     r2objects,
     sentMessages,
-    putObject: (key: string, size: number) => {
-      r2objects.set(key, { size })
-    },
   }
 }
 

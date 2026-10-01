@@ -31,10 +31,12 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   unsupported_file_type: 'Only PDF or DOCX documents are accepted.',
   filename_type_mismatch: 'The file name does not match its document type.',
   file_too_large: 'The file exceeds the 30 MB limit.',
-  upload_not_found: 'The upload did not complete. Please try again.',
-  upload_size_mismatch: 'The uploaded file changed during transfer. Please try again.',
-  presigned_unsupported:
-    'Direct uploads are unavailable with local storage emulation. Restart the Worker against remote R2 (see AGENTS.md).',
+  empty_file: 'The selected file is empty.',
+  missing_file: 'A PDF or DOCX document is required.',
+  invalid_fields: 'Some fields need attention. Check the title and try again.',
+  invalid_form: 'The submission could not be read. Please try again.',
+  storage_unavailable:
+    'File storage is temporarily unavailable. Please try again in a moment.',
   unknown_school: 'The selected school is no longer available.',
   unknown_course: 'The selected course is no longer available.',
   course_school_mismatch: 'The selected course does not belong to the selected school.',
@@ -127,47 +129,24 @@ export function NewSubmissionPage() {
       const token = await getIdToken()
       if (!token) throw new ApiError(401, 'Signed out or session expired.')
 
-      const initiated = await apiFetch<{ key: string; uploadUrl: string }>(
-        '/api/uploads/initiate',
-        token,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            fileName: values.file.name,
-            mimeType: values.file.type,
-            sizeBytes: values.file.size,
-          }),
-        },
-      )
-
-      const upload = await fetch(initiated.uploadUrl, {
-        method: 'PUT',
-        headers: { 'content-type': values.file.type },
-        body: values.file,
-      })
-      if (!upload.ok) throw new Error(`upload failed with status ${upload.status}`)
+      // Single Worker-proxied request: file + metadata as multipart/form-data.
+      // The Worker streams the file into private R2, so the browser never
+      // needs bucket access or CORS. No content-type header — the browser
+      // sets the multipart boundary itself.
+      const form = new FormData()
+      form.append('file', values.file)
+      form.append('idempotencyKey', idempotencyKey)
+      form.append('title', values.title)
+      if (values.authors) form.append('authors', values.authors)
+      if (values.schoolId) form.append('schoolId', values.schoolId)
+      if (values.courseId) form.append('courseId', values.courseId)
+      if (values.year) form.append('year', values.year)
+      if (values.researchType) form.append('researchType', values.researchType)
 
       const created = await apiFetch<{ id: string; status: string }>(
         '/api/submissions',
         token,
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            key: initiated.key,
-            fileName: values.file.name,
-            mimeType: values.file.type,
-            sizeBytes: values.file.size,
-            idempotencyKey,
-            title: values.title,
-            authors: values.authors || undefined,
-            schoolId: values.schoolId || undefined,
-            courseId: values.courseId || undefined,
-            year: values.year || undefined,
-            researchType: values.researchType || undefined,
-          }),
-        },
+        { method: 'POST', body: form },
       )
       setSubmissionId(created.id)
       setPhase('success')

@@ -7,12 +7,8 @@ import { verifyIdToken, type TokenVerifier } from './auth'
 import { isAllowedDomain, parseAllowedOrigins, type Env } from './config'
 import { createDb } from './db'
 import { createSubmissionAtomic, recordDecisionAtomic } from './writes'
-import { UPLOAD_POLICY, buildIntakeKey, extensionMatchesMime, supportsPresignedUrls } from './uploads'
-import {
-  createSubmissionSchema,
-  decideSchema,
-  initiateUploadSchema,
-} from './schemas'
+import { UPLOAD_POLICY, buildIntakeKey, validateUploadFile } from './uploads'
+import { decideSchema, submissionFormFieldsSchema } from './schemas'
 
 type Role = 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN'
 
@@ -143,156 +139,155 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
   })
 
   /**
-   * Step 1 of submission: authorize a short-lived direct browser-to-R2
-   * upload. No database rows are created here — the submission exists only
-   * after finalize verifies the object. Keys are server-generated; client
-   * file names become a sanitized suffix only.
+   * Submission intake: the browser POSTs multipart/form-data (file + text
+   * fields) straight to the Worker, which streams the file into private
+   * R2 and then persists the PENDING submission, its file row, an audit
+   * event, and an outbox event atomically. The browser never talks to R2
+   * directly, so no presigned URLs or bucket CORS are involved.
+   *
+   * Idempotency: replays with the same idempotency key return the original
+   * submission WITHOUT storing another object — the replay check runs
+   * before the R2 put. Concurrent first-time races are arbitrated by the
+   * unique constraint; the loser deletes its orphaned object best-effort.
    */
-  app.post(
-    '/api/uploads/initiate',
-    requireAuth,
-    zValidator('json', initiateUploadSchema),
-    async (c) => {
-      const { fileName, mimeType, sizeBytes } = c.req.valid('json')
-      if (!supportsPresignedUrls(c.env.DOCUMENTS)) {
-        return c.json({ error: 'presigned_unsupported' }, 501)
-      }
-      if (!UPLOAD_POLICY.allowedMimeTypes.includes(mimeType)) {
-        return c.json({ error: 'unsupported_file_type' }, 400)
-      }
-      if (!extensionMatchesMime(fileName, mimeType)) {
-        return c.json({ error: 'filename_type_mismatch' }, 400)
-      }
-      if (sizeBytes > UPLOAD_POLICY.maxSizeBytes) {
-        return c.json(
-          { error: 'file_too_large', maxSizeBytes: UPLOAD_POLICY.maxSizeBytes },
-          400,
-        )
-      }
-      const key = buildIntakeKey(fileName)
-      const uploadUrl = await c.env.DOCUMENTS.createPresignedUrl({
-        method: 'put',
-        key,
-        expiration: UPLOAD_POLICY.uploadUrlTtlSeconds,
-      })
-      return c.json({
-        key,
-        uploadUrl,
-        expiresInSeconds: UPLOAD_POLICY.uploadUrlTtlSeconds,
-      })
-    },
-  )
+  app.post('/api/submissions', requireAuth, async (c) => {
+    let form: Record<string, string | File | (string | File)[]>
+    try {
+      form = (await c.req.parseBody()) as Record<
+        string,
+        string | File | (string | File)[]
+      >
+    } catch {
+      return c.json({ error: 'invalid_form' }, 400)
+    }
+    const first = (v: unknown): string | File | undefined =>
+      Array.isArray(v) ? (v[0] as string | File) : (v as string | File)
 
-  /**
-   * Step 2 of submission: verify the uploaded object, then persist the
-   * PENDING submission, its file row, an audit event, and an outbox event
-   * atomically. Retries with the same idempotency key return the original
-   * submission instead of duplicating it.
-   */
-  app.post(
-    '/api/submissions',
-    requireAuth,
-    zValidator('json', createSubmissionSchema),
-    async (c) => {
-      const body = c.req.valid('json')
-      if (!body.key.startsWith(UPLOAD_POLICY.keyPrefix)) {
-        return c.json({ error: 'invalid_file_key' }, 400)
-      }
-      if (
-        !UPLOAD_POLICY.allowedMimeTypes.includes(body.mimeType) ||
-        !extensionMatchesMime(body.fileName, body.mimeType)
-      ) {
-        return c.json({ error: 'unsupported_file_type' }, 400)
-      }
-      if (body.sizeBytes > UPLOAD_POLICY.maxSizeBytes) {
-        return c.json(
-          { error: 'file_too_large', maxSizeBytes: UPLOAD_POLICY.maxSizeBytes },
-          400,
-        )
-      }
-      const stored = await c.env.DOCUMENTS.head(body.key)
-      if (!stored) {
-        return c.json({ error: 'upload_not_found' }, 422)
-      }
-      if (stored.size !== body.sizeBytes) {
-        return c.json({ error: 'upload_size_mismatch' }, 422)
-      }
+    const rawFile = first(form['file'])
+    if (!(rawFile instanceof File)) {
+      return c.json({ error: 'missing_file' }, 400)
+    }
+    const validated = validateUploadFile(rawFile)
+    if (typeof validated === 'string') {
+      const status = validated === 'file_too_large' ? 400 : 400
+      const body =
+        validated === 'file_too_large'
+          ? { error: validated, maxSizeBytes: UPLOAD_POLICY.maxSizeBytes }
+          : { error: validated }
+      return c.json(body, status)
+    }
 
-      const db = createDb(c.env.DATABASE_URL)
-      const profile = c.get('profile')
+    const text = (name: string): string | undefined => {
+      const v = first(form[name])
+      if (typeof v !== 'string') return undefined
+      const trimmed = v.trim()
+      return trimmed === '' ? undefined : trimmed
+    }
+    // Empty strings mean "no selection" for the optional UUID/metadata fields.
+    const fields = submissionFormFieldsSchema.safeParse({
+      idempotencyKey: text('idempotencyKey'),
+      title: text('title'),
+      authors: text('authors'),
+      schoolId: text('schoolId'),
+      courseId: text('courseId'),
+      year: text('year'),
+      researchType: text('researchType'),
+    })
+    if (!fields.success) {
+      return c.json({ error: 'invalid_fields' }, 400)
+    }
+    const meta = fields.data
 
-      if (body.schoolId) {
-        const school = await db.query.schools.findFirst({
-          where: eq(schools.id, body.schoolId),
-        })
-        if (!school) return c.json({ error: 'unknown_school' }, 400)
-      }
-      if (body.courseId) {
-        const course = await db.query.courses.findFirst({
-          where: eq(courses.id, body.courseId),
-        })
-        if (!course) return c.json({ error: 'unknown_course' }, 400)
-        if (body.schoolId && course.schoolId !== body.schoolId) {
-          return c.json({ error: 'course_school_mismatch' }, 400)
-        }
-      }
+    const db = createDb(c.env.DATABASE_URL)
+    const profile = c.get('profile')
 
-      const replay = await db.query.submissions.findFirst({
-        where: eq(submissions.idempotencyKey, body.idempotencyKey),
-      })
-      if (replay) {
-        if (replay.submitterId !== profile.id) {
-          return c.json({ error: 'idempotency_conflict' }, 409)
-        }
-        return c.json({ id: replay.id, status: replay.status }, 200)
-      }
-
-      const created = await (async () => {
-        try {
-          return await createSubmissionAtomic(db, {
-            submitterId: profile.id,
-            idempotencyKey: body.idempotencyKey,
-            title: body.title,
-            authors: body.authors,
-            schoolId: body.schoolId,
-            courseId: body.courseId,
-            year: body.year,
-            researchType: body.researchType,
-            r2Key: body.key,
-            fileName: body.fileName,
-            mimeType: body.mimeType,
-            sizeBytes: body.sizeBytes,
-            submitterEmail: profile.email,
-          })
-        } catch (err) {
-          // Lost a concurrent finalize race: the winner's row is the truth.
-          if ((err as { code?: string }).code !== '23505') throw err
-          const winner = await db.query.submissions.findFirst({
-            where: eq(submissions.idempotencyKey, body.idempotencyKey),
-          })
-          if (winner && winner.submitterId === profile.id) {
-            return { submissionId: winner.id, outboxId: null as string | null }
-          }
-          return null
-        }
-      })()
-      if (!created) {
+    const replay = await db.query.submissions.findFirst({
+      where: eq(submissions.idempotencyKey, meta.idempotencyKey),
+    })
+    if (replay) {
+      if (replay.submitterId !== profile.id) {
         return c.json({ error: 'idempotency_conflict' }, 409)
       }
+      return c.json({ id: replay.id, status: replay.status }, 200)
+    }
 
-      // Best-effort enqueue: the outbox row is the durable record, so a
-      // failed send only delays the notification until a sweeper exists.
-      if (created.outboxId) {
-        try {
-          await c.env.NOTIFICATIONS.send({ outboxId: created.outboxId })
-        } catch (err) {
-          console.error('queue send failed', created.outboxId, err)
-        }
+    if (meta.schoolId) {
+      const school = await db.query.schools.findFirst({
+        where: eq(schools.id, meta.schoolId),
+      })
+      if (!school) return c.json({ error: 'unknown_school' }, 400)
+    }
+    if (meta.courseId) {
+      const course = await db.query.courses.findFirst({
+        where: eq(courses.id, meta.courseId),
+      })
+      if (!course) return c.json({ error: 'unknown_course' }, 400)
+      if (meta.schoolId && course.schoolId !== meta.schoolId) {
+        return c.json({ error: 'course_school_mismatch' }, 400)
       }
-      const status = created.outboxId ? 201 : 200
-      return c.json({ id: created.submissionId, status: 'PENDING' }, status)
-    },
-  )
+    }
+
+    const key = buildIntakeKey(validated.fileName)
+    try {
+      await c.env.DOCUMENTS.put(key, rawFile, {
+        httpMetadata: { contentType: validated.mimeType },
+      })
+    } catch (err) {
+      console.error('r2 put failed', err)
+      return c.json({ error: 'storage_unavailable' }, 503)
+    }
+
+    const created = await (async () => {
+      try {
+        return await createSubmissionAtomic(db, {
+          submitterId: profile.id,
+          idempotencyKey: meta.idempotencyKey,
+          title: meta.title,
+          authors: meta.authors,
+          schoolId: meta.schoolId,
+          courseId: meta.courseId,
+          year: meta.year,
+          researchType: meta.researchType,
+          r2Key: key,
+          fileName: validated.fileName,
+          mimeType: validated.mimeType,
+          sizeBytes: validated.sizeBytes,
+          submitterEmail: profile.email,
+        })
+      } catch (err) {
+        // Lost a concurrent finalize race: the winner's row is the truth.
+        // Remove the orphaned object best-effort so retries don't leak R2 keys.
+        if ((err as { code?: string }).code !== '23505') throw err
+        try {
+          await c.env.DOCUMENTS.delete(key)
+        } catch {
+          // Orphan cleanup is best-effort; the DB stays authoritative.
+        }
+        const winner = await db.query.submissions.findFirst({
+          where: eq(submissions.idempotencyKey, meta.idempotencyKey),
+        })
+        if (winner && winner.submitterId === profile.id) {
+          return { submissionId: winner.id, outboxId: null as string | null }
+        }
+        return null
+      }
+    })()
+    if (!created) {
+      return c.json({ error: 'idempotency_conflict' }, 409)
+    }
+
+    // Best-effort enqueue: the outbox row is the durable record, so a
+    // failed send only delays the notification until a sweeper exists.
+    if (created.outboxId) {
+      try {
+        await c.env.NOTIFICATIONS.send({ outboxId: created.outboxId })
+      } catch (err) {
+        console.error('queue send failed', created.outboxId, err)
+      }
+    }
+    const status = created.outboxId ? 201 : 200
+    return c.json({ id: created.submissionId, status: 'PENDING' }, status)
+  })
 
   /** REO review queue: PENDING submissions with submitter and file context. */
   app.get(
@@ -409,16 +404,15 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
   /**
    * Authorized file access. Managers only: submitters have no implied
    * document access (explicit policy required), and public downloads arrive
-   * with the discovery stage. Short-lived signed URL, never raw R2 access.
+   * with the discovery stage. The Worker streams the private R2 bytes back
+   * after authorization — the browser never touches R2, so no signed URLs
+   * or bucket CORS are involved.
    */
   app.get(
     '/api/submissions/:id/download',
     requireAuth,
     requireRole(...MANAGERS),
     async (c) => {
-      if (!supportsPresignedUrls(c.env.DOCUMENTS)) {
-        return c.json({ error: 'presigned_unsupported' }, 501)
-      }
       const db = createDb(c.env.DATABASE_URL)
       const submission = await db.query.submissions.findFirst({
         where: eq(submissions.id, c.req.param('id')),
@@ -428,16 +422,24 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
         return c.json({ error: 'not_found' }, 404)
       }
       const file = submission.files[0]
-      const url = await c.env.DOCUMENTS.createPresignedUrl({
-        method: 'get',
-        key: file.r2Key,
-        expiration: UPLOAD_POLICY.downloadUrlTtlSeconds,
-      })
-      return c.json({
-        url,
-        fileName: file.fileName,
-        expiresInSeconds: UPLOAD_POLICY.downloadUrlTtlSeconds,
-      })
+      const obj = await c.env.DOCUMENTS.get(file.r2Key)
+      if (!obj) {
+        return c.json({ error: 'file_missing' }, 410)
+      }
+      const safeName = file.fileName.replace(/["\\\r\n]/g, '_')
+      const headers = new Headers()
+      headers.set(
+        'content-type',
+        file.mimeType ?? obj.contentType ?? 'application/octet-stream',
+      )
+      headers.set(
+        'content-disposition',
+        `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+      )
+      headers.set('content-length', String(obj.size))
+      // Authorized content: never let caches store it.
+      headers.set('cache-control', 'private, no-store')
+      return new Response(obj.body, { headers })
     },
   )
 

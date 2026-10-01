@@ -1,16 +1,12 @@
 import { z } from 'zod'
 
-export const initiateUploadSchema = z.object({
-  fileName: z.string().min(1).max(255),
-  mimeType: z.string().min(1),
-  sizeBytes: z.number().int().positive(),
-})
-
-export const createSubmissionSchema = z.object({
-  key: z.string().min(1),
-  fileName: z.string().min(1).max(255),
-  mimeType: z.string().min(1),
-  sizeBytes: z.number().int().positive(),
+/**
+ * Text fields of the multipart submission form. The file itself arrives
+ * as a File part and is validated separately (validateUploadFile), since
+ * Zod cannot validate Blobs as cleanly. Empty strings from FormData mean
+ * "no selection" and are normalized to undefined by the route.
+ */
+export const submissionFormFieldsSchema = z.object({
   idempotencyKey: z.string().uuid(),
   title: z.string().trim().min(1).max(500),
   authors: z.string().trim().max(2000).optional(),

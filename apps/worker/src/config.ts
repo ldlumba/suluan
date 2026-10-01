@@ -1,16 +1,38 @@
 /**
  * Structural R2 binding surface. Declared locally instead of importing
- * @cloudflare/workers-types: the Worker only needs these three members,
- * and structural typing keeps the dependency footprint minimal. The real
+ * @cloudflare/workers-types: the Worker only needs these members, and
+ * structural typing keeps the dependency footprint minimal. The real
  * runtime binding satisfies this interface.
+ *
+ * NOTE: R2 bindings have no presigned-URL API — the browser never talks
+ * to R2 directly. Uploads arrive as multipart bodies the Worker streams
+ * into R2; downloads stream back through the Worker after authorization.
  */
+export interface R2ObjectHead {
+  size: number
+}
+
+export interface R2ObjectBodyLike {
+  body: ReadableStream
+  size: number
+  contentType?: string
+}
+
 export interface R2BucketLike {
-  head(key: string): Promise<{ size: number } | null>
-  createPresignedUrl(opts: {
-    method: 'put' | 'get'
-    key: string
-    expiration?: number
-  }): Promise<string>
+  head(key: string): Promise<R2ObjectHead | null>
+  put(
+    key: string,
+    value:
+      | ReadableStream
+      | ArrayBuffer
+      | ArrayBufferView
+      | string
+      | Blob
+      | null,
+    options?: { httpMetadata?: { contentType?: string } },
+  ): Promise<R2ObjectHead>
+  get(key: string): Promise<R2ObjectBodyLike | null>
+  delete(key: string): Promise<void>
 }
 
 /** Structural queue-producer surface (see R2BucketLike rationale). */

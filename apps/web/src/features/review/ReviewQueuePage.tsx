@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { ApiError, apiFetch } from '@/lib/api'
+import { ApiError, apiDownload, apiFetch } from '@/lib/api'
 import { useAuth } from '@/features/auth/useAuth'
 
 interface QueueItem {
@@ -39,6 +39,7 @@ export function ReviewQueuePage() {
   const [deciding, setDeciding] = useState<QueueItem | null>(null)
   const [remarks, setRemarks] = useState('')
   const [decideError, setDecideError] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   const isManager = profile !== null && profile.role !== 'USER'
   const queueQuery = useQuery({
@@ -99,12 +100,27 @@ export function ReviewQueuePage() {
   }
 
   async function download(item: QueueItem) {
-    const token = await getIdToken()
-    const result = await apiFetch<{ url: string; fileName: string }>(
-      `/api/submissions/${item.id}/download`,
-      token,
-    )
-    window.open(result.url, '_blank', 'noopener')
+    setDownloadError(null)
+    try {
+      const token = await getIdToken()
+      const { blob, fileName } = await apiDownload(
+        `/api/submissions/${item.id}/download`,
+        token,
+      )
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = fileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      // Revoke after the browser has had a chance to start the download.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch (err) {
+      setDownloadError(
+        err instanceof ApiError ? err.message : 'The download failed.',
+      )
+    }
   }
 
   const items = queueQuery.data ?? []
@@ -125,6 +141,11 @@ export function ReviewQueuePage() {
           {queueQuery.isError && (
             <p role="alert" className="text-sm text-destructive">
               The queue could not be loaded.
+            </p>
+          )}
+          {downloadError && (
+            <p role="alert" className="text-sm text-destructive">
+              {downloadError}
             </p>
           )}
           {!queueQuery.isLoading && items.length === 0 && (

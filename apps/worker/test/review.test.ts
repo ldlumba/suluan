@@ -6,6 +6,7 @@ import {
   outboxEvents,
   researchRecords,
   recordFiles,
+  submissionFiles,
   submissions,
 } from '@suluan/db/schema'
 import { logEmailAdapter } from '../src/email'
@@ -85,26 +86,32 @@ needsDb('review workflow', () => {
   }
 
   async function submit(title: string): Promise<{ id: string; key: string }> {
-    const init = (await (
-      await post('/api/uploads/initiate', userToken, {
-        fileName: 'paper.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: 777,
-      })
-    ).json()) as { key: string }
-    t.putObject(init.key, 777)
-    const res = await post('/api/submissions', userToken, {
-      key: init.key,
-      fileName: 'paper.pdf',
-      mimeType: 'application/pdf',
-      sizeBytes: 777,
-      idempotencyKey: crypto.randomUUID(),
-      title,
+    const file = new File(['x'.repeat(777)], 'paper.pdf', {
+      type: 'application/pdf',
     })
+    const form = new FormData()
+    form.append('file', file)
+    form.append('idempotencyKey', crypto.randomUUID())
+    form.append('title', title)
+    const res = await t.app.request(
+      '/api/submissions',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${userToken}` },
+        body: form,
+      },
+      t.testEnv(),
+    )
     expect(res.status).toBe(201)
     const body = (await res.json()) as { id: string }
     submissionIds.push(body.id)
-    return { id: body.id, key: init.key }
+    const db = testDb()
+    const files = await db
+      .select()
+      .from(submissionFiles)
+      .where(eq(submissionFiles.submissionId, body.id))
+    expect(files).toHaveLength(1)
+    return { id: body.id, key: files[0].r2Key }
   }
 
   it('hides the review queue from ordinary users', async () => {
@@ -203,15 +210,17 @@ needsDb('review workflow', () => {
     expect(records).toHaveLength(0)
   })
 
-  it('denies file downloads to submitters, allows managers', async () => {
+  it('denies file downloads to submitters, streams bytes to managers', async () => {
     const { id } = await submit('Download check')
     const denied = await get(`/api/submissions/${id}/download`, userToken)
     expect(denied.status).toBe(403)
     const allowed = await get(`/api/submissions/${id}/download`, managerToken)
     expect(allowed.status).toBe(200)
-    const body = (await allowed.json()) as { url: string; fileName: string }
-    expect(body.url).toContain('get')
-    expect(body.fileName).toBe('paper.pdf')
+    expect(allowed.headers.get('content-type')).toContain('application/pdf')
+    expect(allowed.headers.get('content-disposition')).toContain('attachment')
+    expect(allowed.headers.get('content-disposition')).toContain('paper.pdf')
+    const bytes = new Uint8Array(await allowed.arrayBuffer())
+    expect(bytes.length).toBe(777)
   })
 
   it('dispatches outbox events once, then reports replays', async () => {
