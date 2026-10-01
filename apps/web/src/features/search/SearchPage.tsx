@@ -282,10 +282,9 @@ export function SearchPage() {
           <>
             {items.length === 0 && (
               <p>
-                No matching accepted papers.{' '}
                 {mode === 'semantic'
-                  ? 'Papers appear here once they have been extracted, keyword-prepared, and embedded.'
-                  : 'Full-text matches become available after extraction and search preparation.'}
+                  ? 'No close match. Try fewer or more general words, or switch to Keyword search for exact terms.'
+                  : 'No matching accepted papers. Full-text matches become available after extraction and search preparation.'}
               </p>
             )}
             <ul className="space-y-4">
@@ -293,12 +292,16 @@ export function SearchPage() {
                 <li key={item.id} className="space-y-2 rounded-lg border p-4">
                   <h2 className="font-semibold">{item.title}</h2>
                   <p className="text-sm text-muted-foreground">
-                    {item.fullTextStatus === 'READY'
-                      ? 'Full text searchable'
-                      : item.fullTextStatus === 'FAILED'
-                        ? 'Full-text processing failed — metadata only'
-                        : 'Full text pending — metadata only'}
-                    {' · '}
+                    {mode === 'keyword' && (
+                      <>
+                        {item.fullTextStatus === 'READY'
+                          ? 'Full text searchable'
+                          : item.fullTextStatus === 'FAILED'
+                            ? 'Full-text processing failed — metadata only'
+                            : 'Full text pending — metadata only'}
+                        {' · '}
+                      </>
+                    )}
                     {item.visibility === 'PUBLIC'
                       ? 'Public'
                       : item.visibility === 'UA_ONLY'

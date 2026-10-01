@@ -27,6 +27,15 @@ const querySchema = z.object({
 })
 const indexSchema = z.object({ recordId: z.string().uuid().optional() })
 const PAGE_SIZE = 10
+/**
+ * Provisional relevance floor for cosine distance (0 = identical, 2 =
+ * opposite). Nearest-neighbour search always has a "closest" row even when it
+ * is unrelated, so without a floor every query returns papers. 0.7 is a
+ * conservative development starting point, not an approved institutional
+ * tuning value; revise it against real SULUAN relevance judgments as the
+ * corpus grows.
+ */
+export const MAX_SEMANTIC_DISTANCE = 0.7
 /** Bounded per-call batch; the production pipeline prepares per paper. */
 const INDEX_BATCH = 10
 /** Semantic preparation is operator-triggered, so it is bounded hard. */
@@ -266,6 +275,7 @@ export function searchRoutes(
         from ranked
         join research_records r on r.id = ranked.record_id
         join submissions s on s.id = r.submission_id
+        where ranked.distance <= ${MAX_SEMANTIC_DISTANCE}
         order by ranked.distance asc, r.id
         limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
       `)

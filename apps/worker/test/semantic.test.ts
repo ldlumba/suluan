@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { eq, sql } from 'drizzle-orm'
 import { EMBEDDING_DIMS, researchRecords, submissions } from '@suluan/db/schema'
 import { CHUNKER_VERSION } from '../src/chunking'
+import { MAX_SEMANTIC_DISTANCE } from '../src/search'
 import {
   deleteAuditEvents,
   deleteProfiles,
@@ -50,6 +51,54 @@ needsDb('semantic search', () => {
           let hash = 0
           for (const ch of token) hash = (hash * 31 + ch.charCodeAt(0)) % EMBEDDING_DIMS
           values[hash] = Math.min(1, values[hash] + 0.1)
+        }
+        return { values }
+      })
+      return new Response(JSON.stringify({ embeddings }), { status: 200 })
+    })
+    return stats
+  }
+
+  /**
+   * Controlled unit vectors for the relevance-floor regression. Ordinary
+   * queries are e0; the no-match query is a dense vector far from every sparse
+   * fixture vector. Documents choose their vector by marker in the test text:
+   * - close / restricted: e0, distance 0
+   * - boundary: dot(query, doc) = 0.3, distance exactly 0.7
+   * - far: e1, distance 1
+   */
+  function stubThresholdGemini(): { calls: number; inputs: number } {
+    const stats = { calls: 0, inputs: 0 }
+    vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
+      if (!String(input).includes(GEMINI_HOST)) return realFetch(input, init)
+      stats.calls += 1
+      const body = JSON.parse(String(init?.body)) as {
+        requests: {
+          taskType: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY'
+          content: { parts: { text: string }[] }
+        }[]
+      }
+      const embeddings = body.requests.map((request) => {
+        stats.inputs += 1
+        const text = request.content.parts[0].text
+        const values = new Array(EMBEDDING_DIMS).fill(0)
+        if (
+          request.taskType === 'RETRIEVAL_QUERY' &&
+          text.includes('threshold-no-match')
+        ) {
+          values.fill(1)
+        } else if (
+          request.taskType === 'RETRIEVAL_QUERY' ||
+          text.includes('threshold-close')
+        ) {
+          values[0] = 1
+        } else if (text.includes('threshold-boundary')) {
+          values[0] = 0.3
+          values[1] = Math.sqrt(1 - 0.3 ** 2)
+        } else if (text.includes('threshold-restricted')) {
+          values[0] = 1
+        } else {
+          values[1] = 1
         }
         return { values }
       })
@@ -339,11 +388,17 @@ needsDb('semantic search', () => {
   })
 
   it('ranks the closest paper first and applies visibility to results', async () => {
-    const target = `photovoltaic ${tag} conversion efficiency solar panel output`
-    const distractor = `marine ${tag} coral reef biodiversity survey transect`
+    // Earlier preparation tests intentionally charge the shared development
+    // bucket. Ranking needs provider calls of its own and is not a quota test.
+    await testDb().execute(sql`delete from embedding_usage`)
+    const target = `photovoltaic photovoltaic photovoltaic ${tag} conversion efficiency solar panel output`
+    const distractor = `photovoltaic marine ${tag} coral reef biodiversity survey transect`
     const publicPaper = await paper('PUBLIC', target)
     const restricted = await paper('RESTRICTED', distractor)
-    const uaOnly = await paper('UA_ONLY', `laboratory ${tag} titration procedure buffer`)
+    const uaOnly = await paper(
+      'UA_ONLY',
+      `photovoltaic laboratory ${tag} titration procedure buffer`,
+    )
     // Preparation is bounded to 2 papers per call, so embed these explicitly
     // rather than relying on a bulk call picking them out of the backlog.
     for (const p of [publicPaper, restricted, uaOnly]) {
@@ -394,7 +449,62 @@ needsDb('semantic search', () => {
     )
   })
 
+  it('returns only records at or below the provisional relevance floor', async () => {
+    // Isolate the daily budget from earlier semantic tests; the quota itself is
+    // tested separately below. This test controls vector geometry, not usage.
+    await testDb().execute(sql`delete from embedding_usage`)
+    const close = await paper('PUBLIC', `threshold-close ${tag}`)
+    const boundary = await paper('PUBLIC', `threshold-boundary ${tag}`)
+    const far = await paper('PUBLIC', `threshold-far ${tag}`)
+    const restricted = await paper('RESTRICTED', `threshold-restricted ${tag}`)
+    const provider = stubThresholdGemini()
+    for (const p of [close, boundary, far, restricted]) {
+      expect((await embedAll(p.recordId)).embedded).toBe(1)
+    }
+
+    const anon = await get('/api/search/semantic?q=threshold calibration', null)
+    expect(anon.status).toBe(200)
+    const anonBody = (await anon.json()) as {
+      items: { id: string; distance: number }[]
+      semanticStatus: string
+    }
+    expect(anonBody.semanticStatus).toBe('ready')
+    const anonIds = anonBody.items.map((item) => item.id)
+    expect(anonIds).toContain(close.recordId)
+    // The boundary is inclusive: <= 0.7, not < 0.7.
+    expect(anonIds).toContain(boundary.recordId)
+    expect(anonIds).not.toContain(far.recordId)
+    // Relevance never overrides visibility.
+    expect(anonIds).not.toContain(restricted.recordId)
+    const boundaryDistance = Number(
+      anonBody.items.find((item) => item.id === boundary.recordId)?.distance,
+    )
+    expect(boundaryDistance).toBeCloseTo(MAX_SEMANTIC_DISTANCE, 5)
+
+    const managerResult = await get(
+      '/api/search/semantic?q=threshold calibration',
+      manager,
+    )
+    const managerIds = (
+      (await managerResult.json()) as { items: { id: string }[] }
+    ).items.map((item) => item.id)
+    expect(managerIds).toContain(restricted.recordId)
+    expect(managerIds).not.toContain(far.recordId)
+
+    const noMatch = await get(
+      '/api/search/semantic?q=threshold-no-match',
+      manager,
+    )
+    expect(noMatch.status).toBe(200)
+    expect(await noMatch.json()).toMatchObject({
+      items: [],
+      semanticStatus: 'ready',
+    })
+    expect(provider.calls).toBe(7) // 4 document batches + 3 query calls
+  })
+
   it('orders results by ascending distance rather than by id', async () => {
+    await testDb().execute(sql`delete from embedding_usage`)
     // Guards the ORDER BY itself. The visibility test above can pass on a
     // single eligible row regardless of ordering, so rank several here.
     for (const label of ['one', 'two', 'three']) {

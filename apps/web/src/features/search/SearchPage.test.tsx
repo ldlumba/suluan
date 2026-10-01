@@ -139,7 +139,7 @@ describe('keyword search', () => {
 describe('semantic search', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('requests the semantic endpoint and renders its results in keyword mode', async () => {
+  it('requests the semantic endpoint and renders its results in semantic mode', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
       if (path.startsWith('/api/search/semantic')) {
         return {
@@ -162,6 +162,24 @@ describe('semantic search', () => {
       '/api/search/records?q=humidity&page=1',
       'test-token',
     )
+    expect(screen.queryByText('Full text searchable')).not.toBeInTheDocument()
+  })
+
+  it('explains when no semantic result clears the relevance floor', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+      semanticStatus: 'ready',
+    } as never)
+    renderPage('ADMIN', '/search?q=maritime+law&mode=semantic')
+
+    expect(await screen.findByText(/No close match/)).toHaveTextContent(
+      'switch to Keyword search for exact terms',
+    )
+    expect(
+      screen.queryByText(/No matching accepted papers/),
+    ).not.toBeInTheDocument()
   })
 
   it('falls back to keyword results when the daily limit is reached', async () => {

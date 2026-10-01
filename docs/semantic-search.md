@@ -22,6 +22,8 @@ option on the same `/search` page.
 4. **Search** — your question is embedded as a `RETRIEVAL_QUERY` and compared
    against every stored vector using cosine distance. Chunks of the same paper
    are grouped, so a paper appears once with its closest chunk as the snippet.
+   Results above the provisional `0.7` cosine-distance floor are omitted rather
+   than presenting an unrelated paper merely because it is the nearest one.
 
 Step 3 is **manager-only** and is an operator action, like step 2. Step 4 is
 public and open to signed-out visitors.
@@ -50,7 +52,9 @@ there is no SDK that might reject it.
    embedded from how many papers. Run it again until it reports no more.
 4. Click **Semantic**, search for a topic in your own words rather than a title.
    You should get relevant papers even without matching keywords.
-5. Switch back to **Keyword** and confirm word-based matching still works.
+5. Search for a clearly unrelated topic. Semantic mode should show **No close
+   match** instead of returning the least-unrelated paper. Switch to **Keyword**
+   and confirm word-based matching still works.
 6. Sign out and repeat step 4 in a private window. Anonymous visitors get public
    papers only, and results should still work.
 7. Accept a paper as **Restricted**, embed it, and confirm it never appears for
@@ -58,16 +62,22 @@ there is no SDK that might reject it.
 
 ## Limits and behavior
 
-- **Daily development cap: 20 requests and 2,000 chunks per day.** One thesis is
-  roughly 25–50 chunks, so this is about 40 papers a day. The limit resets on
-  the UTC day. When it is reached, semantic search falls back to keyword results
-  and says so — it does not error.
+- **Daily development cap: 20 requests and 2,000 embedding inputs per day.**
+  Document chunks and search queries are inputs. One thesis is roughly 25–50
+  chunks, so the input limit is about 40 papers a day before searches. The limit
+  resets on the UTC day. When it is reached, semantic search falls back to
+  keyword results and says so — it does not error.
 - **Cost is currently zero** because the project uses the Gemini free tier. If
   billing is ever enabled, embedding costs about US$0.002 per thesis. Enabling
   billing also requires creating the agreed ₱250/month billing alert, and it is
   the same gate that must be cleared before Cloud Run.
 - **No vector index yet.** Search scans every stored vector, which is exact and
   instant at this size. Revisit only with real row counts.
+- **The relevance floor is provisional.** The current maximum cosine distance
+  is `0.7`. It prevents nearest-neighbour search from returning unrelated
+  papers when no good match exists, but it must be tuned against real SULUAN
+  relevance judgments as the corpus grows. Keyword mode remains available for
+  exact terms.
 - **Embeddings are per extraction.** Re-extracting a paper produces a new
   chunk snapshot, which needs a new embedding batch. A changed chunker version
   likewise requires re-embedding.
