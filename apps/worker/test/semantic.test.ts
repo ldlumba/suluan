@@ -127,8 +127,12 @@ needsDb('semantic search', () => {
     )
   }
 
-  /** Submit, accept with the given visibility, keyword-index, then embed. */
-  async function paper(visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED', text: string) {
+  /** Submit, accept, and arrange a keyword snapshot with one or more chunks. */
+  async function paper(
+    visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED',
+    text: string | string[],
+  ) {
+    const chunkTexts = Array.isArray(text) ? text : [text]
     const form = new FormData()
     form.append('file', new File(['x'.repeat(300)], 'paper.pdf', { type: 'application/pdf' }))
     form.append('title', `Sem ${visibility} ${tag}`)
@@ -167,9 +171,20 @@ needsDb('semantic search', () => {
       returning id
     `)
     const keywordIndex = inserted.rows[0] as { id: string }
+    const chunks = chunkTexts.map((content, ordinal) => ({
+      ordinal,
+      startOffset: ordinal * 2000,
+      endOffset: ordinal * 2000 + content.length,
+      content,
+    }))
     await testDb().execute(sql`
-      insert into document_chunks (index_id, ordinal, start_offset, end_offset, content)
-      values (${keywordIndex.id}, 0, 0, ${text.length}, ${text})
+      insert into document_chunks
+        (index_id, ordinal, start_offset, end_offset, content)
+      select ${keywordIndex.id}::uuid, x.ordinal, x."startOffset",
+        x."endOffset", x.content
+      from jsonb_to_recordset(${JSON.stringify(chunks)}::jsonb)
+        as x(ordinal integer, "startOffset" integer, "endOffset" integer,
+          content text)
     `)
     return { recordId: record.id, submissionId, keywordIndexId: keywordIndex.id }
   }
@@ -226,6 +241,61 @@ needsDb('semantic search', () => {
       )
     `)
     expect(rows.rows[0].n).toBe(1)
+  })
+
+  it('embeds every chunk, repairs a partial snapshot, then converges to zero', async () => {
+    // A one-chunk fixture cannot detect the original failure: the semantic
+    // snapshot insert succeeded for chunk 0, then ON CONFLICT DO NOTHING
+    // returned no id for chunks 1..N and silently skipped every later vector.
+    const p = await paper('PUBLIC', [
+      `first ${tag} introduction and abstract`,
+      `second ${tag} literature review`,
+      `third ${tag} methodology and findings`,
+      `fourth ${tag} conclusion and recommendations`,
+    ])
+    const provider = stubGemini()
+
+    const first = await embedAll(p.recordId)
+    expect(first.embedded).toBe(4)
+    expect(provider.calls).toBe(1)
+    expect(provider.inputs).toBe(4)
+    let counts = await testDb().execute(sql`
+      select
+        (select count(*)::int from document_chunks
+          where index_id = ${p.keywordIndexId}) as chunks,
+        (select count(*)::int from document_embeddings e
+          join semantic_indexes si on si.id = e.semantic_index_id
+          where si.keyword_index_id = ${p.keywordIndexId}) as vectors
+    `)
+    expect(counts.rows[0]).toMatchObject({ chunks: 4, vectors: 4 })
+
+    // Arrange the exact production failure state without deleting the existing
+    // chunk-0 vector: one vector exists under the snapshot, three are missing.
+    await testDb().execute(sql`
+      delete from document_embeddings
+      where chunk_id in (
+        select id from document_chunks
+        where index_id = ${p.keywordIndexId} and ordinal > 0
+      )
+    `)
+    const repaired = await embedAll(p.recordId)
+    expect(repaired.embedded).toBe(3)
+    expect(provider.calls).toBe(2)
+    expect(provider.inputs).toBe(7)
+    counts = await testDb().execute(sql`
+      select
+        (select count(*)::int from document_chunks
+          where index_id = ${p.keywordIndexId}) as chunks,
+        (select count(*)::int from document_embeddings e
+          join semantic_indexes si on si.id = e.semantic_index_id
+          where si.keyword_index_id = ${p.keywordIndexId}) as vectors
+    `)
+    expect(counts.rows[0]).toMatchObject({ chunks: 4, vectors: 4 })
+
+    const complete = await embedAll(p.recordId)
+    expect(complete.embedded).toBe(0)
+    // No candidates means no paid provider call.
+    expect(provider.calls).toBe(2)
   })
 
   it('reports a provider failure as 502 rather than an opaque 500', async () => {

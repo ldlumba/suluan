@@ -71,6 +71,9 @@ there is no SDK that might reject it.
 - **Embeddings are per extraction.** Re-extracting a paper produces a new
   chunk snapshot, which needs a new embedding batch. A changed chunker version
   likewise requires re-embedding.
+- **Interrupted batches are repairable.** Preparation selects missing chunks,
+  not missing papers. Running the embed action again keeps existing vectors and
+  writes only the missing ones; it never needs to delete and re-embed a paper.
 - **Restricted papers are embedded too**, but stay hidden in results. Access is
   a read-time decision, so lifting an embargo needs no re-embedding.
 

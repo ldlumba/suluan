@@ -282,11 +282,12 @@ export function searchRoutes(
    * Semantic preparation (manager-only). Embeds the chunks of keyword snapshots
    * that have no vectors for the CURRENT model and width yet.
    *
-   * Idempotent twice over: the snapshot is created with ON CONFLICT DO NOTHING
-   * and each vector insert relies on UNIQUE(chunk_id), so a retried or
-   * concurrent call cannot duplicate embeddings. Quota is consumed per batch
-   * immediately before the paid call, and the batch is sized to the remaining
-   * daily input budget so one call can never blow the cap.
+   * Idempotent twice over: the snapshot upsert always returns its id and the
+   * vector insert relies on UNIQUE(chunk_id), so a retried or concurrent call
+   * cannot duplicate embeddings. Candidates are missing CHUNKS, not missing
+   * snapshots — a partially embedded paper must remain eligible. Quota is
+   * consumed per batch immediately before the paid call, and the batch is sized
+   * to the remaining daily input budget so one call cannot blow the cap.
    */
   app.post(
     '/semantic/prepare',
@@ -309,10 +310,7 @@ export function searchRoutes(
         where s.status = 'ACCEPTED' and k.chunker_version = ${CHUNKER_VERSION}
           and (${recordId ?? null}::uuid is null or k.record_id = ${recordId ?? null}::uuid)
           and not exists (
-            select 1 from semantic_indexes si
-            where si.keyword_index_id = k.id
-              and si.model = ${EMBEDDING_MODEL}
-              and si.dimensions = ${EMBEDDING_DIMS}
+            select 1 from document_embeddings e where e.chunk_id = d.id
           )
         order by k.record_id, d.ordinal
         limit ${EMBED_INPUT_BATCH}
@@ -380,31 +378,55 @@ export function searchRoutes(
             502,
           )
         }
-        for (const [offset, row] of group.entries()) {
-          const inserted = await db.execute(sql`
-            with snapshot as (
-              insert into semantic_indexes
-                (keyword_index_id, model, dimensions, chunker_version, source_sha256, created_by)
-              values (${row.keyword_index_id}, ${EMBEDDING_MODEL}, ${EMBEDDING_DIMS},
-                ${CHUNKER_VERSION}, ${row.source_sha256}, ${c.get('profile').id})
-              on conflict (keyword_index_id, model, dimensions) do nothing
-              returning id
-            ), vector as (
-              insert into document_embeddings (semantic_index_id, chunk_id, embedding)
-              select snapshot.id, ${row.chunk_id}::uuid,
-                cast(${toVectorLiteral(vectors[offset])} as vector)
-              from snapshot
-              on conflict (chunk_id) do nothing
-              returning id
-            ), audit as (
-              insert into audit_events (actor_id, action, entity_type, entity_id)
-              select ${c.get('profile').id}, 'semantic_index.embedded', 'research_record',
-                ${row.record_id}::text
-              from vector
-            ) select id from vector
-          `)
-          embedded += inserted.rows.length
-        }
+        const payload = group.map((row, offset) => ({
+          keywordIndexId: row.keyword_index_id,
+          recordId: row.record_id,
+          sourceSha256: row.source_sha256,
+          chunkId: row.chunk_id,
+          embedding: toVectorLiteral(vectors[offset]),
+        }))
+        const inserted = await db.execute(sql`
+          with input as (
+            select * from jsonb_to_recordset(${JSON.stringify(payload)}::jsonb)
+              as x(
+                "keywordIndexId" uuid,
+                "recordId" uuid,
+                "sourceSha256" text,
+                "chunkId" uuid,
+                embedding text
+              )
+          ), snapshots as (
+            insert into semantic_indexes
+              (keyword_index_id, model, dimensions, chunker_version,
+                source_sha256, created_by)
+            select distinct "keywordIndexId", ${EMBEDDING_MODEL}::text,
+              ${EMBEDDING_DIMS}::integer, ${CHUNKER_VERSION}::text,
+              "sourceSha256", ${c.get('profile').id}::uuid
+            from input
+            on conflict (keyword_index_id, model, dimensions) do update
+              set created_by = semantic_indexes.created_by
+            returning id, keyword_index_id
+          ), vectors as (
+            insert into document_embeddings
+              (semantic_index_id, chunk_id, embedding)
+            select snapshots.id, input."chunkId", cast(input.embedding as vector)
+            from input
+            join snapshots
+              on snapshots.keyword_index_id = input."keywordIndexId"
+            on conflict (chunk_id) do nothing
+            returning id, chunk_id
+          ), audit as (
+            insert into audit_events
+              (actor_id, action, entity_type, entity_id)
+            select distinct ${c.get('profile').id}::uuid,
+              'semantic_index.embedded',
+              'research_record', input."recordId"::text
+            from vectors
+            join input on input."chunkId" = vectors.chunk_id
+          )
+          select id from vectors
+        `)
+        embedded += inserted.rows.length
       }
       c.header('Cache-Control', 'private, no-store')
       return c.json({
