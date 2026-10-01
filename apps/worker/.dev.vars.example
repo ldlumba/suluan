@@ -9,3 +9,6 @@
 DATABASE_URL=
 FIREBASE_PROJECT_ID=
 ALLOWED_DOMAINS=ua.edu.ph
+# Local frontend origin. Add more comma-separated origins if you serve the
+# frontend on another port; production sets this via the dashboard instead.
+ALLOWED_ORIGINS=http://localhost:5173

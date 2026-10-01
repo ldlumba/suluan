@@ -2,6 +2,13 @@ export interface Env {
   DATABASE_URL: string
   FIREBASE_PROJECT_ID: string
   ALLOWED_DOMAINS: string
+  /**
+   * Comma-separated exact origins allowed to call the API from browsers
+   * (e.g. "http://localhost:5173"). Production value is set at deploy time;
+   * never "*" — the API carries Authorization headers and must not accept
+   * arbitrary origins.
+   */
+  ALLOWED_ORIGINS: string
 }
 
 /**
@@ -21,4 +28,12 @@ export function isAllowedDomain(
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean)
     .includes(domain)
+}
+
+/** Parse the CORS origin allowlist. Matching is exact — no wildcards. */
+export function parseAllowedOrigins(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
 }

@@ -4,5 +4,8 @@ compatibility_date = "2026-09-30"
 
 # Non-secret config only. DATABASE_URL and any future credentials are
 # secrets: local via .dev.vars, production via `wrangler secret put`.
+# ALLOWED_ORIGINS is the committed localhost default; production overrides
+# it via the Cloudflare dashboard at deploy time (never "*").
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"
+ALLOWED_ORIGINS = "http://localhost:5173"

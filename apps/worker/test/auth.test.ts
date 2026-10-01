@@ -1,69 +1,19 @@
 import { neon } from '@neondatabase/serverless'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/neon-http'
-import {
-  createLocalJWKSet,
-  generateKeyPair,
-  SignJWT,
-  type CryptoKey as JoseCryptoKey,
-  type JWTVerifyGetKey,
-} from 'jose'
+import { generateKeyPair, SignJWT } from 'jose'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { profiles } from '@suluan/db/schema'
-import { loadRootEnv } from '@suluan/db/scripts/env.mjs'
-import { createApp } from '../src/app'
-import type { Env } from '../src/config'
+import { KID, PROJECT_ID, setupTestAuth, type TestAuth } from './helpers'
 
-const PROJECT_ID = 'test-project'
-
-/**
- * Tokens are minted with a throwaway local RSA key and verified through
- * jose's local JWKS — the full signature/issuer/audience/expiry path runs,
- * with no Google network dependency. Route tests touching the database
- * skip when DATABASE_URL is absent (same pattern as packages/db).
- */
-
-loadRootEnv()
-
-let jwks: JWTVerifyGetKey
-let privateKey: JoseCryptoKey
-const KID = 'test-key-1'
-
-let app: ReturnType<typeof createApp>
-
-async function mintToken(claims: Record<string, unknown>, key?: JoseCryptoKey) {
-  return new SignJWT({ ...claims })
-    .setProtectedHeader({ alg: 'RS256', kid: KID })
-    .setIssuer(`https://securetoken.google.com/${PROJECT_ID}`)
-    .setAudience(PROJECT_ID)
-    .setIssuedAt()
-    .setExpirationTime('5m')
-    .sign(key ?? privateKey)
-}
-
-function testEnv(): Env {
-  return {
-    DATABASE_URL: process.env.DATABASE_URL ?? '',
-    FIREBASE_PROJECT_ID: PROJECT_ID,
-    ALLOWED_DOMAINS: 'ua.edu.ph',
-  }
-}
-
-function authed(path: string, token: string | null) {
-  const headers: Record<string, string> =
-    token === null ? {} : { authorization: `Bearer ${token}` }
-  return app.request(path, { headers }, testEnv())
-}
+let t: TestAuth
+let authed: TestAuth['authed']
+let mintToken: TestAuth['mintToken']
 
 beforeAll(async () => {
-  const pair = await generateKeyPair('RS256')
-  privateKey = pair.privateKey
-  const { exportJWK } = await import('jose')
-  const jwk = await exportJWK(pair.publicKey)
-  jwks = createLocalJWKSet({
-    keys: [{ ...jwk, kid: KID, alg: 'RS256', use: 'sig' }],
-  })
-  app = createApp((projectId) => ({ jwks, projectId }))
+  t = await setupTestAuth()
+  authed = t.authed
+  mintToken = t.mintToken
 })
 
 describe('token verification', () => {
@@ -91,7 +41,7 @@ describe('token verification', () => {
       .setAudience(PROJECT_ID)
       .setIssuedAt(Math.floor(Date.now() / 1000) - 600)
       .setExpirationTime(Math.floor(Date.now() / 1000) - 300)
-      .sign(privateKey)
+      .sign(t.privateKey)
     expect((await authed('/api/me', expired)).status).toBe(401)
   })
 
@@ -102,7 +52,7 @@ describe('token verification', () => {
       .setAudience('other-project')
       .setIssuedAt()
       .setExpirationTime('5m')
-      .sign(privateKey)
+      .sign(t.privateKey)
     expect((await authed('/api/me', other)).status).toBe(401)
   })
 

@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { Hono, type MiddlewareHandler } from 'hono'
+import { cors } from 'hono/cors'
 import { profiles } from '@suluan/db/schema'
 import { verifyIdToken, type TokenVerifier } from './auth'
-import { isAllowedDomain, type Env } from './config'
+import { isAllowedDomain, parseAllowedOrigins, type Env } from './config'
 import { createDb } from './db'
 
 type Role = 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN'
@@ -21,6 +22,21 @@ export type AppContext = { Bindings: Env; Variables: Variables }
  */
 export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
   const app = new Hono<AppContext>()
+
+  /**
+   * CORS first: preflight OPTIONS must succeed without credentials so
+   * browsers ever reach the auth boundary. Origins are exact-matched
+   * against ALLOWED_ORIGINS; anything else gets no ACAO headers.
+   */
+  app.use('/api/*', async (c, next) => {
+    const origins = parseAllowedOrigins(c.env.ALLOWED_ORIGINS)
+    return cors({
+      origin: origins,
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type'],
+      maxAge: 600,
+    })(c, next)
+  })
 
   /**
    * Authentication + authorization boundary. Verifies the Firebase ID token,

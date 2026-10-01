@@ -40,6 +40,7 @@ Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alo
   - The db integration test skips automatically when `.env`/`DATABASE_URL` is absent, so `npm run check` stays green on credential-less clones.
 - Worker (`apps/worker`, Hono; decisions recorded in the context doc):
   - `npm run dev:worker` — local API on http://localhost:8787. Reads `apps/worker/.dev.vars` (copy from `.dev.vars.example`; git-ignored) — NOT the root `.env`. Use the pooled Neon endpoint + real `FIREBASE_PROJECT_ID` there.
+  - Browser CORS is exact-origin allowlisted via `ALLOWED_ORIGINS` (committed default `http://localhost:5173` in `wrangler.toml`; production overrides via dashboard, never `"*"`). Missing ACAO on a preflight means the origin isn't listed — not an auth failure.
   - Token verification uses Google's public JWKS — no service-account secret needed. Tests inject a local JWKS (`createApp` factory) so no Google network dependency.
   - Cloudflare Workers have no TCP Postgres access: the Worker reaches Neon via the HTTP driver (`@neondatabase/serverless`) — never `pg` direct. (Supersedes the earlier forward-looking note.)
 - Web auth: Firebase config lives in `apps/web/.env.local` (`VITE_FIREBASE_*`, git-ignored); missing config disables sign-in UI only. `src/setupTests.ts` registers testing-library cleanup manually — Vitest runs without globals so auto-cleanup never fires (renders leak between tests without it).
