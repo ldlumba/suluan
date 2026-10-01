@@ -24,6 +24,9 @@ const expectedTables = [
   'processing_jobs',
   'keyword_indexes',
   'document_chunks',
+  'semantic_indexes',
+  'document_embeddings',
+  'embedding_usage',
 ]
 
 /** Drizzle bookkeeping lives in its own schema in current drizzle-orm. */
@@ -91,6 +94,36 @@ try {
       )
       failures.push(`enum ${name}`)
     }
+  }
+
+  // Embedding geometry is part of the approved design: vectors of different
+  // widths are not comparable, so the stored column width must match.
+  const { rows: dims } = await client.query(
+    `select a.atttypmod as width
+     from pg_attribute a join pg_class c on c.oid = a.attrelid
+     where c.relname = 'document_embeddings'
+       and a.attname = 'embedding'`,
+  )
+  if (Number(dims[0]?.width) === 768) {
+    console.log('ok   document_embeddings.embedding is vector(768)')
+  } else {
+    console.log(
+      `FAIL document_embeddings.embedding is vector(${dims[0]?.width}), expected 768`,
+    )
+    failures.push('document_embeddings.embedding width')
+  }
+
+  // Embed-once is a storage-level guarantee, not just application logic.
+  const { rows: uniq } = await client.query(
+    `select count(*)::int as n from pg_constraint
+     where conrelid = 'document_embeddings'::regclass
+       and contype = 'u' and pg_get_constraintdef(oid) like '%chunk_id%'`,
+  )
+  if (uniq[0]?.n > 0) {
+    console.log('ok   document_embeddings UNIQUE(chunk_id)')
+  } else {
+    console.log('FAIL document_embeddings missing UNIQUE(chunk_id)')
+    failures.push('document_embeddings unique chunk_id')
   }
 
   // Locked rule: remarks required before either decision.

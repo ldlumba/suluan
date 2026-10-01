@@ -431,6 +431,15 @@ needsDb('review workflow', () => {
       .update(outboxEvents)
       .set({ claimToken: crypto.randomUUID(), leaseUntil: new Date(0) })
       .where(eq(outboxEvents.id, event.id))
+    // The sweep takes the OLDEST 50 due rows. Suites share one dev database and
+    // run in parallel, so a freshly created row sorts behind whatever other
+    // files are inserting and can fall outside that window. Backdate this row
+    // so it is unambiguously inside the sweep batch; the behaviour under test
+    // (an expired claim is re-enqueued) is unchanged.
+    await db
+      .update(outboxEvents)
+      .set({ createdAt: new Date('2000-01-01T00:00:00.000Z') })
+      .where(eq(outboxEvents.id, event.id))
     const queued: unknown[] = []
     await sweepOutbox(db, {
       async send(message) {

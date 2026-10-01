@@ -12,7 +12,10 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   apiFetch: vi.fn(),
 }))
 
-function renderPage(role: 'USER' | 'ADMIN' = 'ADMIN') {
+function renderPage(
+  role: 'USER' | 'ADMIN' = 'ADMIN',
+  entry = '/search?q=initial',
+) {
   vi.mocked(useAuth).mockReturnValue({
     profile: { id: 'manager', role },
     loading: false,
@@ -24,11 +27,21 @@ function renderPage(role: 'USER' | 'ADMIN' = 'ADMIN') {
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <MemoryRouter initialEntries={['/search?q=initial']}>
+      <MemoryRouter initialEntries={[entry]}>
         <SearchPage />
       </MemoryRouter>
     </QueryClientProvider>,
   )
+}
+
+const semanticItem = {
+  id: 'rec-1',
+  title: 'Solar panel efficiency in humid climates',
+  authors: 'Dela Cruz',
+  year: '2026',
+  snippet: 'Measured output under high humidity.',
+  fullTextStatus: 'READY' as const,
+  visibility: 'PUBLIC' as const,
 }
 
 describe('keyword search', () => {
@@ -120,5 +133,90 @@ describe('keyword search', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText('Stale pending text')).not.toBeInTheDocument()
     expect(screen.queryByText('Stale failed text')).not.toBeInTheDocument()
+  })
+})
+
+describe('semantic search', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('requests the semantic endpoint and renders its results in keyword mode', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/search/semantic')) {
+        return {
+          items: [semanticItem],
+          page: 1,
+          hasMore: false,
+          semanticStatus: 'ready',
+        } as never
+      }
+      return { items: [], page: 1, hasMore: false } as never
+    })
+    renderPage('ADMIN', '/search?q=humidity&mode=semantic')
+    expect(await screen.findByText(semanticItem.title)).toBeInTheDocument()
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/search/semantic?q=humidity&page=1',
+      'test-token',
+    )
+    // Keyword must not also run in semantic mode.
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      '/api/search/records?q=humidity&page=1',
+      'test-token',
+    )
+  })
+
+  it('falls back to keyword results when the daily limit is reached', async () => {
+    const keywordItem = {
+      ...semanticItem,
+      id: 'kw-1',
+      title: 'Keyword fallback study',
+    }
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/search/semantic')) {
+        return {
+          items: [],
+          page: 1,
+          hasMore: false,
+          semanticStatus: 'quota_exhausted',
+          reason: 'daily embedding limit reached',
+        } as never
+      }
+      return { items: [keywordItem], page: 1, hasMore: false } as never
+    })
+    renderPage('ADMIN', '/search?q=humidity&mode=semantic')
+    // The user still gets results, plus an explanation of the downgrade.
+    expect(await screen.findByText(keywordItem.title)).toBeInTheDocument()
+    expect(screen.getByText(/daily limit is reached/i)).toBeInTheDocument()
+  })
+
+  it('explains that semantic search is unconfigured without an error', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/search/semantic')) {
+        return {
+          items: [],
+          page: 1,
+          hasMore: false,
+          semanticStatus: 'unconfigured',
+        } as never
+      }
+      return { items: [], page: 1, hasMore: false } as never
+    })
+    renderPage('USER', '/search?q=humidity&mode=semantic')
+    expect(await screen.findByText(/not configured/i)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('offers embedding only to managers', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
+    renderPage('USER', '/search?q=humidity&mode=semantic')
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled())
+    expect(
+      screen.queryByRole('button', { name: /embed papers for semantic search/i }),
+    ).not.toBeInTheDocument()
+
+    vi.clearAllMocks()
+    renderPage('ADMIN', '/search?q=humidity&mode=semantic')
+    expect(
+      await screen.findByRole('button', { name: /embed papers for semantic search/i }),
+    ).toBeInTheDocument()
   })
 })

@@ -53,6 +53,17 @@ export interface Env {
   ALLOWED_ORIGINS: string
   DOCUMENTS: R2BucketLike
   NOTIFICATIONS: QueueLike
+  /**
+   * Gemini API key, server-side only. Never expose to the browser and never
+   * commit: local runs read `apps/worker/.dev.vars` (git-ignored), deployment
+   * would use a Wrangler secret. Current AI Studio keys use the `AQ.` auth-key
+   * format and are bound to a service account; older `AIza` traffic keys were
+   * rejected by the API from September 2026.
+   *
+   * Optional so a credential-less clone stays green: with no key, semantic
+   * endpoints degrade to keyword results instead of failing.
+   */
+  GEMINI_API_KEY?: string
   /** Test/dev REO recipient. Unset until the mailbox decision lands. */
   REO_MAILBOX?: string
 }

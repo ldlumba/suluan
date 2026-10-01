@@ -2,6 +2,7 @@ import { Hono, type MiddlewareHandler } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { EMBEDDING_DIMS, EMBEDDING_MODEL } from '@suluan/db/schema'
 import type { AppContext } from './app'
 import { createDb } from './db'
 import { CHUNKER_VERSION, chunkText } from './chunking'
@@ -11,6 +12,14 @@ import {
   viewerRoleFor,
   type ViewerRole,
 } from './visibility'
+import {
+  batches,
+  embedTexts,
+  EmbeddingError,
+  isSemanticEnabled,
+  toVectorLiteral,
+} from './embeddings'
+import { consumeQuota, consumeQueryQuota, DEV_LIMITS } from './quota'
 
 const querySchema = z.object({
   q: z.string().trim().max(200).default(''),
@@ -20,6 +29,9 @@ const indexSchema = z.object({ recordId: z.string().uuid().optional() })
 const PAGE_SIZE = 10
 /** Bounded per-call batch; the production pipeline prepares per paper. */
 const INDEX_BATCH = 10
+/** Semantic preparation is operator-triggered, so it is bounded hard. */
+const EMBED_PAPER_BATCH = 2
+const EMBED_INPUT_BATCH = 100
 
 /**
  * Keyword discovery. Public by default (owner-approved 2026-10-01): accepted
@@ -142,6 +154,267 @@ export function searchRoutes(
     c.header('Cache-Control', 'private, no-store')
     return c.json({ indexed, hasMore: candidates.rows.length > INDEX_BATCH })
   })
+
+  /**
+   * Semantic search. Public by default like keyword search, and filtered through
+   * the SAME `effectiveVisibility` predicate so search and download cannot drift
+   * apart. Restricted papers are embedded but stay hidden: visibility is a read
+   * policy, not an indexing decision, and an embargo that later lifts must not
+   * require a re-embed.
+   *
+   * Fails closed to keyword, never to an error: a missing key, an exhausted
+   * quota, or an upstream failure returns keyword results with a
+   * `semanticStatus` explaining the degradation. Quota is consumed BEFORE the
+   * paid call, per the AI-guardrail rule.
+   */
+  app.get(
+    '/semantic',
+    optionalAuth,
+    zValidator('query', querySchema),
+    async (c) => {
+      const { q, page } = c.req.valid('query')
+      const db = createDb(c.env.DATABASE_URL)
+      const profile = c.get('profile')
+      const viewer = viewerRoleFor(profile?.role ?? null)
+      c.header(
+        'Cache-Control',
+        viewer === 'PUBLIC' ? 'public, max-age=30' : 'private, no-store',
+      )
+
+      // An empty query has nothing to embed; defer to keyword listing.
+      if (!q) {
+        return c.json({
+          items: [],
+          page,
+          hasMore: false,
+          semanticStatus: 'empty_query' as const,
+        })
+      }
+      if (!isSemanticEnabled(c.env.GEMINI_API_KEY)) {
+        return c.json({
+          items: [],
+          page,
+          hasMore: false,
+          semanticStatus: 'unconfigured' as const,
+        })
+      }
+      const quota = await consumeQueryQuota(db, {
+        viewer,
+        profileId: profile?.id ?? null,
+      })
+      if (!quota.allowed) {
+        // Do not call Gemini. Keyword results are served by the caller.
+        return c.json({
+          items: [],
+          page,
+          hasMore: false,
+          semanticStatus: 'quota_exhausted' as const,
+          reason: quota.reason,
+        })
+      }
+
+      let vector: number[]
+      try {
+        // RETRIEVAL_QUERY (not DOCUMENT) is what makes asymmetric retrieval work.
+        ;[vector] = await embedTexts(
+          c.env.GEMINI_API_KEY as string,
+          [q],
+          'RETRIEVAL_QUERY',
+        )
+      } catch (err) {
+        return c.json({
+          items: [],
+          page,
+          hasMore: false,
+          semanticStatus:
+            err instanceof EmbeddingError ? 'provider_error' : ('unavailable' as const),
+          reason:
+            err instanceof EmbeddingError
+              ? err.message
+              : 'Semantic search is temporarily unavailable.',
+        })
+      }
+
+      // Best distance per record: chunks of the same paper are not separate
+      // results, they are evidence for one result.
+      const queryVector = toVectorLiteral(vector)
+      const rows = await db.execute(sql`
+        with best as (
+          select e.semantic_index_id, k.record_id,
+            min(e.embedding <=> cast(${queryVector} as vector)) as distance,
+            (array_agg(d.content order by e.embedding <=> cast(${queryVector} as vector)))[1] as snippet
+          from document_embeddings e
+          join document_chunks d on d.id = e.chunk_id
+          join semantic_indexes si on si.id = e.semantic_index_id
+          join keyword_indexes k on k.id = si.keyword_index_id
+          where si.model = ${EMBEDDING_MODEL} and si.dimensions = ${EMBEDDING_DIMS}
+            and si.chunker_version = ${CHUNKER_VERSION}
+          group by e.semantic_index_id, k.record_id
+        ), ranked as (
+          select distinct on (b.record_id) b.record_id, b.distance, b.snippet
+          from best b
+          join research_records r on r.id = b.record_id
+          join submissions s on s.id = r.submission_id
+          where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
+          order by b.record_id, b.distance asc
+        )
+        select r.id, r.title, r.submission_id as "submissionId", s.authors, s.year,
+          ${visibilityCase()} as visibility,
+          'READY' as "fullTextStatus",
+          left(ranked.snippet, 400) as snippet,
+          ranked.distance
+        from ranked
+        join research_records r on r.id = ranked.record_id
+        join submissions s on s.id = r.submission_id
+        order by ranked.distance asc, r.id
+        limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
+      `)
+      return c.json({
+        items: rows.rows.slice(0, PAGE_SIZE),
+        page,
+        hasMore: rows.rows.length > PAGE_SIZE,
+        semanticStatus: 'ready' as const,
+      })
+    },
+  )
+
+  /**
+   * Semantic preparation (manager-only). Embeds the chunks of keyword snapshots
+   * that have no vectors for the CURRENT model and width yet.
+   *
+   * Idempotent twice over: the snapshot is created with ON CONFLICT DO NOTHING
+   * and each vector insert relies on UNIQUE(chunk_id), so a retried or
+   * concurrent call cannot duplicate embeddings. Quota is consumed per batch
+   * immediately before the paid call, and the batch is sized to the remaining
+   * daily input budget so one call can never blow the cap.
+   */
+  app.post(
+    '/semantic/prepare',
+    requireAuth,
+    requireManager,
+    zValidator('json', indexSchema),
+    async (c) => {
+      const { recordId } = c.req.valid('json')
+      if (!isSemanticEnabled(c.env.GEMINI_API_KEY)) {
+        return c.json({ error: 'semantic_not_configured' }, 503)
+      }
+      const db = createDb(c.env.DATABASE_URL)
+      const candidates = await db.execute(sql`
+        select k.id as keyword_index_id, k.record_id, k.source_sha256,
+          d.id as chunk_id, d.content
+        from keyword_indexes k
+        join document_chunks d on d.index_id = k.id
+        join research_records r on r.id = k.record_id
+        join submissions s on s.id = r.submission_id
+        where s.status = 'ACCEPTED' and k.chunker_version = ${CHUNKER_VERSION}
+          and (${recordId ?? null}::uuid is null or k.record_id = ${recordId ?? null}::uuid)
+          and not exists (
+            select 1 from semantic_indexes si
+            where si.keyword_index_id = k.id
+              and si.model = ${EMBEDDING_MODEL}
+              and si.dimensions = ${EMBEDDING_DIMS}
+          )
+        order by k.record_id, d.ordinal
+        limit ${EMBED_INPUT_BATCH}
+      `)
+      if (candidates.rows.length === 0) {
+        c.header('Cache-Control', 'private, no-store')
+        return c.json({ embedded: 0, papers: 0, hasMore: false })
+      }
+      const rows = candidates.rows as {
+        keyword_index_id: string
+        record_id: string
+        source_sha256: string
+        chunk_id: string
+        content: string
+      }[]
+      const records = [...new Set(rows.map((r) => r.record_id))]
+      // Bound the per-call paper count as well as the input count.
+      const allowed = new Set(records.slice(0, EMBED_PAPER_BATCH))
+      const targets = rows.filter((r) => allowed.has(r.record_id))
+      const remaining = Math.max(
+        0,
+        Math.min(targets.length, DEV_LIMITS.maxInputs),
+      )
+      const work = targets.slice(0, remaining)
+
+      let embedded = 0
+      for (const group of batches(work)) {
+        const quota = await consumeQuota(
+          db,
+          'dev_global',
+          'all',
+          1,
+          group.length,
+          DEV_LIMITS,
+        )
+        if (!quota.allowed) {
+          return c.json({
+            embedded,
+            papers: 0,
+            hasMore: true,
+            stopped: quota.reason,
+          })
+        }
+        let vectors: number[][]
+        try {
+          vectors = await embedTexts(
+            c.env.GEMINI_API_KEY as string,
+            group.map((row) => row.content),
+            'RETRIEVAL_DOCUMENT',
+          )
+        } catch (err) {
+          // A provider failure must not surface as an opaque 500: this is an
+          // operator action, so report what happened and how far it got. The
+          // quota was already charged for this batch, which is the safe
+          // direction — a retry storm still cannot exceed the daily cap.
+          return c.json(
+            {
+              error: 'embedding_provider_failed',
+              embedded,
+              reason:
+                err instanceof EmbeddingError
+                  ? err.message
+                  : 'Embedding provider is unavailable.',
+            },
+            502,
+          )
+        }
+        for (const [offset, row] of group.entries()) {
+          const inserted = await db.execute(sql`
+            with snapshot as (
+              insert into semantic_indexes
+                (keyword_index_id, model, dimensions, chunker_version, source_sha256, created_by)
+              values (${row.keyword_index_id}, ${EMBEDDING_MODEL}, ${EMBEDDING_DIMS},
+                ${CHUNKER_VERSION}, ${row.source_sha256}, ${c.get('profile').id})
+              on conflict (keyword_index_id, model, dimensions) do nothing
+              returning id
+            ), vector as (
+              insert into document_embeddings (semantic_index_id, chunk_id, embedding)
+              select snapshot.id, ${row.chunk_id}::uuid,
+                cast(${toVectorLiteral(vectors[offset])} as vector)
+              from snapshot
+              on conflict (chunk_id) do nothing
+              returning id
+            ), audit as (
+              insert into audit_events (actor_id, action, entity_type, entity_id)
+              select ${c.get('profile').id}, 'semantic_index.embedded', 'research_record',
+                ${row.record_id}::text
+              from vector
+            ) select id from vector
+          `)
+          embedded += inserted.rows.length
+        }
+      }
+      c.header('Cache-Control', 'private, no-store')
+      return c.json({
+        embedded,
+        papers: allowed.size,
+        hasMore: candidates.rows.length > work.length,
+      })
+    },
+  )
+
   return app
 }
 
