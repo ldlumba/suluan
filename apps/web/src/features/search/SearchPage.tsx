@@ -197,9 +197,9 @@ export function SearchPage() {
                 : 'Embed papers for semantic search'}
             </Button>
             <p className="mt-2 text-sm text-muted-foreground">
-              Sends up to 2 papers (100 chunks) per batch to Gemini. Counts
-              against the daily embedding limit. Papers are embedded once per
-              extraction.
+              Sends one bounded batch of up to 2 papers (20 chunks) to Gemini.
+              Wait at least 30 seconds between batches. Counts against the daily
+              embedding limit. Papers are embedded once per extraction.
             </p>
             {embed.isSuccess && (
               <p role="status">

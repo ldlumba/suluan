@@ -71,3 +71,20 @@ and tables, not headers, footnotes, images, or a reliable page layout.
 - No extracted text is exposed in listing responses, logs, search, or AI evidence.
 - This local manager-token adapter is not the future Cloud Run service identity.
   Cloud deployment needs a separate authenticated delivery design and cost review.
+
+## Pace semantic preparation
+
+After extraction and keyword preparation, use the same manager token through the
+process-scoped `SULUAN_ID_TOKEN` variable to prepare missing semantic vectors:
+
+```powershell
+services/processing/.venv/Scripts/python.exe services/processing/semantic_prepare.py
+```
+
+The command makes one manager-authorized Gemini request for at most 20 chunks,
+waits 30 seconds, and repeats. It stops when preparation is complete, the Worker
+reports its daily development cap, or 20 batches have run. A provider error or
+429 stops immediately: it is never retried automatically because each attempt
+may consume quota. Existing vectors remain intact, so rerunning later resumes
+only missing chunks. The command accepts localhost Worker origins only and never
+accepts the Firebase token as a command-line argument.

@@ -9,6 +9,7 @@ from docx import Document
 
 from extraction import ExtractionError, extract
 from runner import bounded_extract, WorkerClient, run_job
+from semantic_prepare import run_batches
 
 PDF = "application/pdf"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -105,6 +106,35 @@ class ExtractionTests(unittest.TestCase):
             with self.assertRaisesRegex(ExtractionError, "PROCESSING_LIMIT"):
                 extract(self.pdf("Too much extracted text"), PDF)
         self.assertEqual(bounded_extract(self.pdf("Timeout"), PDF, timeout=0)["errorCode"], "PROCESSING_LIMIT")
+
+    def test_semantic_operator_paces_successful_batches(self):
+        calls, waits, output = [], [], []
+
+        class Client:
+            results = iter(
+                [
+                    {"embedded": 20, "papers": 1, "hasMore": True},
+                    {"embedded": 3, "papers": 1, "hasMore": False},
+                ]
+            )
+
+            def json(self, path, body):
+                calls.append((path, body))
+                return next(self.results)
+
+        total = run_batches(
+            Client(), interval=30, sleep=waits.append, emit=output.append
+        )
+        self.assertEqual(total, 23)
+        self.assertEqual(
+            calls,
+            [
+                ("/api/search/semantic/prepare", {}),
+                ("/api/search/semantic/prepare", {}),
+            ],
+        )
+        self.assertEqual(waits, [30])
+        self.assertEqual(output[-1], "semantic preparation complete")
 
 
 if __name__ == "__main__":

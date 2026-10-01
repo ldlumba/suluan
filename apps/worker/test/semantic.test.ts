@@ -347,6 +347,69 @@ needsDb('semantic search', () => {
     expect(provider.calls).toBe(2)
   })
 
+  it('uses one provider request for 20 chunks and resumes the remainder', async () => {
+    await testDb().execute(sql`delete from embedding_usage`)
+    const p = await paper(
+      'PUBLIC',
+      Array.from(
+        { length: 21 },
+        (_, ordinal) => `batch ${ordinal} ${tag} bounded provider request`,
+      ),
+    )
+    const provider = stubGemini()
+
+    const first = await embedAll(p.recordId)
+    expect(first).toMatchObject({ embedded: 20, papers: 1, hasMore: true })
+    expect(provider.calls).toBe(1)
+    expect(provider.inputs).toBe(20)
+
+    const second = await embedAll(p.recordId)
+    expect(second).toMatchObject({ embedded: 1, papers: 1, hasMore: false })
+    expect(provider.calls).toBe(2)
+    expect(provider.inputs).toBe(21)
+
+    const rows = await testDb().execute(sql`
+      select count(*)::int as n from document_embeddings e
+      join semantic_indexes si on si.id = e.semantic_index_id
+      where si.keyword_index_id = ${p.keywordIndexId}
+    `)
+    expect(rows.rows[0].n).toBe(21)
+  })
+
+  it('reports provider rate limiting distinctly and keeps existing vectors', async () => {
+    const p = await paper('PUBLIC', `rate limited ${tag} preparation`)
+    vi.stubGlobal(
+      'fetch',
+      async (input: string | URL | Request, init?: RequestInit) => {
+        if (String(input).includes(GEMINI_HOST)) {
+          return new Response(
+            JSON.stringify({ error: { code: 429, message: 'RESOURCE_EXHAUSTED' } }),
+            { status: 429 },
+          )
+        }
+        return realFetch(input, init)
+      },
+    )
+    const res = await post('/api/search/semantic/prepare', manager, {
+      recordId: p.recordId,
+    })
+    expect(res.status).toBe(429)
+    const body = (await res.json()) as {
+      error: string
+      message: string
+      embedded: number
+    }
+    expect(body.error).toBe('embedding_provider_rate_limited')
+    expect(body.message).toMatch(/at least 30 seconds/)
+    expect(body.embedded).toBe(0)
+    const rows = await testDb().execute(sql`
+      select count(*)::int as n from document_embeddings e
+      join semantic_indexes si on si.id = e.semantic_index_id
+      where si.keyword_index_id = ${p.keywordIndexId}
+    `)
+    expect(rows.rows[0].n).toBe(0)
+  })
+
   it('reports a provider failure as 502 rather than an opaque 500', async () => {
     await paper('PUBLIC', `upstream ${tag} failure during preparation`)
     vi.stubGlobal(
@@ -360,8 +423,13 @@ needsDb('semantic search', () => {
     )
     const res = await post('/api/search/semantic/prepare', manager, {})
     expect(res.status).toBe(502)
-    const body = (await res.json()) as { error: string; embedded: number }
+    const body = (await res.json()) as {
+      error: string
+      message: string
+      embedded: number
+    }
     expect(body.error).toBe('embedding_provider_failed')
+    expect(body.message).toMatch(/Wait briefly and retry/)
     expect(body.embedded).toBe(0)
   })
 

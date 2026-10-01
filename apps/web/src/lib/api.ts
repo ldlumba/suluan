@@ -35,13 +35,18 @@ export async function apiFetch<T>(
     throw new ApiError(403, 'Your account is not permitted to do that.')
   if (!res.ok) {
     let code: string | null = null
+    let message = 'Request failed.'
     try {
-      const body = (await res.clone().json()) as { error?: unknown }
+      const body = (await res.clone().json()) as {
+        error?: unknown
+        message?: unknown
+      }
       if (typeof body.error === 'string') code = body.error
+      if (typeof body.message === 'string') message = body.message
     } catch {
       // Non-JSON error body; fall through to the generic message.
     }
-    throw new ApiError(res.status, 'Request failed.', code)
+    throw new ApiError(res.status, message, code)
   }
   return (await res.json()) as T
 }

@@ -13,7 +13,7 @@ import {
   type ViewerRole,
 } from './visibility'
 import {
-  batches,
+  EMBED_BATCH_SIZE,
   embedTexts,
   EmbeddingError,
   isSemanticEnabled,
@@ -39,7 +39,7 @@ export const MAX_SEMANTIC_DISTANCE = 0.7
 const INDEX_BATCH = 10
 /** Semantic preparation is operator-triggered, so it is bounded hard. */
 const EMBED_PAPER_BATCH = 2
-const EMBED_INPUT_BATCH = 100
+const EMBED_INPUT_BATCH = EMBED_BATCH_SIZE
 
 /**
  * Keyword discovery. Public by default (owner-approved 2026-10-01): accepted
@@ -297,9 +297,11 @@ export function searchRoutes(
    * Idempotent twice over: the snapshot upsert always returns its id and the
    * vector insert relies on UNIQUE(chunk_id), so a retried or concurrent call
    * cannot duplicate embeddings. Candidates are missing CHUNKS, not missing
-   * snapshots — a partially embedded paper must remain eligible. Quota is
-   * consumed per batch immediately before the paid call, and the batch is sized
-   * to the remaining daily input budget so one call cannot blow the cap.
+   * snapshots — a partially embedded paper must remain eligible. One operator
+   * action makes exactly one bounded provider request; this avoids bursting
+   * several synchronous Gemini calls inside a single Worker request. Quota is
+   * consumed immediately before that paid call and is not refunded on provider
+   * failure, so retries cannot bypass the daily safety cap.
    */
   app.post(
     '/semantic/prepare',
@@ -325,7 +327,7 @@ export function searchRoutes(
             select 1 from document_embeddings e where e.chunk_id = d.id
           )
         order by k.record_id, d.ordinal
-        limit ${EMBED_INPUT_BATCH}
+        limit ${EMBED_INPUT_BATCH + 1}
       `)
       if (candidates.rows.length === 0) {
         c.header('Cache-Control', 'private, no-store')
@@ -344,106 +346,107 @@ export function searchRoutes(
       const targets = rows.filter((r) => allowed.has(r.record_id))
       const remaining = Math.max(
         0,
-        Math.min(targets.length, DEV_LIMITS.maxInputs),
+        Math.min(targets.length, EMBED_INPUT_BATCH, DEV_LIMITS.maxInputs),
       )
       const work = targets.slice(0, remaining)
 
-      let embedded = 0
-      for (const group of batches(work)) {
-        const quota = await consumeQuota(
-          db,
-          'dev_global',
-          'all',
-          1,
-          group.length,
-          DEV_LIMITS,
-        )
-        if (!quota.allowed) {
-          return c.json({
-            embedded,
-            papers: 0,
-            hasMore: true,
-            stopped: quota.reason,
-          })
-        }
-        let vectors: number[][]
-        try {
-          vectors = await embedTexts(
-            c.env.GEMINI_API_KEY as string,
-            group.map((row) => row.content),
-            'RETRIEVAL_DOCUMENT',
-          )
-        } catch (err) {
-          // A provider failure must not surface as an opaque 500: this is an
-          // operator action, so report what happened and how far it got. The
-          // quota was already charged for this batch, which is the safe
-          // direction — a retry storm still cannot exceed the daily cap.
-          return c.json(
-            {
-              error: 'embedding_provider_failed',
-              embedded,
-              reason:
-                err instanceof EmbeddingError
-                  ? err.message
-                  : 'Embedding provider is unavailable.',
-            },
-            502,
-          )
-        }
-        const payload = group.map((row, offset) => ({
-          keywordIndexId: row.keyword_index_id,
-          recordId: row.record_id,
-          sourceSha256: row.source_sha256,
-          chunkId: row.chunk_id,
-          embedding: toVectorLiteral(vectors[offset]),
-        }))
-        const inserted = await db.execute(sql`
-          with input as (
-            select * from jsonb_to_recordset(${JSON.stringify(payload)}::jsonb)
-              as x(
-                "keywordIndexId" uuid,
-                "recordId" uuid,
-                "sourceSha256" text,
-                "chunkId" uuid,
-                embedding text
-              )
-          ), snapshots as (
-            insert into semantic_indexes
-              (keyword_index_id, model, dimensions, chunker_version,
-                source_sha256, created_by)
-            select distinct "keywordIndexId", ${EMBEDDING_MODEL}::text,
-              ${EMBEDDING_DIMS}::integer, ${CHUNKER_VERSION}::text,
-              "sourceSha256", ${c.get('profile').id}::uuid
-            from input
-            on conflict (keyword_index_id, model, dimensions) do update
-              set created_by = semantic_indexes.created_by
-            returning id, keyword_index_id
-          ), vectors as (
-            insert into document_embeddings
-              (semantic_index_id, chunk_id, embedding)
-            select snapshots.id, input."chunkId", cast(input.embedding as vector)
-            from input
-            join snapshots
-              on snapshots.keyword_index_id = input."keywordIndexId"
-            on conflict (chunk_id) do nothing
-            returning id, chunk_id
-          ), audit as (
-            insert into audit_events
-              (actor_id, action, entity_type, entity_id)
-            select distinct ${c.get('profile').id}::uuid,
-              'semantic_index.embedded',
-              'research_record', input."recordId"::text
-            from vectors
-            join input on input."chunkId" = vectors.chunk_id
-          )
-          select id from vectors
-        `)
-        embedded += inserted.rows.length
+      const quota = await consumeQuota(
+        db,
+        'dev_global',
+        'all',
+        1,
+        work.length,
+        DEV_LIMITS,
+      )
+      if (!quota.allowed) {
+        return c.json({
+          embedded: 0,
+          papers: 0,
+          hasMore: true,
+          stopped: quota.reason,
+        })
       }
+      let vectors: number[][]
+      try {
+        vectors = await embedTexts(
+          c.env.GEMINI_API_KEY as string,
+          work.map((row) => row.content),
+          'RETRIEVAL_DOCUMENT',
+        )
+      } catch (err) {
+        // The provider call may still count externally, so the quota consumed
+        // above is deliberately retained. No vector write has happened yet;
+        // the response can therefore report zero progress truthfully.
+        const rateLimited = err instanceof EmbeddingError && err.status === 429
+        return c.json(
+          {
+            error: rateLimited
+              ? 'embedding_provider_rate_limited'
+              : 'embedding_provider_failed',
+            message: rateLimited
+              ? 'Gemini reached its rolling rate limit. Wait at least 30 seconds before retrying; existing vectors were kept.'
+              : 'Gemini could not embed this batch. Wait briefly and retry; existing vectors were kept.',
+            embedded: 0,
+            reason:
+              err instanceof EmbeddingError
+                ? err.message
+                : 'Embedding provider is unavailable.',
+          },
+          rateLimited ? 429 : 502,
+        )
+      }
+      const payload = work.map((row, offset) => ({
+        keywordIndexId: row.keyword_index_id,
+        recordId: row.record_id,
+        sourceSha256: row.source_sha256,
+        chunkId: row.chunk_id,
+        embedding: toVectorLiteral(vectors[offset]),
+      }))
+      const inserted = await db.execute(sql`
+        with input as (
+          select * from jsonb_to_recordset(${JSON.stringify(payload)}::jsonb)
+            as x(
+              "keywordIndexId" uuid,
+              "recordId" uuid,
+              "sourceSha256" text,
+              "chunkId" uuid,
+              embedding text
+            )
+        ), snapshots as (
+          insert into semantic_indexes
+            (keyword_index_id, model, dimensions, chunker_version,
+              source_sha256, created_by)
+          select distinct "keywordIndexId", ${EMBEDDING_MODEL}::text,
+            ${EMBEDDING_DIMS}::integer, ${CHUNKER_VERSION}::text,
+            "sourceSha256", ${c.get('profile').id}::uuid
+          from input
+          on conflict (keyword_index_id, model, dimensions) do update
+            set created_by = semantic_indexes.created_by
+          returning id, keyword_index_id
+        ), vectors as (
+          insert into document_embeddings
+            (semantic_index_id, chunk_id, embedding)
+          select snapshots.id, input."chunkId", cast(input.embedding as vector)
+          from input
+          join snapshots
+            on snapshots.keyword_index_id = input."keywordIndexId"
+          on conflict (chunk_id) do nothing
+          returning id, chunk_id
+        ), audit as (
+          insert into audit_events
+            (actor_id, action, entity_type, entity_id)
+          select distinct ${c.get('profile').id}::uuid,
+            'semantic_index.embedded',
+            'research_record', input."recordId"::text
+          from vectors
+          join input on input."chunkId" = vectors.chunk_id
+        )
+        select id from vectors
+      `)
       c.header('Cache-Control', 'private, no-store')
       return c.json({
-        embedded,
-        papers: allowed.size,
+        embedded: inserted.rows.length,
+        papers: new Set(work.map((row) => row.record_id)).size,
         hasMore: candidates.rows.length > work.length,
       })
     },

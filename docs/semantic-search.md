@@ -50,7 +50,14 @@ there is no SDK that might reject it.
 2. On `/search`, run **Prepare extracted papers for search** until the batch
    reports complete. This creates the chunks.
 3. Run **Embed papers for semantic search**. It reports how many chunks were
-   embedded from how many papers. Run it again until it reports no more.
+   embedded from how many papers. Each action makes one Gemini request for at
+   most 20 chunks from at most two papers. Wait at least 30 seconds between
+   actions, or use the paced operator command below. Run until it reports no
+   more or the daily development cap stops the run.
+
+   ```powershell
+   services/processing/.venv/Scripts/python.exe services/processing/semantic_prepare.py
+   ```
 4. Click **Semantic**, search for a topic in your own words rather than a title.
    You should get relevant papers even without matching keywords.
 5. Search for both covered and clearly unrelated topics. Record the returned
@@ -65,10 +72,18 @@ there is no SDK that might reject it.
 ## Limits and behavior
 
 - **Daily development cap: 20 requests and 2,000 embedding inputs per day.**
-  Document chunks and search queries are inputs. One thesis is roughly 25–50
-  chunks, so the input limit is about 40 papers a day before searches. The limit
-  resets on the UTC day. When it is reached, semantic search falls back to
-  keyword results and says so — it does not error.
+  Document chunks and search queries are inputs. With 20 chunks per provider
+  request, the request cap binds first at 400 chunks (roughly 8–16 theses) before
+  searches. The limit resets on the UTC day. When it is reached, semantic search
+  falls back to keyword results and says so — it does not error.
+- **Preparation does not burst provider calls.** One manager action maps to one
+  synchronous Gemini batch (up to 20 chunks). The observed free-tier limits are
+  100 requests/minute, 30K tokens/minute, and 1K requests/day; TPM, not RPM or
+  RPD, was the binding provider limit during corpus seeding. Wait 30 seconds
+  between calls. A provider failure writes no vectors and keeps existing vectors.
+  A 429 is reported distinctly and is never retried automatically. The attempted
+  call remains charged to the server-side quota because it may have consumed
+  provider capacity.
 - **Cost is currently zero** because the project uses the Gemini free tier. If
   billing is ever enabled, embedding costs about US$0.002 per thesis. Enabling
   billing also requires creating the agreed ₱250/month billing alert, and it is

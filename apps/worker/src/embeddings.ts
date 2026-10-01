@@ -29,7 +29,10 @@ export type EmbedTaskType = 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY'
 
 /** Model's hard input limit; our 2,000-char chunks are far below it. */
 const MAX_INPUT_TOKENS = 2048
-/** Bounded batch per HTTP call; the quota counts requests AND inputs. */
+/**
+ * Free-tier-safe synchronous batch. Twenty 2,000-character chunks stay below
+ * the observed 30K tokens/minute ceiling when operator calls are paced.
+ */
 export const EMBED_BATCH_SIZE = 20
 
 export class EmbeddingError extends Error {
