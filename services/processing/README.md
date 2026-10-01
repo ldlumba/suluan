@@ -1,0 +1,73 @@
+# Local document processing
+
+This is the local, operator-driven extraction slice. Cloud Run deployment,
+authenticated service-to-service delivery, automatic queue consumption, OCR,
+indexing, and embeddings are deferred. No cloud service is activated by setup.
+
+## Setup (from repository root, PowerShell)
+
+```powershell
+python -m venv services/processing/.venv
+services/processing/.venv/Scripts/python.exe -m pip install -r services/processing/requirements.txt
+services/processing/.venv/Scripts/python.exe -m unittest discover -s services/processing -v
+```
+
+The Python suite is separate from `npm run check`; run both for processing changes.
+Dependencies are isolated in the ignored venv. Python 3.13 is the verified local version.
+
+## Process an accepted paper
+
+1. Run `npm run dev:worker` and `npm run dev`. Sign in as ADMIN or REPOSITORY_MANAGER.
+2. Accept a submission. Acceptance atomically creates one `QUEUED` job.
+   Migration 0004 also queues pre-existing accepted records without parsing them.
+3. In browser DevTools → Network, select a successful authenticated API request
+   (e.g. `/api/me`). Copy only the token portion after `Bearer` from its
+   Authorization header. Treat it as a temporary password: do not share it,
+   paste it into chat, or commit it. It expires; use a fresh token when needed.
+4. List jobs with the command below. Paste the token into its hidden prompt.
+
+```powershell
+services/processing/.venv/Scripts/python.exe services/processing/runner.py
+```
+
+Then process one job using its UUID (not the submission UUID):
+
+```powershell
+services/processing/.venv/Scripts/python.exe services/processing/runner.py --job <job-uuid>
+```
+
+The runner claims the job, downloads its submission through the Worker, parses
+in a bounded subprocess, and posts the result with the claim token. An optional
+process-scoped `SULUAN_ID_TOKEN` environment variable avoids repeated prompts;
+the CLI does not accept tokens as command-line arguments. Only localhost origins
+are accepted; redirects are rejected to avoid forwarding credentials.
+
+Failed jobs require explicit retry:
+
+```powershell
+services/processing/.venv/Scripts/python.exe services/processing/runner.py --job <job-uuid> --retry
+```
+
+`NO_EXTRACTABLE_TEXT` means manual attention is needed (often a scanned or blank
+document), not proof that OCR would succeed. Retrying the same scanned file will
+not add OCR. Encrypted, malformed, and over-limit files have separate error codes.
+Mixed PDFs can succeed with `PAGES_WITHOUT_TEXT`; DOCX extracts body paragraphs
+and tables, not headers, footnotes, images, or a reliable page layout.
+
+## Durability and boundaries
+
+- Pending/rejected submissions never get processing jobs. Worker routes require
+  a current manager role and recheck acceptance before claim/retry/completion.
+- Concurrent claims are atomic; expired 10-minute claims can be reclaimed.
+  Stale attempt results are rejected. Identical completion retries are harmless.
+- Extraction failures cannot reverse acceptance. Result text, SHA-256 of source
+  bytes, parser version, page count, and warnings are stored in Neon as restricted
+  operational data. Source documents remain in private R2.
+- A parser timeout/crash reports failure. A runner/network crash may leave the
+  job PROCESSING until its lease expires; rerun the same job after expiry.
+- Storage mode matters: local R2 and remote R2 have different contents, while
+  this development setup uses the same Neon DB. Run against the same mode used
+  to upload the file. Missing objects fail instead of being replaced or fabricated.
+- No extracted text is exposed in listing responses, logs, search, or AI evidence.
+- This local manager-token adapter is not the future Cloud Run service identity.
+  Cloud deployment needs a separate authenticated delivery design and cost review.

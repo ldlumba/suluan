@@ -14,6 +14,8 @@ import {
   validateUploadFile,
 } from './uploads'
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
+import { processingRoutes } from './processing'
+import { searchRoutes } from './search'
 
 type Role = 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN'
 
@@ -108,6 +110,11 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
   }
 
   const MANAGERS: Role[] = ['REPOSITORY_MANAGER', 'ADMIN']
+
+  app.use('/api/processing/*', requireAuth)
+  app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))
+  app.use('/api/search/*', requireAuth)
+  app.route('/api/search', searchRoutes(requireRole(...MANAGERS)))
 
   app.get('/api/health', (c) => c.json({ status: 'ok' }))
 

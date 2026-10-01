@@ -5,8 +5,8 @@ import { submissions } from './intake'
  * Published repository domain — SEPARATE from intake. A record exists only
  * via acceptance of a submission (submission_id is the bridge, one-to-one).
  * Rejected submissions never get rows here; they stay in the REO-only
- * intake archive. Ingestion/indexing state columns arrive with the
- * document-processing stage (exact enum names are TBD) — do not invent them.
+ * intake archive. Extraction state lives in processing_jobs; search indexing
+ * is a later stage and is not implied by successful extraction.
  */
 export const researchRecords = pgTable('research_records', {
   id: uuid('id').defaultRandom().primaryKey(),

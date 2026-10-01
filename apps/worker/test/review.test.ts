@@ -8,9 +8,10 @@ import {
   recordFiles,
   submissionFiles,
   submissions,
+  processingJobs,
 } from '@suluan/db/schema'
 import { logEmailAdapter } from '../src/email'
-import { processOutboxEvent } from '../src/notifications'
+import { processOutboxEvent, sweepOutbox } from '../src/notifications'
 import {
   deleteAuditEvents,
   deleteProfiles,
@@ -118,6 +119,115 @@ needsDb('review workflow', () => {
     expect((await get('/api/review/queue', userToken)).status).toBe(403)
   })
 
+  it('restricts processing operations to managers', async () => {
+    expect((await get('/api/processing/jobs', null)).status).toBe(401)
+    expect((await get('/api/processing/jobs', userToken)).status).toBe(403)
+    for (const action of ['claim', 'result', 'retry']) {
+      expect(
+        (
+          await post(
+            `/api/processing/${crypto.randomUUID()}/${action}`,
+            userToken,
+            {},
+          )
+        ).status,
+      ).toBe(403)
+    }
+  })
+
+  it('queues accepted files only and fences expired extraction results', async () => {
+    const { id } = await submit('Extraction lifecycle')
+    const pending = await get('/api/processing/jobs', managerToken)
+    expect(await pending.json()).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ submissionId: id })]),
+    )
+    await post('/api/decisions', managerToken, {
+      submissionId: id,
+      status: 'ACCEPTED',
+      remarks: 'Approved',
+    })
+    const db = testDb()
+    const [record] = await db
+      .select()
+      .from(researchRecords)
+      .where(eq(researchRecords.submissionId, id))
+    const [job] = await db
+      .select()
+      .from(processingJobs)
+      .where(eq(processingJobs.recordId, record.id))
+    expect(job.status).toBe('QUEUED')
+    const prefix = `/api/processing/${job.id}`
+    const claim = await post(prefix + '/claim', managerToken, {})
+    expect(claim.status).toBe(200)
+    const first = (await claim.json()) as { claimToken: string }
+    expect((await post(prefix + '/claim', managerToken, {})).status).toBe(409)
+    await db
+      .update(processingJobs)
+      .set({ leaseUntil: new Date(0) })
+      .where(eq(processingJobs.id, job.id))
+    const second = (await (
+      await post(prefix + '/claim', managerToken, {})
+    ).json()) as { claimToken: string }
+    const failure = { status: 'FAILED', errorCode: 'NO_EXTRACTABLE_TEXT' }
+    expect(
+      (
+        await post(prefix + '/result', managerToken, {
+          ...failure,
+          claimToken: first.claimToken,
+        })
+      ).status,
+    ).toBe(409)
+    expect(
+      (
+        await post(prefix + '/result', managerToken, {
+          ...failure,
+          claimToken: second.claimToken,
+        })
+      ).status,
+    ).toBe(200)
+    const [accepted] = await db
+      .select()
+      .from(submissions)
+      .where(eq(submissions.id, id))
+    expect(accepted.status).toBe('ACCEPTED')
+    expect((await post(prefix + '/retry', managerToken, {})).status).toBe(200)
+    const third = (await (
+      await post(prefix + '/claim', managerToken, {})
+    ).json()) as { claimToken: string }
+    const success = {
+      claimToken: third.claimToken,
+      status: 'EXTRACTED',
+      result: {
+        text: 'Extracted study text',
+        sha256: 'a'.repeat(64),
+        parser: 'test/1',
+        pageCount: 1,
+        warnings: [],
+      },
+    }
+    expect((await post(prefix + '/result', managerToken, success)).status).toBe(
+      200,
+    )
+    expect((await post(prefix + '/result', managerToken, success)).status).toBe(
+      200,
+    )
+    expect(
+      (
+        await post(prefix + '/result', managerToken, {
+          ...failure,
+          claimToken: second.claimToken,
+        })
+      ).status,
+    ).toBe(409)
+    expect((await post(prefix + '/claim', managerToken, {})).status).toBe(409)
+    const [finished] = await db
+      .select()
+      .from(processingJobs)
+      .where(eq(processingJobs.id, job.id))
+    expect(finished.status).toBe('EXTRACTED')
+    expect(finished.attempts).toBe(3)
+  })
+
   it('lists pending submissions for managers', async () => {
     const { id } = await submit('Awaiting review')
     const res = await get('/api/review/queue', managerToken)
@@ -208,6 +318,10 @@ needsDb('review workflow', () => {
       .from(researchRecords)
       .where(eq(researchRecords.submissionId, id))
     expect(records).toHaveLength(0)
+    const listed = await (await get('/api/processing/jobs', managerToken)).json()
+    expect(listed).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ submissionId: id })]),
+    )
   })
 
   it('denies file downloads to submitters, streams title-named bytes to managers', async () => {
@@ -281,5 +395,110 @@ needsDb('review workflow', () => {
       status: 'SENT',
       recipientEmail: 'author@ua.edu.ph',
     })
+  })
+
+  it('recovers a failed send and expired claim without repeating a decision', async () => {
+    const { id } = await submit('Retry notification')
+    const db = testDb()
+    const [event] = await db
+      .select()
+      .from(outboxEvents)
+      .where(eq(outboxEvents.aggregateId, id))
+    const failing = {
+      name: 'test',
+      async send(): Promise<{ providerMessageId: string }> {
+        throw new Error('temporary sender failure')
+      },
+    }
+    await expect(
+      processOutboxEvent(db, event.id, failing, 'reo@ua.edu.ph'),
+    ).rejects.toThrow('temporary sender failure')
+    const [failed] = await db
+      .select()
+      .from(outboxEvents)
+      .where(eq(outboxEvents.id, event.id))
+    expect(failed.processedAt).toBeNull()
+    expect(
+      await processOutboxEvent(
+        db,
+        event.id,
+        logEmailAdapter(),
+        'reo@ua.edu.ph',
+      ),
+    ).toBe('busy')
+    // Simulate an abandoned worker whose lease has expired.
+    await db
+      .update(outboxEvents)
+      .set({ claimToken: crypto.randomUUID(), leaseUntil: new Date(0) })
+      .where(eq(outboxEvents.id, event.id))
+    const queued: unknown[] = []
+    await sweepOutbox(db, {
+      async send(message) {
+        queued.push(message)
+      },
+    })
+    expect(queued).toContainEqual({ outboxId: event.id })
+    expect(
+      await processOutboxEvent(
+        db,
+        event.id,
+        logEmailAdapter(),
+        'reo@ua.edu.ph',
+      ),
+    ).toBe('sent')
+    expect(
+      await processOutboxEvent(
+        db,
+        event.id,
+        logEmailAdapter(),
+        'reo@ua.edu.ph',
+      ),
+    ).toBe('already-processed')
+    const notes = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.submissionId, id))
+    expect(notes.map((n) => n.status)).toEqual(
+      expect.arrayContaining(['FAILED', 'SENT']),
+    )
+    expect(notes).toHaveLength(2)
+  })
+
+  it('keeps concurrent deliveries from dispatching an active claim twice', async () => {
+    const { id } = await submit('Concurrent notification')
+    const db = testDb()
+    const [event] = await db
+      .select()
+      .from(outboxEvents)
+      .where(eq(outboxEvents.aggregateId, id))
+    let release!: () => void
+    let entered!: () => void
+    const sending = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let sends = 0
+    const adapter = {
+      name: 'test',
+      async send() {
+        sends++
+        entered()
+        await gate
+        return { providerMessageId: 'test-concurrent' }
+      },
+    }
+    const first = processOutboxEvent(db, event.id, adapter, 'reo@ua.edu.ph')
+    await sending
+    try {
+      expect(
+        await processOutboxEvent(db, event.id, adapter, 'reo@ua.edu.ph'),
+      ).toBe('busy')
+    } finally {
+      release()
+    }
+    expect(await first).toBe('sent')
+    expect(sends).toBe(1)
   })
 })

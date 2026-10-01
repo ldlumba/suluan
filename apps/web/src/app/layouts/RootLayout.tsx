@@ -28,6 +28,14 @@ export function RootLayout() {
             </Link>
             {profile && profile.role !== 'USER' && (
               <Link
+                to="/search"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Search
+              </Link>
+            )}
+            {profile && profile.role !== 'USER' && (
+              <Link
                 to="/review"
                 className="text-sm text-muted-foreground hover:text-foreground"
               >

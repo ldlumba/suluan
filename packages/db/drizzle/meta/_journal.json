@@ -22,6 +22,27 @@
       "when": 1790820510753,
       "tag": "0002_green_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790837485216,
+      "tag": "0003_faulty_dark_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790838060247,
+      "tag": "0004_colorful_power_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790840101358,
+      "tag": "0005_abnormal_eternity",
+      "breakpoints": true
     }
   ]
 }

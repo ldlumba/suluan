@@ -21,6 +21,9 @@ const expectedTables = [
   'audit_events',
   'outbox_events',
   'notifications',
+  'processing_jobs',
+  'keyword_indexes',
+  'document_chunks',
 ]
 
 /** Drizzle bookkeeping lives in its own schema in current drizzle-orm. */
@@ -30,12 +33,18 @@ const expectedEnums = {
   role: ['USER', 'REPOSITORY_MANAGER', 'ADMIN'],
   submission_status: ['PENDING', 'ACCEPTED', 'REJECTED'],
   notification_status: ['PENDING', 'SENT', 'SKIPPED', 'FAILED'],
+  extraction_status: ['QUEUED', 'PROCESSING', 'EXTRACTED', 'FAILED'],
 }
 
 const failures = []
 const client = new Client({ connectionString })
 await client.connect()
 try {
+  const { rows: vector } = await client.query(
+    "select extname from pg_extension where extname = 'vector'",
+  )
+  if (vector.length) console.log('ok   extension vector')
+  else failures.push('extension vector missing')
   const { rows: tables } = await client.query(
     `select table_name from information_schema.tables
      where table_schema = 'public'`,

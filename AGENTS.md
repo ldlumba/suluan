@@ -77,5 +77,12 @@ Stages 0–2 are established: **0 local bootstrap — done 2026-09-30** (React/V
 
 ## Maintaining this file
 
+- **Keyword-first discovery (2026-10-01):** migration 0005 enables pgvector and creates `keyword_indexes` snapshots plus `document_chunks` with generated `simple` tsvectors and a GIN index. `/search` is a manager-only preview. Worker `/api/search/records?q=&page=` checks ACCEPTED + EXTRACTED + matching extraction claim/chunker version; returns 10 records/page. POST `/api/search/index` accepts JSON `{}` (up to 10 extracted papers) or `{recordId}`; it is idempotent and atomically stores chunks + snapshot + audit. Queued extraction jobs are untouched. `KEYWORD_READY` is a description of a snapshot, not an extraction enum or semantic INDEXED status. Vector dimensions/embedding schema, Gemini, public visibility, and cloud delivery remain TBD. See `docs/keyword-search.md` for manual checks.
+
+- **Local extraction slice (2026-10-01):** `services/processing` contains the Python PyMuPDF/python-docx core and operator CLI; see its README. Migration 0004 adds `processing_jobs` with `QUEUED/PROCESSING/EXTRACTED/FAILED`, created atomically on acceptance and backfilled for existing accepted records. Worker `/api/processing/jobs` plus `/:id/claim`, `/:id/result`, `/:id/retry` require managers. Lease-fenced results prevent stale completions; failed jobs require explicit retry. `EXTRACTED` is not indexed. OCR and Cloud Run deployment/queue delivery remain deferred.
+- Processing tests: `services/processing/.venv/Scripts/python.exe -m unittest discover -s services/processing -v` from repo root, **in addition to** `npm run check`. Venv created with Python 3.13; install `services/processing/requirements.txt` into it. No gcloud or cloud billing setup performed.
+
+- Outbox recovery (2026-10-01): migration 0003 adds claim tokens and expiring leases. Notification completion is recorded after dispatch; failures have a one-minute cooldown, abandoned claims expire after five minutes. A five-minute scheduled sweep enqueues up to 50 due rows, including failed initial enqueues. The cron runs automatically only on a deployed Worker; local/manual invocation uses Wrangler's scheduled-event testing. Real external email delivery remains at-least-once across a send/DB failure; the log adapter is not proof of Gmail delivery.
+
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
 - Record approved changes to the architecture baseline with rationale and date in `SULUAN_ARCHITECTURE_V1_CONTEXT.md`.

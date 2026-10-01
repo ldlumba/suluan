@@ -30,8 +30,8 @@ export const auditEvents = pgTable('audit_events', {
 /**
  * Transactional outbox: domain writes and their follow-up jobs commit
  * atomically. A queue consumer claims unprocessed rows (processed_at IS
- * NULL) and dispatches them. Retried deliveries re-check the claim, so
- * repeated messages never duplicate side effects.
+ * NULL) using an expiring lease. Completion follows dispatch; abandoned
+ * claims are recoverable. External delivery is at-least-once.
  */
 export const outboxEvents = pgTable('outbox_events', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -43,6 +43,8 @@ export const outboxEvents = pgTable('outbox_events', {
     .defaultNow()
     .notNull(),
   processedAt: timestamp('processed_at', { withTimezone: true }),
+  claimToken: uuid('claim_token'),
+  leaseUntil: timestamp('lease_until', { withTimezone: true }),
 })
 
 export const notificationStatus = pgEnum('notification_status', [

@@ -126,6 +126,10 @@ export async function recordDecisionAtomic(
       SELECT nr.id, ${input.r2Key}, ${input.fileName}, ${input.mimeType}
       FROM new_record nr
     ),
+    new_processing_job AS (
+      INSERT INTO processing_jobs (record_id)
+      SELECT id FROM new_record
+    ),
     new_audit AS (
       INSERT INTO audit_events
         (actor_id, action, entity_type, entity_id, context)

@@ -8,27 +8,59 @@ export interface OutboxMessage {
 }
 
 /**
- * Claim one outbox row and dispatch it. The UPDATE … WHERE processed_at IS
- * NULL is the atomic claim: concurrent or retried deliveries re-check it,
- * so only the first claimer dispatches. Returns what happened for logging.
+ * Expiring claims recover after crashes. Completion is recorded only after
+ * dispatch. External email remains at-least-once across a send/DB crash;
+ * a future real adapter must account for that ambiguity.
  */
 export async function processOutboxEvent(
   db: Db,
   outboxId: string,
   email: EmailAdapter,
   reoMailbox?: string,
-): Promise<'sent' | 'skipped' | 'already-processed'> {
+): Promise<'sent' | 'skipped' | 'already-processed' | 'busy'> {
+  const claimToken = crypto.randomUUID()
   const claimed = await db.execute(sql`
-    update outbox_events set processed_at = now()
+    update outbox_events
+    set claim_token = ${claimToken}, lease_until = now() + interval '5 minutes'
     where id = ${outboxId} and processed_at is null
+      and (lease_until is null or lease_until < now())
     returning id, event_type as "eventType", payload
   `)
-  if (claimed.rows.length === 0) return 'already-processed'
+  if (claimed.rows.length === 0) {
+    const current = await db.execute(sql`
+      select processed_at from outbox_events where id = ${outboxId}
+    `)
+    return current.rows.length && current.rows[0].processed_at === null
+      ? 'busy'
+      : 'already-processed'
+  }
   const event = claimed.rows[0] as {
     id: string
     eventType: string
     payload: Record<string, string> | null
   }
+  try {
+    const outcome = await dispatchNotification(db, event, email, reoMailbox)
+    await db.execute(sql`
+      update outbox_events set processed_at = now(), claim_token = null, lease_until = null
+      where id = ${outboxId} and claim_token = ${claimToken}
+    `)
+    return outcome
+  } catch (err) {
+    await db.execute(sql`
+      update outbox_events set claim_token = null, lease_until = now() + interval '1 minute'
+      where id = ${outboxId} and claim_token = ${claimToken}
+    `)
+    throw err
+  }
+}
+
+async function dispatchNotification(
+  db: Db,
+  event: { eventType: string; payload: Record<string, string> | null },
+  email: EmailAdapter,
+  reoMailbox?: string,
+): Promise<'sent' | 'skipped'> {
   const payload = event.payload ?? {}
 
   interface Draft {
@@ -117,3 +149,18 @@ export async function processOutboxEvent(
 }
 
 export { outboxEvents }
+
+/** Bounded sweep recovers failed enqueue and exhausted queue deliveries. */
+export async function sweepOutbox(
+  db: Db,
+  queue: { send(message: unknown): Promise<void> },
+) {
+  const due = await db.execute(sql`
+    select id from outbox_events
+    where processed_at is null and (lease_until is null or lease_until < now())
+    order by created_at limit 50
+  `)
+  for (const row of due.rows) {
+    await queue.send({ outboxId: row.id })
+  }
+}

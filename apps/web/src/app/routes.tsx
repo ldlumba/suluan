@@ -5,6 +5,7 @@ import { SignInPage } from './pages/SignInPage'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { NewSubmissionPage } from '@/features/submissions/NewSubmissionPage'
 import { ReviewQueuePage } from '@/features/review/ReviewQueuePage'
+import { SearchPage } from '@/features/search/SearchPage'
 
 /**
  * Route configuration, kept separate from the browser router instance so
@@ -16,6 +17,14 @@ export const routes = [
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/signin', element: <SignInPage /> },
+      {
+        path: '/search',
+        element: (
+          <ProtectedRoute>
+            <SearchPage />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: '/submit',
         element: (

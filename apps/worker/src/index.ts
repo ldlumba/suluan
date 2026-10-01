@@ -2,7 +2,11 @@ import { productionVerifier } from './auth'
 import { createApp } from './app'
 import { createDb } from './db'
 import { logEmailAdapter } from './email'
-import { processOutboxEvent, type OutboxMessage } from './notifications'
+import {
+  processOutboxEvent,
+  sweepOutbox,
+  type OutboxMessage,
+} from './notifications'
 import type { Env, QueueMessageLike } from './config'
 
 const app = createApp(productionVerifier)
@@ -29,7 +33,8 @@ async function handleQueue(
         env.REO_MAILBOX,
       )
       console.log(`outbox ${msg.body.outboxId}: ${outcome}`)
-      msg.ack()
+      if (outcome === 'busy') msg.retry()
+      else msg.ack()
     } catch (err) {
       console.error('queue message failed', msg.body, err)
       msg.retry()
@@ -40,4 +45,7 @@ async function handleQueue(
 export default {
   fetch: app.fetch,
   queue: handleQueue,
+  async scheduled(_event: unknown, env: Env) {
+    await sweepOutbox(createDb(env.DATABASE_URL), env.NOTIFICATIONS)
+  },
 }
