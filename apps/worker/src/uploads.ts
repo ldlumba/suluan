@@ -87,3 +87,25 @@ export function validateUploadFile(file: File): ValidatedUpload | FileRejection 
   if (file.size > UPLOAD_POLICY.maxSizeBytes) return 'file_too_large'
   return { fileName, mimeType, sizeBytes: file.size }
 }
+
+/**
+ * Build the manager-download file name from the submission title, keeping
+ * the original extension so the OS still recognizes the type. Reserved
+ * filename characters and control characters become underscores; the
+ * result is truncated to leave room for the extension. Falls back to the
+ * original file name when the title has no usable characters.
+ */
+export function buildDownloadFileName(
+  title: string,
+  originalFileName: string,
+): string {
+  const ext = originalFileName.split('.').pop()?.toLowerCase()
+  const suffix = ext === 'pdf' || ext === 'docx' ? `.${ext}` : ''
+  const cleaned = title
+    .replace(/[\\/:"*?<>|%\p{C}]/gu, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180)
+  if (!cleaned) return originalFileName || 'document'
+  return `${cleaned}${suffix}`
+}

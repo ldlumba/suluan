@@ -7,7 +7,12 @@ import { verifyIdToken, type TokenVerifier } from './auth'
 import { isAllowedDomain, parseAllowedOrigins, type Env } from './config'
 import { createDb } from './db'
 import { createSubmissionAtomic, recordDecisionAtomic } from './writes'
-import { UPLOAD_POLICY, buildIntakeKey, validateUploadFile } from './uploads'
+import {
+  UPLOAD_POLICY,
+  buildDownloadFileName,
+  buildIntakeKey,
+  validateUploadFile,
+} from './uploads'
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
 
 type Role = 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN'
@@ -38,6 +43,9 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
       origin: origins,
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type'],
+      // The download endpoint streams bytes with a Content-Disposition
+      // filename; browsers can only read that header when it is exposed.
+      exposeHeaders: ['Content-Disposition'],
       maxAge: 600,
     })(c, next)
   })
@@ -426,7 +434,14 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
       if (!obj) {
         return c.json({ error: 'file_missing' }, 410)
       }
-      const safeName = file.fileName.replace(/["\\\r\n]/g, '_')
+      // Reviewers get the paper named after the study, not the submitter's
+      // local file name. The quoted part stays ASCII-safe; the filename*
+      // part carries the full UTF-8 name.
+      const downloadName = buildDownloadFileName(
+        submission.title,
+        file.fileName,
+      )
+      const asciiName = downloadName.replace(/[^\x20-\x7E]/g, '_')
       const headers = new Headers()
       headers.set(
         'content-type',
@@ -434,7 +449,7 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
       )
       headers.set(
         'content-disposition',
-        `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+        `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
       )
       headers.set('content-length', String(obj.size))
       // Authorized content: never let caches store it.

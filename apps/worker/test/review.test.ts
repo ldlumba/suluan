@@ -210,15 +210,19 @@ needsDb('review workflow', () => {
     expect(records).toHaveLength(0)
   })
 
-  it('denies file downloads to submitters, streams bytes to managers', async () => {
+  it('denies file downloads to submitters, streams title-named bytes to managers', async () => {
     const { id } = await submit('Download check')
     const denied = await get(`/api/submissions/${id}/download`, userToken)
     expect(denied.status).toBe(403)
     const allowed = await get(`/api/submissions/${id}/download`, managerToken)
     expect(allowed.status).toBe(200)
     expect(allowed.headers.get('content-type')).toContain('application/pdf')
-    expect(allowed.headers.get('content-disposition')).toContain('attachment')
-    expect(allowed.headers.get('content-disposition')).toContain('paper.pdf')
+    const disposition = allowed.headers.get('content-disposition') ?? ''
+    expect(disposition).toContain('attachment')
+    // Named after the study, with the original extension — not the
+    // submitter's local file name.
+    expect(disposition).toContain('Download check.pdf')
+    expect(disposition).toContain("filename*=UTF-8''Download%20check.pdf")
     const bytes = new Uint8Array(await allowed.arrayBuffer())
     expect(bytes.length).toBe(777)
   })
