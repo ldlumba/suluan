@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm run dev -w web",
     "dev:worker": "npm run dev -w @suluan/worker",
+    "dev:worker:remote": "npm run dev:remote -w @suluan/worker",
     "build": "npm run build -w web",
     "preview": "npm run preview -w web",
     "lint": "npm run lint --workspaces --if-present",

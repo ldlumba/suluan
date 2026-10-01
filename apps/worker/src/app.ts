@@ -7,7 +7,7 @@ import { verifyIdToken, type TokenVerifier } from './auth'
 import { isAllowedDomain, parseAllowedOrigins, type Env } from './config'
 import { createDb } from './db'
 import { createSubmissionAtomic, recordDecisionAtomic } from './writes'
-import { UPLOAD_POLICY, buildIntakeKey, extensionMatchesMime } from './uploads'
+import { UPLOAD_POLICY, buildIntakeKey, extensionMatchesMime, supportsPresignedUrls } from './uploads'
 import {
   createSubmissionSchema,
   decideSchema,
@@ -154,6 +154,9 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
     zValidator('json', initiateUploadSchema),
     async (c) => {
       const { fileName, mimeType, sizeBytes } = c.req.valid('json')
+      if (!supportsPresignedUrls(c.env.DOCUMENTS)) {
+        return c.json({ error: 'presigned_unsupported' }, 501)
+      }
       if (!UPLOAD_POLICY.allowedMimeTypes.includes(mimeType)) {
         return c.json({ error: 'unsupported_file_type' }, 400)
       }
@@ -413,6 +416,9 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
     requireAuth,
     requireRole(...MANAGERS),
     async (c) => {
+      if (!supportsPresignedUrls(c.env.DOCUMENTS)) {
+        return c.json({ error: 'presigned_unsupported' }, 501)
+      }
       const db = createDb(c.env.DATABASE_URL)
       const submission = await db.query.submissions.findFirst({
         where: eq(submissions.id, c.req.param('id')),

@@ -47,7 +47,9 @@ Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alo
   - Cloudflare Workers have no TCP Postgres access: the Worker reaches Neon via the HTTP driver (`@neondatabase/serverless`) — never `pg` direct. (Supersedes the earlier forward-looking note.)
   - neon-http has **no interactive transactions** (`db.transaction()` throws). Multi-row atomicity uses single-statement data-modifying CTEs (`apps/worker/src/writes.ts`); unique constraints arbitrate concurrent duplicates. The outbox pattern still holds — the CTE *is* the atomic commit.
   - `wrangler dev` emulates R2 and Queues **locally** (`.wrangler/`, git-ignored) — dev uploads/notifications never touch real Cloudflare resources unless `--remote` is passed.
+  - Local R2 emulation has **no presigned URLs**: initiate/download return guided `501 presigned_unsupported` there. Test real uploads with `npm run dev:worker:remote` (needs `wrangler login` once + a bucket CORS policy allowing the frontend origin for PUT/GET).
 - Web auth: Firebase config lives in `apps/web/.env.local` (`VITE_FIREBASE_*`, git-ignored); missing config disables sign-in UI only. `src/setupTests.ts` registers testing-library cleanup manually — Vitest runs without globals so auto-cleanup never fires (renders leak between tests without it).
+- Web UI: Base UI `Select.Value` resolves the trigger label **only** from the `items` data prop — with pure component children it falls back to the raw value. Always pass `items={list.map(x => ({ value: x.id, label: x.name }))}` alongside `SelectItem` children.
 
 ## Locked stack (do not add to it casually)
 

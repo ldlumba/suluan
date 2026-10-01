@@ -9,6 +9,7 @@ import {
   testDb,
   type TestAuth,
 } from './helpers'
+import type { R2BucketLike } from '../src/config'
 
 /**
  * Upload-then-finalize flow. All tests need the database (requireAuth
@@ -106,6 +107,36 @@ needsDb('submission intake', () => {
       error: 'file_too_large',
       maxSizeBytes: 30 * 1024 * 1024,
     })
+  })
+
+  it('reports presigned URLs as unavailable when the binding lacks them', async () => {
+    // Local `wrangler dev` R2 emulation has no createPresignedUrl: the
+    // route must answer 501 with guidance, never crash with a TypeError.
+    const token = await userToken('uid-local', 'local@ua.edu.ph')
+    const env = {
+      ...t.testEnv(),
+      DOCUMENTS: {
+        head: async () => null,
+      } as unknown as R2BucketLike,
+    }
+    const res = await t.app.request(
+      '/api/uploads/initiate',
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: 'paper.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 100,
+        }),
+      },
+      env,
+    )
+    expect(res.status).toBe(501)
+    expect(await res.json()).toMatchObject({ error: 'presigned_unsupported' })
   })
 
   it('issues server-owned keys and neutralizes path traversal', async () => {

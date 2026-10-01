@@ -41,3 +41,14 @@ export function extensionMatchesMime(
   const ext = fileName.split('.').pop()?.toLowerCase()
   return ext === expected
 }
+
+/**
+ * Local `wrangler dev` R2 emulation does not implement presigned URLs.
+ * Detect it so routes return a guided 501 instead of crashing on a
+ * TypeError. Remote/production R2 always supports them.
+ */
+export function supportsPresignedUrls(bucket: {
+  createPresignedUrl?: unknown
+}): boolean {
+  return typeof bucket.createPresignedUrl === 'function'
+}

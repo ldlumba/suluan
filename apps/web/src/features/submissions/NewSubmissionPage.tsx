@@ -33,6 +33,8 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   file_too_large: 'The file exceeds the 30 MB limit.',
   upload_not_found: 'The upload did not complete. Please try again.',
   upload_size_mismatch: 'The uploaded file changed during transfer. Please try again.',
+  presigned_unsupported:
+    'Direct uploads are unavailable with local storage emulation. Restart the Worker against remote R2 (see AGENTS.md).',
   unknown_school: 'The selected school is no longer available.',
   unknown_course: 'The selected course is no longer available.',
   course_school_mismatch: 'The selected course does not belong to the selected school.',
@@ -217,7 +219,11 @@ export function NewSubmissionPage() {
                 control={form.control}
                 name="schoolId"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    items={schools.map((s) => ({ value: s.id, label: s.name }))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a school" />
                     </SelectTrigger>
@@ -242,6 +248,7 @@ export function NewSubmissionPage() {
                     value={field.value}
                     onValueChange={field.onChange}
                     disabled={courses.length === 0}
+                    items={courses.map((c) => ({ value: c.id, label: c.name }))}
                   >
                     <SelectTrigger>
                       <SelectValue
