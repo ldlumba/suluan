@@ -88,3 +88,27 @@ reports its daily development cap, or 20 batches have run. A provider error or
 may consume quota. Existing vectors remain intact, so rerunning later resumes
 only missing chunks. The command accepts localhost Worker origins only and never
 accepts the Firebase token as a command-line argument.
+
+## Evaluate semantic relevance
+
+Once every chunk has a vector, restart the Worker and run the labeled evaluation
+with a fresh manager token in `SULUAN_ID_TOKEN`:
+
+```powershell
+services/processing/.venv/Scripts/python.exe services/processing/semantic_relevance.py
+```
+
+The 25 probes in `semantic_relevance_queries.json` include positive, adjacent
+hard-positive, and clean-negative queries. Each semantic query is one paid input;
+the command waits three seconds between calls, never retries a failure, and stops
+if the Worker reports anything other than `semanticStatus: ready`. It also runs
+the free keyword path and computes semantic, keyword, and reciprocal-rank-fusion
+metrics. The report includes distance and margin distributions plus a diagnostic
+for closest-chunk length bias; it does not automatically change production
+thresholds or ranking.
+
+Sanitized results are written to `logs/semantic-relevance.json`, which is ignored
+by Git and checkpointed after every completed probe, so a later failure does not
+discard earlier paid results. Extracted snippets and credentials are never
+written or printed. Review the report before recording any conclusions, then
+restore the temporary request cap from 40 to 20.

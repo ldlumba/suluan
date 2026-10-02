@@ -1,0 +1,172 @@
+[
+  {
+    "id": "coral-physiology",
+    "kind": "positive",
+    "query": "physiological responses of Caribbean corals to warming and ocean acidification",
+    "expectedTitle": "[CORPUS] 01 Coral Physiology Carribean",
+    "expectedChunks": 74
+  },
+  {
+    "id": "child-nutrition",
+    "kind": "positive",
+    "query": "relationship between children's protein intake, height, weight, and growth",
+    "expectedTitle": "[CORPUS] Child, Height, Weight, Protein Intake",
+    "expectedChunks": 80
+  },
+  {
+    "id": "climate-food-insecurity",
+    "kind": "positive",
+    "query": "how extreme weather and climate shocks make households food insecure",
+    "expectedTitle": "[CORPUS] Climate Shocks Food Insecurity",
+    "expectedChunks": 45
+  },
+  {
+    "id": "coffee-farmers",
+    "kind": "positive",
+    "query": "livelihood and production problems experienced by coffee growers in Sultan Kudarat",
+    "expectedTitle": "[CORPUS] Coffee Farmers Sultan Kudarat",
+    "expectedChunks": 26
+  },
+  {
+    "id": "contact-tracing-rights",
+    "kind": "positive",
+    "query": "privacy and human rights risks of smartphone contact tracing during a pandemic",
+    "expectedTitle": "[CORPUS] Digital Contact Tracing Human Rights",
+    "expectedChunks": 40
+  },
+  {
+    "id": "fishing-fleet-diversification",
+    "kind": "positive",
+    "query": "whether fishing vessel owners can reduce income risk by diversifying their fleet",
+    "expectedTitle": "[CORPUS] Fisheries Fleet Diversification",
+    "expectedChunks": 63
+  },
+  {
+    "id": "market-access-food-security",
+    "kind": "positive",
+    "query": "how access to agricultural markets affects household food security in Punjab",
+    "expectedTitle": "[CORPUS] Food Security Punjab Market Access",
+    "expectedChunks": 46
+  },
+  {
+    "id": "library-gamification",
+    "kind": "positive",
+    "query": "using game mechanics to increase student engagement with university library services",
+    "expectedTitle": "[CORPUS] Gamification Academic Library Services",
+    "expectedChunks": 28
+  },
+  {
+    "id": "influenza-extremes",
+    "kind": "positive",
+    "query": "statistical extreme value methods for estimating severe influenza epidemic peaks",
+    "expectedTitle": "[CORPUS] Influenza Epidemics Extreme Value",
+    "expectedChunks": 61
+  },
+  {
+    "id": "marine-reserve-recovery",
+    "kind": "positive",
+    "query": "whether no-take marine protected areas help coral reefs recover after disturbance",
+    "expectedTitle": "[CORPUS] Marine Reserves Coral Recovery",
+    "expectedChunks": 26
+  },
+  {
+    "id": "reef-metabolism",
+    "kind": "positive",
+    "query": "daily pulses of oxygen production and respiration in coral reef metabolism",
+    "expectedTitle": "[CORPUS] Metabolic Pulse Coral Reefs",
+    "expectedChunks": 50
+  },
+  {
+    "id": "fisheries-law",
+    "kind": "positive",
+    "query": "Philippine legal rules, penalties, licensing, and municipal jurisdiction for fishing",
+    "expectedTitle": "[CORPUS] Philippine Fisheries Code",
+    "expectedChunks": 67
+  },
+  {
+    "id": "earthquake-instrumentation",
+    "kind": "positive",
+    "query": "measured accelerometer response of instrumented buildings after an earthquake",
+    "expectedTitle": "[CORPUS] Post Earthquake Instrumented Buildings",
+    "expectedChunks": 36
+  },
+  {
+    "id": "unsupervised-damage-detection",
+    "kind": "positive",
+    "query": "detecting structural damage from unlabeled vibration sensor data without supervised training",
+    "expectedTitle": "[CORPUS] Structural Damage Detection Unsupervised",
+    "expectedChunks": 27
+  },
+  {
+    "id": "tourism-cultural-heritage",
+    "kind": "positive",
+    "query": "whether tourism students' historical awareness improves appreciation of local cultural heritage",
+    "expectedTitle": "The Relationship Between Tourism Students’ Historical Awareness and Their Appreciation of Local Cultural Heritage Evidence From San Fernando, Pampanga",
+    "expectedChunks": 27
+  },
+  {
+    "id": "contrast-coral-reserve",
+    "kind": "hard_positive",
+    "query": "reef recovery inside protected no-fishing zones after a major ecological disturbance",
+    "expectedTitle": "[CORPUS] Marine Reserves Coral Recovery",
+    "expectedChunks": 26,
+    "contrastTitle": "[CORPUS] 01 Coral Physiology Carribean"
+  },
+  {
+    "id": "contrast-coral-metabolism",
+    "kind": "hard_positive",
+    "query": "diel changes in reef oxygen flux, photosynthesis, and community respiration",
+    "expectedTitle": "[CORPUS] Metabolic Pulse Coral Reefs",
+    "expectedChunks": 50,
+    "contrastTitle": "[CORPUS] Marine Reserves Coral Recovery"
+  },
+  {
+    "id": "contrast-fisheries-law",
+    "kind": "hard_positive",
+    "query": "statutory sanctions for illegal fishing and authority over municipal waters",
+    "expectedTitle": "[CORPUS] Philippine Fisheries Code",
+    "expectedChunks": 67,
+    "contrastTitle": "[CORPUS] Fisheries Fleet Diversification"
+  },
+  {
+    "id": "contrast-structural-damage",
+    "kind": "hard_positive",
+    "query": "unsupervised anomaly detection in structural vibration measurements",
+    "expectedTitle": "[CORPUS] Structural Damage Detection Unsupervised",
+    "expectedChunks": 27,
+    "contrastTitle": "[CORPUS] Post Earthquake Instrumented Buildings"
+  },
+  {
+    "id": "contrast-market-access",
+    "kind": "hard_positive",
+    "query": "farm household nutrition outcomes associated with distance and access to produce markets",
+    "expectedTitle": "[CORPUS] Food Security Punjab Market Access",
+    "expectedChunks": 46,
+    "contrastTitle": "[CORPUS] Climate Shocks Food Insecurity"
+  },
+  {
+    "id": "negative-quantum",
+    "kind": "clean_negative",
+    "query": "fault tolerant quantum computing with topological qubits"
+  },
+  {
+    "id": "negative-medieval-poetry",
+    "kind": "clean_negative",
+    "query": "meter and allegory in medieval European court poetry"
+  },
+  {
+    "id": "negative-compilers",
+    "kind": "clean_negative",
+    "query": "compiler register allocation and instruction scheduling optimization"
+  },
+  {
+    "id": "negative-exoplanets",
+    "kind": "clean_negative",
+    "query": "spectroscopic detection of molecules in exoplanet atmospheres"
+  },
+  {
+    "id": "negative-accounting",
+    "kind": "clean_negative",
+    "query": "deferred tax asset recognition under international accounting standards"
+  }
+]
