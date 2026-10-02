@@ -16,6 +16,11 @@ import {
  * Database-gated like the other route suites.
  */
 const needsDb = process.env.DATABASE_URL ? describe : describe.skip
+const DB_TEST_TIMEOUT = 30_000
+
+function dbIt(name: string, test: () => Promise<void>) {
+  it(name, test, DB_TEST_TIMEOUT)
+}
 
 needsDb('record visibility and submitter status', () => {
   let t: TestAuth
@@ -138,7 +143,7 @@ needsDb('record visibility and submitter status', () => {
     return { recordId: record.id, submissionId: res.submissionId }
   }
 
-  it('records manager-selected visibility and rejects invalid embargo input', async () => {
+  dbIt('records manager-selected visibility and rejects invalid embargo input', async () => {
     const ok = await acceptWith('UA_ONLY')
     const db = testDb()
     const [row] = await db.select().from(researchRecords).where(eq(researchRecords.id, ok.recordId))
@@ -169,7 +174,7 @@ needsDb('record visibility and submitter status', () => {
     recordIds.push(stored.id)
   })
 
-  it('limits anonymous search to PUBLIC records without a live embargo', async () => {
+  dbIt('limits anonymous search to PUBLIC records without a live embargo', async () => {
     const publicPaper = await acceptWith('PUBLIC')
     const uaOnly = await acceptWith('UA_ONLY')
     const restricted = await acceptWith('RESTRICTED')
@@ -198,7 +203,7 @@ needsDb('record visibility and submitter status', () => {
     expect(mgrIds).toContain(restricted.recordId)
   })
 
-  it('degrades an embargoed PUBLIC record to UA-only for visitors', async () => {
+  dbIt('degrades an embargoed PUBLIC record to UA-only for visitors', async () => {
     // The API no-ops a date on PUBLIC, so this defensive read-side rule is
     // arranged directly in Neon (ops imports can produce such a row).
     const paper = await acceptWith('PUBLIC')
@@ -220,7 +225,7 @@ needsDb('record visibility and submitter status', () => {
     expect(row?.visibility).toBe('UA_ONLY')
   })
 
-  it('auto-lifts a restricted record to public once its embargo elapses', async () => {
+  dbIt('auto-lifts a restricted record to public once its embargo elapses', async () => {
     // A past date is rejected at input, so the elapsed-embargo state is
     // arranged directly in Neon to exercise the read-side auto-lift.
     const paper = await acceptWith('RESTRICTED', '2099-01-01')
@@ -237,7 +242,7 @@ needsDb('record visibility and submitter status', () => {
     expect(row?.visibility).toBe('PUBLIC')
   })
 
-  it('serves downloads by visibility and never confirms hidden records', async () => {
+  dbIt('serves downloads by visibility and never confirms hidden records', async () => {
     const publicPaper = await acceptWith('PUBLIC')
     const restricted = await acceptWith('RESTRICTED')
     // The intake flow already stored the bytes in the R2 mock under the
@@ -269,7 +274,7 @@ needsDb('record visibility and submitter status', () => {
     expect(probe.status).toBe(404)
   })
 
-  it('shows a submitter only their own status and remarks', async () => {
+  dbIt('shows a submitter only their own status and remarks', async () => {
     const mine = await acceptWith('PUBLIC')
     const mineRes = await get('/api/submissions/mine', author)
     expect(mineRes.status).toBe(200)

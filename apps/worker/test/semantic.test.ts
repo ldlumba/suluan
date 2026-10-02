@@ -21,6 +21,11 @@ import {
 const needsDb = process.env.DATABASE_URL ? describe : describe.skip
 const realFetch = globalThis.fetch
 const GEMINI_HOST = 'generativelanguage.googleapis.com'
+const DB_TEST_TIMEOUT = 30_000
+
+function dbIt(name: string, test: () => Promise<void>) {
+  it(name, test, DB_TEST_TIMEOUT)
+}
 
 needsDb('semantic search', () => {
   let t: TestAuth
@@ -249,7 +254,7 @@ needsDb('semantic search', () => {
     stubGemini()
   })
 
-  it('reports unconfigured when no key is present and does not call out', async () => {
+  dbIt('reports unconfigured when no key is present and does not call out', async () => {
     const calls = stubGemini()
     const res = await t.app.request(
       '/api/search/semantic?q=test',
@@ -263,7 +268,7 @@ needsDb('semantic search', () => {
     expect(calls.calls).toBe(0)
   })
 
-  it('rejects preparation for anonymous and ordinary users', async () => {
+  dbIt('rejects preparation for anonymous and ordinary users', async () => {
     expect((await get('/api/search/semantic/prepare', null)).status).toBe(404)
     const anon = await t.app.request(
       '/api/search/semantic/prepare',
@@ -274,7 +279,7 @@ needsDb('semantic search', () => {
     expect((await post('/api/search/semantic/prepare', author, {})).status).toBe(403)
   })
 
-  it('embeds once and is idempotent across repeated preparations', async () => {
+  dbIt('embeds once and is idempotent across repeated preparations', async () => {
     const p = await paper('PUBLIC', `solar ${tag} photovoltaic efficiency`)
     const first = await embedAll(p.recordId)
     expect(first.embedded).toBe(1)
@@ -292,7 +297,7 @@ needsDb('semantic search', () => {
     expect(rows.rows[0].n).toBe(1)
   })
 
-  it('embeds every chunk, repairs a partial snapshot, then converges to zero', async () => {
+  dbIt('embeds every chunk, repairs a partial snapshot, then converges to zero', async () => {
     // A one-chunk fixture cannot detect the original failure: the semantic
     // snapshot insert succeeded for chunk 0, then ON CONFLICT DO NOTHING
     // returned no id for chunks 1..N and silently skipped every later vector.
@@ -347,7 +352,7 @@ needsDb('semantic search', () => {
     expect(provider.calls).toBe(2)
   })
 
-  it('uses one provider request for 20 chunks and resumes the remainder', async () => {
+  dbIt('uses one provider request for 20 chunks and resumes the remainder', async () => {
     await testDb().execute(sql`delete from embedding_usage`)
     const p = await paper(
       'PUBLIC',
@@ -376,7 +381,7 @@ needsDb('semantic search', () => {
     expect(rows.rows[0].n).toBe(21)
   })
 
-  it('reports provider rate limiting distinctly and keeps existing vectors', async () => {
+  dbIt('reports provider rate limiting distinctly and keeps existing vectors', async () => {
     const p = await paper('PUBLIC', `rate limited ${tag} preparation`)
     vi.stubGlobal(
       'fetch',
@@ -410,7 +415,7 @@ needsDb('semantic search', () => {
     expect(rows.rows[0].n).toBe(0)
   })
 
-  it('reports a provider failure as 502 rather than an opaque 500', async () => {
+  dbIt('reports a provider failure as 502 rather than an opaque 500', async () => {
     await paper('PUBLIC', `upstream ${tag} failure during preparation`)
     vi.stubGlobal(
       'fetch',
@@ -433,7 +438,7 @@ needsDb('semantic search', () => {
     expect(body.embedded).toBe(0)
   })
 
-  it('stores vectors normalized at the approved width and model', async () => {
+  dbIt('stores vectors normalized at the approved width and model', async () => {
     const p = await paper('PUBLIC', `normalized ${tag} vector storage check`)
     expect((await embedAll(p.recordId)).embedded).toBe(1)
     const rows = await testDb().execute(sql`
@@ -455,7 +460,7 @@ needsDb('semantic search', () => {
     expect(row.stored).toBe(EMBEDDING_DIMS)
   })
 
-  it('ranks the closest paper first and applies visibility to results', async () => {
+  dbIt('ranks the closest paper first and applies visibility to results', async () => {
     // Earlier preparation tests intentionally charge the shared development
     // bucket. Ranking needs provider calls of its own and is not a quota test.
     await testDb().execute(sql`delete from embedding_usage`)
@@ -517,7 +522,7 @@ needsDb('semantic search', () => {
     )
   })
 
-  it('applies the distance guardrail to controlled vector geometry', async () => {
+  dbIt('applies the distance guardrail to controlled vector geometry', async () => {
     // Isolate the daily budget from earlier semantic tests; the quota itself is
     // tested separately below. This proves the SQL boundary and visibility
     // composition only. Synthetic unit vectors cannot validate whether 0.7
@@ -573,7 +578,7 @@ needsDb('semantic search', () => {
     expect(provider.calls).toBe(7) // 4 document batches + 3 query calls
   })
 
-  it('orders results by ascending distance rather than by id', async () => {
+  dbIt('orders results by ascending distance rather than by id', async () => {
     await testDb().execute(sql`delete from embedding_usage`)
     // Guards the ORDER BY itself. The visibility test above can pass on a
     // single eligible row regardless of ordering, so rank several here.
@@ -592,7 +597,7 @@ needsDb('semantic search', () => {
     expect(distances).toEqual(sorted)
   })
 
-  it('serves anonymous results cacheably and signed-in results privately', async () => {
+  dbIt('serves anonymous results cacheably and signed-in results privately', async () => {
     const p = await paper('PUBLIC', `cache ${tag} header semantics`)
     expect((await embedAll(p.recordId)).embedded).toBe(1)
     const anon = await get('/api/search/semantic?q=cache', null)
@@ -601,7 +606,7 @@ needsDb('semantic search', () => {
     expect(signedIn.headers.get('cache-control')).toBe('private, no-store')
   })
 
-  it('degrades to keyword instead of failing when the provider errors', async () => {
+  dbIt('degrades to keyword instead of failing when the provider errors', async () => {
     const p = await paper('PUBLIC', `provider ${tag} failure fallback check`)
     expect((await embedAll(p.recordId)).embedded).toBe(1)
     vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
@@ -618,7 +623,7 @@ needsDb('semantic search', () => {
     expect(body.items).toEqual([])
   })
 
-  it('enforces the daily cap server-side and never calls the provider past it', async () => {
+  dbIt('enforces the daily cap server-side and never calls the provider past it', async () => {
     const db = testDb()
     await db.execute(sql`delete from embedding_usage`)
     const before = await get('/api/search/semantic?q=quota probe', null)
@@ -635,9 +640,9 @@ needsDb('semantic search', () => {
     // without any provider traffic.
     await db.execute(sql`
       insert into embedding_usage (bucket, actor_key, day, requests, inputs)
-      values ('dev_global', 'all', current_date, 20, 2000)
+      values ('dev_global', 'all', current_date, 40, 2000)
       on conflict (bucket, actor_key, day) do update
-        set requests = 20, inputs = 2000
+        set requests = 40, inputs = 2000
     `)
     const calls = stubGemini()
     const denied = await get('/api/search/semantic?q=quota probe again', null)
@@ -649,7 +654,7 @@ needsDb('semantic search', () => {
     expect(calls.calls).toBe(0)
   })
 
-  it('does not consume quota for an empty query', async () => {
+  dbIt('does not consume quota for an empty query', async () => {
     const db = testDb()
     await db.execute(sql`delete from embedding_usage`)
     const res = await get('/api/search/semantic?q=', null)

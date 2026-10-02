@@ -71,11 +71,11 @@ there is no SDK that might reject it.
 
 ## Limits and behavior
 
-- **Daily development cap: 20 requests and 2,000 embedding inputs per day.**
-  Document chunks and search queries are inputs. With 20 chunks per provider
-  request, the request cap binds first at 400 chunks (roughly 8–16 theses) before
-  searches. The limit resets on the UTC day. When it is reached, semantic search
-  falls back to keyword results and says so — it does not error.
+- **Temporary relevance-evaluation cap: 40 requests and 2,000 embedding inputs
+  per UTC day.** The request cap was raised from 20 only to run the labeled
+  15-paper corpus evaluation and must return to 20 afterward. Document chunks
+  and search queries are both inputs. When either limit is reached, semantic
+  search falls back to keyword results and says so — it does not error.
 - **Preparation does not burst provider calls.** One manager action maps to one
   synchronous Gemini batch (up to 20 chunks). The observed free-tier limits are
   100 requests/minute, 30K tokens/minute, and 1K requests/day; TPM, not RPM or

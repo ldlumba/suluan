@@ -12,6 +12,12 @@ import {
 } from './helpers'
 
 const needsDb = process.env.DATABASE_URL ? describe : describe.skip
+const DB_TEST_TIMEOUT = 30_000
+
+function dbIt(name: string, test: () => Promise<void>) {
+  it(name, test, DB_TEST_TIMEOUT)
+}
+
 needsDb('restricted keyword discovery', () => {
   let t: TestAuth
   let manager: string
@@ -106,7 +112,7 @@ needsDb('restricted keyword discovery', () => {
         .where(eq(processingJobs.recordId, record.id))
     return { id, recordId: record.id }
   }
-  it('allows public reads but keeps preparation manager-only', async () => {
+  dbIt('allows public reads but keeps preparation manager-only', async () => {
     // Discovery is public (owner-approved 2026-10-01); only PUBLIC records
     // with an elapsed embargo are visible, enforced by the visibility filter.
     expect((await request('/api/search/records?q=private', null)).status).toBe(
@@ -119,7 +125,7 @@ needsDb('restricted keyword discovery', () => {
     expect((await request('/api/search/index', null, {})).status).toBe(401)
     expect((await request('/api/search/index', user, {})).status).toBe(403)
   })
-  it('indexes idempotently, matches full text and metadata, and excludes pending/rejected/queued records', async () => {
+  dbIt('indexes idempotently, matches full text and metadata, and excludes pending/rejected/queued records', async () => {
     const accepted = await fixture('ACCEPTED')
     const queued = await fixture('ACCEPTED', false)
     await fixture('PENDING')

@@ -35,13 +35,12 @@ export interface QuotaLimits {
 }
 
 /**
- * Dev cap: 20 requests AND 2,000 inputs per day. Chosen because a 2,000-char
- * chunker makes one thesis roughly 25-50 inputs, so a 100/day *input* cap
- * would only embed ~2 papers a day, while 20 requests alone would be far too
- * loose. Together this is about 40 papers/day, ample for development and
- * trivially inside the Gemini free tier.
+ * Temporary relevance-evaluation cap: 40 requests AND 2,000 inputs per day.
+ * The request cap was raised from 20 only for the labeled 15-paper corpus run;
+ * it remains far below the observed provider RPD limit and the input cap still
+ * bounds paid work. Restore 20 requests after relevance evaluation finishes.
  */
-export const DEV_LIMITS: QuotaLimits = { maxRequests: 20, maxInputs: 2000 }
+export const DEV_LIMITS: QuotaLimits = { maxRequests: 40, maxInputs: 2000 }
 
 /** Approved production query-side limits, applied to search calls only. */
 export const QUERY_LIMITS: Record<'anonymous' | 'authenticated', QuotaLimits> = {
