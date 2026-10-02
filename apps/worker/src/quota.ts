@@ -35,12 +35,11 @@ export interface QuotaLimits {
 }
 
 /**
- * Temporary relevance-evaluation cap: 40 requests AND 2,000 inputs per day.
- * The request cap was raised from 20 only for the labeled 15-paper corpus run;
- * it remains far below the observed provider RPD limit and the input cap still
- * bounds paid work. Restore 20 requests after relevance evaluation finishes.
+ * Development cap: 20 requests AND 2,000 inputs per day. Requests catch retry
+ * storms while inputs bound paid work. A temporary 40-request evaluation window
+ * was completed and reverted on 2026-10-02.
  */
-export const DEV_LIMITS: QuotaLimits = { maxRequests: 40, maxInputs: 2000 }
+export const DEV_LIMITS: QuotaLimits = { maxRequests: 20, maxInputs: 2000 }
 
 /** Approved production query-side limits, applied to search calls only. */
 export const QUERY_LIMITS: Record<'anonymous' | 'authenticated', QuotaLimits> = {

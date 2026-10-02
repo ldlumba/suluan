@@ -249,8 +249,9 @@ needsDb('semantic search', () => {
     return (await res.json()) as { embedded: number; papers: number; hasMore: boolean }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Quota counters are per UTC day, so each test starts from a clean slate.
+    await testDb().execute(sql`delete from embedding_usage`)
     stubGemini()
   })
 
@@ -640,9 +641,9 @@ needsDb('semantic search', () => {
     // without any provider traffic.
     await db.execute(sql`
       insert into embedding_usage (bucket, actor_key, day, requests, inputs)
-      values ('dev_global', 'all', current_date, 40, 2000)
+      values ('dev_global', 'all', current_date, 20, 2000)
       on conflict (bucket, actor_key, day) do update
-        set requests = 40, inputs = 2000
+        set requests = 20, inputs = 2000
     `)
     const calls = stubGemini()
     const denied = await get('/api/search/semantic?q=quota probe again', null)

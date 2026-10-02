@@ -71,11 +71,11 @@ there is no SDK that might reject it.
 
 ## Limits and behavior
 
-- **Temporary relevance-evaluation cap: 40 requests and 2,000 embedding inputs
-  per UTC day.** The request cap was raised from 20 only to run the labeled
-  15-paper corpus evaluation and must return to 20 afterward. Document chunks
-  and search queries are both inputs. When either limit is reached, semantic
-  search falls back to keyword results and says so — it does not error.
+- **Daily development cap: 20 requests and 2,000 embedding inputs per UTC day.**
+  The temporary 40-request relevance-evaluation window was completed and reverted
+  on 2026-10-02. Document chunks and search queries are both inputs. When either
+  limit is reached, semantic search falls back to keyword results and says so —
+  it does not error.
 - **Preparation does not burst provider calls.** One manager action maps to one
   synchronous Gemini batch (up to 20 chunks). The observed free-tier limits are
   100 requests/minute, 30K tokens/minute, and 1K requests/day; TPM, not RPM or
@@ -102,6 +102,34 @@ there is no SDK that might reject it.
   the minimum distance over all its chunks. More chunks create more chances for
   a spuriously close match, so relevance evaluation must include papers with
   varied lengths rather than tuning only on similarly sized documents.
+
+## Relevance evaluation — 2026-10-02
+
+The reproducible 25-query run against 806 vectors completed successfully: 15
+direct positives, five adjacent-topic hard positives, and five clean negatives.
+The manager view was used so all labeled UA-only records were eligible.
+
+- Semantic search ranked the labeled target first for **20/20 positive queries**
+  (Hit@1, Hit@3, Hit@10, and MRR all `1.0`). It also beat the named adjacent
+  paper in all **5/5** hard-positive contrasts.
+- Keyword search found the labeled target for only **1/20** probes. Reciprocal
+  rank fusion also scored `1.0`, but mostly inherited the semantic ordering; this
+  run does not show an independent hybrid improvement.
+- Positive target distances ranged from `0.1754` to `0.2733`. Clean-negative top
+  results ranged from `0.3881` to `0.4260`, leaving an observed gap of about
+  `0.1148`. The current `0.7` guardrail rejected none of those negatives.
+- Top-result frequency versus expected-paper chunk count had Pearson `r=0.153`.
+  That is weak in this sample, but does not rule out length bias: one 61-chunk
+  influenza paper was the nearest result for four of five unrelated queries.
+
+This validates semantic **ranking behavior in the curated development corpus**,
+not a production abstention threshold. The apparent best cutoff (`0.2733`) was
+selected and scored on the same small, topic-informed query set with only five
+clean negatives. Keep `MAX_SEMANTIC_DISTANCE = 0.7` as a defensive bound only;
+do not promote semantic mode to production until an independent/blinded holdout
+with realistic user phrasing validates a cutoff and tests false positives. Raw
+sanitized results remain local in the Git-ignored `logs/semantic-relevance.json`.
+
 - **Embeddings are per extraction.** Re-extracting a paper produces a new
   chunk snapshot, which needs a new embedding batch. A changed chunker version
   likewise requires re-embedding.

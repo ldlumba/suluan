@@ -110,5 +110,6 @@ thresholds or ranking.
 Sanitized results are written to `logs/semantic-relevance.json`, which is ignored
 by Git and checkpointed after every completed probe, so a later failure does not
 discard earlier paid results. Extracted snippets and credentials are never
-written or printed. Review the report before recording any conclusions, then
-restore the temporary request cap from 40 to 20.
+written or printed. Review the report before recording any conclusions. The
+temporary evaluation cap was restored to 20 requests/day after the 2026-10-02
+run; repeating all 25 probes therefore requires a separately approved window.
