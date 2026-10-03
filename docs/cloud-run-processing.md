@@ -2,14 +2,36 @@
 
 ## Status
 
-The authenticated pull contract and container entry point are implemented and
-locally tested. Nothing has been deployed: no billing account, budget alert,
-Google API, Artifact Registry repository, Cloud Run Job, or Scheduler trigger
-was created by this work.
+Development activation is verified as of 2026-10-03. The bounded pull
+contract and container entry point are implemented, remotely built, deployed
+as a manual Cloud Run Job, and smoke-tested end to end against the deployed
+Worker and remote R2. The PHP 250 monthly budget alert is set. Scheduler
+remains intentionally undeployed; execution stays manual.
 
-Deployment stays blocked until the owner verifies current pricing, attaches the
-approved development billing account, and creates the agreed **PHP 250 monthly
-budget alert**. Free-tier allowances are not a guarantee of zero cost.
+## Development smoke test (2026-10-03)
+
+- Project/region/job: `suluan-dev` / `asia-southeast1` / `suluan-processing`.
+- Successful execution: `suluan-processing-lssfx` (`1 / 1 complete`).
+- Tested image digest:
+  `sha256:b178570b3afb9017e7a332f2e45f6d2a76c6073e73f0244e341c8c52c7b2e033`.
+- Worker origin and workload audience:
+  `https://suluan-api.ctrlfinder.workers.dev` (both values identical).
+- Service identity: dedicated `suluan-processing` service account; short-lived
+  metadata-server ID token only, no JSON key and no shared secret.
+- Fixture: `[CLOUD TEST] Processing smoke test`, accepted by a manager, then
+  claimed, downloaded through the Worker, extracted in Cloud Run, and posted
+  with the claim-token lease. Search showed
+  `Full text searchable · Public` after keyword preparation.
+- Two faults were found and fixed during activation: missing Job environment
+  variables on first creation (container exit 2), and Cloudflare edge error
+  1010 rejecting the bare Python client before the Worker ran. The runner now
+  sends a browser-compatible `User-Agent` and reports only the endpoint path,
+  HTTP status, Worker error body, and token `aud`/`email`/`iss`/`exp` claims —
+  never tokens, document bytes, or secrets.
+
+Deployment stays bounded: one task, parallelism 1, max retries 0, 15-minute
+timeout, `SULUAN_MAX_JOBS=5`. Do not enable Scheduler without a separately
+approved frequency, retry/dead-letter, monitoring, and overlap policy.
 
 ## Locked delivery and identity design
 
@@ -93,9 +115,11 @@ services/processing/.venv/Scripts/python.exe -m unittest discover -s services/pr
 Do not execute deployment commands until each gate is confirmed:
 
 1. Recheck official Cloud Run Jobs, Artifact Registry, build, logging, and
-   Scheduler pricing for the selected region. Region remains **TBD**.
+   Scheduler pricing for the selected region. Region is `asia-southeast1`
+   for this development activation.
 2. Confirm the development Google/Firebase project and institutional ownership.
 3. Attach billing and create/verify the PHP 250 monthly budget alert first.
+   Done for dev on 2026-10-03.
 4. Install and authenticate `gcloud`; enable only the APIs actually needed.
 5. Create a dedicated `suluan-processing` service account with no project roles
    beyond those demonstrably required. Configure the Cloud Run Job to run as it.
@@ -104,8 +128,10 @@ Do not execute deployment commands until each gate is confirmed:
 7. Configure the matching Worker audience/account values and deploy the Worker.
 8. Execute one manually queued development fixture. Verify claim audit, private
    download, extraction result, replay behavior, and abandoned-lease recovery.
+   Done 2026-10-03 (`suluan-processing-lssfx` → `Full text searchable`).
 9. Only after that check, choose a bounded schedule. Scheduler frequency,
    retry/dead-letter policy, region, and observability thresholds remain TBD.
+   Manual execution remains the approved development trigger.
 
 Official references checked 2026-10-03: Cloud Run service identity documents the
 metadata-server audience-bound ID-token flow; Cloud Run Jobs supports a dedicated
