@@ -1,4 +1,5 @@
 import io
+import json
 import unittest
 import zipfile
 from email.message import Message
@@ -8,7 +9,14 @@ import pymupdf
 from docx import Document
 
 from extraction import ExtractionError, extract
-from cloud_runner import ServiceWorkerClient, metadata_identity_token, run_claims
+from cloud_runner import (
+    ServiceWorkerClient,
+    decode_jwt_payload,
+    format_worker_error,
+    metadata_identity_token,
+    process_claim,
+    run_claims,
+)
 from runner import bounded_extract, WorkerClient, run_job
 from semantic_prepare import run_batches
 
@@ -195,6 +203,58 @@ class ExtractionTests(unittest.TestCase):
         self.assertIn("format=full", captured["url"])
         self.assertEqual(captured["header"], "Google")
         self.assertEqual(captured["timeout"], 10)
+
+
+    def test_cloud_runner_error_reports_path_body_and_token_claims(self):
+        import base64
+        import urllib.error
+
+        payload = base64.urlsafe_b64encode(
+            json.dumps(
+                {
+                    "aud": "https://worker.example",
+                    "email": "svc@example.iam.gserviceaccount.com",
+                }
+            ).encode()
+        ).decode().rstrip("=")
+        token = f"header.{payload}.signature"
+        body = io.BytesIO(b'{"error":"forbidden"}')
+        error = urllib.error.HTTPError(
+            "https://worker.example/api/internal/processing/claim",
+            403,
+            "Forbidden",
+            {},
+            body,
+        )
+        detail = format_worker_error(error, token)
+        self.assertIn("/api/internal/processing/claim", detail)
+        self.assertIn("403", detail)
+        self.assertIn("forbidden", detail)
+        self.assertIn("https://worker.example", detail)
+        self.assertIn("svc@example.iam.gserviceaccount.com", detail)
+        self.assertNotIn(token, detail)
+        self.assertEqual(decode_jwt_payload("not-a-jwt"), {})
+
+    def test_cloud_runner_download_failure_posts_failed_without_retry(self):
+        import urllib.error
+
+        posted = []
+
+        class Client:
+            last_token = ""
+
+            def json(self, path, body=None):
+                posted.append((path, body))
+                return {"status": body["status"]}
+
+            def request(self, path):
+                raise urllib.error.HTTPError(path, 403, "Forbidden", {}, io.BytesIO(b"{}"))
+
+        status, error = process_claim(
+            Client(), {"jobId": "job-id", "claimToken": "claim-token"}
+        )
+        self.assertEqual((status, error), ("FAILED", "DOWNLOAD_FAILED"))
+        self.assertEqual(posted[0][1]["errorCode"], "DOWNLOAD_FAILED")
 
 
 if __name__ == "__main__":
