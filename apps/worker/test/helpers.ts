@@ -45,6 +45,7 @@ export interface TestAuth {
     claims: Record<string, unknown>,
     key?: JoseCryptoKey,
   ) => Promise<string>
+  mintServiceToken: (claims?: Record<string, unknown>) => Promise<string>
   testEnv: () => Env
   authed: (
     path: string,
@@ -52,7 +53,10 @@ export interface TestAuth {
     extraHeaders?: Record<string, string>,
   ) => Response | Promise<Response>
   /** In-memory R2 stand-in: key -> stored bytes and content type. */
-  r2objects: Map<string, { size: number; bytes: Uint8Array; contentType?: string }>
+  r2objects: Map<
+    string,
+    { size: number; bytes: Uint8Array; contentType?: string }
+  >
   /** Queue messages the app tried to send, in order. */
   sentMessages: unknown[]
 }
@@ -64,7 +68,7 @@ export async function setupTestAuth(): Promise<TestAuth> {
   const jwks: JWTVerifyGetKey = createLocalJWKSet({
     keys: [{ ...jwk, kid: KID, alg: 'RS256', use: 'sig' }],
   })
-  const app = createApp(() => ({ jwks, projectId: PROJECT_ID }))
+  const app = createApp(() => ({ jwks, projectId: PROJECT_ID }), { jwks })
   const r2objects = new Map<
     string,
     { size: number; bytes: Uint8Array; contentType?: string }
@@ -74,12 +78,7 @@ export async function setupTestAuth(): Promise<TestAuth> {
   /** Read any supported R2 put value into bytes for the in-memory stand-in. */
   async function toBytes(
     value:
-      | ReadableStream
-      | ArrayBuffer
-      | ArrayBufferView
-      | string
-      | Blob
-      | null,
+      ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob | null,
   ): Promise<Uint8Array> {
     if (value === null) return new Uint8Array(0)
     if (typeof value === 'string') return new TextEncoder().encode(value)
@@ -98,7 +97,9 @@ export async function setupTestAuth(): Promise<TestAuth> {
       const { done, value: chunk } = await reader.read()
       if (done) break
       chunks.push(
-        chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk as ArrayBuffer),
+        chunk instanceof Uint8Array
+          ? chunk
+          : new Uint8Array(chunk as ArrayBuffer),
       )
     }
     const total = chunks.reduce((n, c) => n + c.length, 0)
@@ -124,12 +125,30 @@ export async function setupTestAuth(): Promise<TestAuth> {
       .sign(key ?? privateKey)
   }
 
+  async function mintServiceToken(claims: Record<string, unknown> = {}) {
+    return new SignJWT({
+      sub: 'processing-service-subject',
+      email: 'suluan-processing@test-project.iam.gserviceaccount.com',
+      email_verified: true,
+      ...claims,
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: KID })
+      .setIssuer('https://accounts.google.com')
+      .setAudience('https://api.test.suluan.example')
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(privateKey)
+  }
+
   function testEnv(): Env {
     return {
       DATABASE_URL: process.env.DATABASE_URL ?? '',
       FIREBASE_PROJECT_ID: PROJECT_ID,
       ALLOWED_DOMAINS: 'ua.edu.ph',
       ALLOWED_ORIGINS: 'http://localhost:5173',
+      PROCESSING_SERVICE_AUDIENCE: 'https://api.test.suluan.example',
+      PROCESSING_SERVICE_ACCOUNT:
+        'suluan-processing@test-project.iam.gserviceaccount.com',
       DOCUMENTS: {
         head: async (key: string) => {
           const obj = r2objects.get(key)
@@ -195,6 +214,7 @@ export async function setupTestAuth(): Promise<TestAuth> {
     app,
     privateKey,
     mintToken,
+    mintServiceToken,
     testEnv,
     authed,
     r2objects,
@@ -223,9 +243,7 @@ export async function insertProfile(
  */
 export async function deleteSubmissions(db: Db, ids: string[]) {
   if (ids.length === 0) return
-  await db
-    .delete(notifications)
-    .where(inArray(notifications.submissionId, ids))
+  await db.delete(notifications).where(inArray(notifications.submissionId, ids))
   await db.delete(outboxEvents).where(inArray(outboxEvents.aggregateId, ids))
   const records = await db
     .select({ id: researchRecords.id })
@@ -277,20 +295,20 @@ export async function deleteAuditEvents(
   actorUids: string[],
 ) {
   if (entityIds.length > 0) {
-    await db
-      .delete(auditEvents)
-      .where(inArray(auditEvents.entityId, entityIds))
+    await db.delete(auditEvents).where(inArray(auditEvents.entityId, entityIds))
   }
   if (actorUids.length > 0) {
-    await db.delete(auditEvents).where(
-      inArray(
-        auditEvents.actorId,
-        db
-          .select({ id: profiles.id })
-          .from(profiles)
-          .where(inArray(profiles.firebaseUid, actorUids)),
-      ),
-    )
+    await db
+      .delete(auditEvents)
+      .where(
+        inArray(
+          auditEvents.actorId,
+          db
+            .select({ id: profiles.id })
+            .from(profiles)
+            .where(inArray(profiles.firebaseUid, actorUids)),
+        ),
+      )
   }
 }
 

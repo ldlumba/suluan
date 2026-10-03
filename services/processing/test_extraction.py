@@ -8,6 +8,7 @@ import pymupdf
 from docx import Document
 
 from extraction import ExtractionError, extract
+from cloud_runner import ServiceWorkerClient, metadata_identity_token, run_claims
 from runner import bounded_extract, WorkerClient, run_job
 from semantic_prepare import run_batches
 
@@ -76,6 +77,8 @@ class ExtractionTests(unittest.TestCase):
     def test_token_cannot_be_sent_to_remote_url(self):
         with self.assertRaises(ValueError):
             WorkerClient("https://example.com", "test-token")
+        with self.assertRaises(ValueError):
+            ServiceWorkerClient("http://example.com", lambda: "test-token")
 
     def test_runner_downloads_claimed_file_and_posts_fenced_result(self):
         data = self.pdf("Integration fixture")
@@ -135,6 +138,63 @@ class ExtractionTests(unittest.TestCase):
         )
         self.assertEqual(waits, [30])
         self.assertEqual(output[-1], "semantic preparation complete")
+
+    def test_cloud_runner_pulls_bounded_claims_and_posts_result(self):
+        data = self.pdf("Cloud extraction")
+        calls = []
+
+        class Response(io.BytesIO):
+            def __init__(self):
+                super().__init__(data)
+                self.headers = Message()
+                self.headers["Content-Type"] = PDF
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                self.close()
+
+        class Client:
+            claims = iter(
+                [
+                    {"jobId": "job-id", "claimToken": "claim-token"},
+                    None,
+                ]
+            )
+
+            def json(self, path, body=None):
+                calls.append((path, body))
+                if path.endswith("/claim"):
+                    return next(self.claims)
+                return {"status": body["status"]}
+
+            def request(self, path):
+                calls.append((path, None))
+                return Response()
+
+        output = []
+        self.assertEqual(run_claims(Client(), emit=output.append), 1)
+        self.assertIn("claimToken=claim-token", calls[1][0])
+        self.assertEqual(calls[2][1]["status"], "EXTRACTED")
+        self.assertEqual(output[-1], "no claimable jobs; completed=1")
+
+    def test_cloud_runner_requests_an_audience_bound_metadata_token(self):
+        captured = {}
+
+        class Opener:
+            def open(self, request, timeout):
+                captured["url"] = request.full_url
+                captured["header"] = request.get_header("Metadata-flavor")
+                captured["timeout"] = timeout
+                return io.BytesIO(b"signed-token\n")
+
+        token = metadata_identity_token("https://worker.example", Opener())
+        self.assertEqual(token, "signed-token")
+        self.assertIn("audience=https%3A%2F%2Fworker.example", captured["url"])
+        self.assertIn("format=full", captured["url"])
+        self.assertEqual(captured["header"], "Google")
+        self.assertEqual(captured["timeout"], 10)
 
 
 if __name__ == "__main__":

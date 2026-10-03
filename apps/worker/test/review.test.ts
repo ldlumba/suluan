@@ -1,7 +1,8 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   decisions,
+  auditEvents,
   notifications,
   outboxEvents,
   researchRecords,
@@ -35,8 +36,10 @@ needsDb('review workflow', () => {
   let t: TestAuth
   const uids: string[] = []
   const submissionIds: string[] = []
+  const systemAuditEntityIds: string[] = []
   let userToken = ''
   let managerToken = ''
+  let serviceToken = ''
 
   beforeAll(async () => {
     t = await setupTestAuth()
@@ -59,10 +62,12 @@ needsDb('review workflow', () => {
       sub: 'uid-reviewer',
       email: 'reviewer@ua.edu.ph',
     })
+    serviceToken = await t.mintServiceToken()
   })
 
   afterAll(async () => {
     const db = testDb()
+    await deleteAuditEvents(db, systemAuditEntityIds, [])
     await deleteSubmissions(db, submissionIds)
     await deleteAuditEvents(db, submissionIds, uids)
     await deleteProfiles(db, uids)
@@ -228,6 +233,82 @@ needsDb('review workflow', () => {
     expect(finished.attempts).toBe(3)
   })
 
+  it('lets only the pinned processing service pull, download, and complete a claim', async () => {
+    const { id } = await submit('Service extraction lifecycle')
+    await post('/api/decisions', managerToken, {
+      submissionId: id,
+      status: 'ACCEPTED',
+      remarks: 'Approved for service extraction',
+    })
+    const db = testDb()
+    const [record] = await db
+      .select()
+      .from(researchRecords)
+      .where(eq(researchRecords.submissionId, id))
+    const [job] = await db
+      .select()
+      .from(processingJobs)
+      .where(eq(processingJobs.recordId, record.id))
+    systemAuditEntityIds.push(job.id)
+
+    const claimResponse = await post(
+      '/api/internal/processing/claim',
+      serviceToken,
+      { jobId: job.id },
+    )
+    expect(claimResponse.status).toBe(200)
+    const claim = (await claimResponse.json()) as {
+      jobId: string
+      claimToken: string
+    }
+    expect(claim.jobId).toBe(job.id)
+
+    const badDownload = await get(
+      `/api/internal/processing/${job.id}/download?claimToken=${crypto.randomUUID()}`,
+      serviceToken,
+    )
+    expect(badDownload.status).toBe(409)
+    const download = await get(
+      `/api/internal/processing/${job.id}/download?claimToken=${claim.claimToken}`,
+      serviceToken,
+    )
+    expect(download.status).toBe(200)
+    expect((await download.arrayBuffer()).byteLength).toBe(777)
+
+    const result = {
+      claimToken: claim.claimToken,
+      status: 'EXTRACTED',
+      result: {
+        text: 'Cloud Run extracted study text',
+        sha256: 'b'.repeat(64),
+        parser: 'suluan-processing/test',
+        pageCount: 1,
+        warnings: [],
+      },
+    }
+    const resultPath = `/api/internal/processing/${job.id}/result`
+    expect((await post(resultPath, serviceToken, result)).status).toBe(200)
+    expect((await post(resultPath, serviceToken, result)).status).toBe(200)
+    expect(
+      (
+        await post('/api/internal/processing/claim', serviceToken, {
+          jobId: job.id,
+        })
+      ).status,
+    ).toBe(204)
+
+    const audit = await db.query.auditEvents.findFirst({
+      where: and(
+        eq(auditEvents.entityId, job.id),
+        eq(auditEvents.action, 'extraction.completed'),
+      ),
+    })
+    expect(audit?.actorId).toBeNull()
+    expect(audit?.context).toMatchObject({
+      serviceAccount: 'suluan-processing@test-project.iam.gserviceaccount.com',
+    })
+  })
+
   it('lists pending submissions for managers', async () => {
     const { id } = await submit('Awaiting review')
     const res = await get('/api/review/queue', managerToken)
@@ -318,7 +399,9 @@ needsDb('review workflow', () => {
       .from(researchRecords)
       .where(eq(researchRecords.submissionId, id))
     expect(records).toHaveLength(0)
-    const listed = await (await get('/api/processing/jobs', managerToken)).json()
+    const listed = await (
+      await get('/api/processing/jobs', managerToken)
+    ).json()
     expect(listed).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ submissionId: id })]),
     )

@@ -74,6 +74,68 @@ describe('domain allowlist', () => {
   })
 })
 
+describe('processing service identity', () => {
+  function serviceRequest(token: string | null, env = t.testEnv()) {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    }
+    if (token) headers.authorization = `Bearer ${token}`
+    return t.app.request(
+      '/api/internal/processing/claim',
+      { method: 'POST', headers, body: JSON.stringify({ jobId: 'invalid' }) },
+      env,
+    )
+  }
+
+  it('requires a Google workload token rather than a Firebase user token', async () => {
+    expect((await serviceRequest(null)).status).toBe(401)
+    const firebase = await mintToken({
+      sub: 'uid-service',
+      email: 'boss@ua.edu.ph',
+    })
+    expect((await serviceRequest(firebase)).status).toBe(401)
+  })
+
+  it('pins the exact configured service account', async () => {
+    const wrong = await t.mintServiceToken({
+      email: 'other@test-project.iam.gserviceaccount.com',
+    })
+    expect((await serviceRequest(wrong)).status).toBe(401)
+  })
+
+  it('pins the exact Worker audience', async () => {
+    const wrongAudience = await new SignJWT({
+      sub: 'processing-service-subject',
+      email: 'suluan-processing@test-project.iam.gserviceaccount.com',
+      email_verified: true,
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: KID })
+      .setIssuer('https://accounts.google.com')
+      .setAudience('https://wrong-audience.example')
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(t.privateKey)
+    expect((await serviceRequest(wrongAudience)).status).toBe(401)
+  })
+
+  it('accepts the configured workload before request validation', async () => {
+    const token = await t.mintServiceToken()
+    // Invalid UUID proves authentication passed without touching Neon.
+    expect((await serviceRequest(token)).status).toBe(400)
+    expect((await authed('/api/processing/jobs', token)).status).toBe(401)
+  })
+
+  it('fails closed when service identity configuration is absent', async () => {
+    const token = await t.mintServiceToken()
+    const env = {
+      ...t.testEnv(),
+      PROCESSING_SERVICE_AUDIENCE: undefined,
+      PROCESSING_SERVICE_ACCOUNT: undefined,
+    }
+    expect((await serviceRequest(token, env)).status).toBe(503)
+  })
+})
+
 const needsDb = process.env.DATABASE_URL ? describe : describe.skip
 
 needsDb('protected routes with database', () => {

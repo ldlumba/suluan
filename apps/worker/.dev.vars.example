@@ -12,3 +12,7 @@ ALLOWED_DOMAINS=ua.edu.ph
 # Local frontend origin. Add more comma-separated origins if you serve the
 # frontend on another port; production sets this via the dashboard instead.
 ALLOWED_ORIGINS=http://localhost:5173
+# Cloud Run Job workload identity. Leave empty until the dedicated service
+# account and deployed Worker audience exist; no private key is stored here.
+PROCESSING_SERVICE_AUDIENCE=
+PROCESSING_SERVICE_ACCOUNT=

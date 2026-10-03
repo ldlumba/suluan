@@ -3,7 +3,14 @@ import { Hono, type MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
 import { zValidator } from '@hono/zod-validator'
 import { courses, profiles, schools, submissions } from '@suluan/db/schema'
-import { verifyIdToken, type TokenVerifier } from './auth'
+import {
+  productionServiceVerifier,
+  verifyIdToken,
+  verifyServiceToken,
+  type ServiceTokenVerifier,
+  type TokenVerifier,
+  type VerifiedServiceIdentity,
+} from './auth'
 import { isAllowedDomain, parseAllowedOrigins, type Env } from './config'
 import { createDb } from './db'
 import { createSubmissionAtomic, recordDecisionAtomic } from './writes'
@@ -14,7 +21,7 @@ import {
   validateUploadFile,
 } from './uploads'
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
-import { processingRoutes } from './processing'
+import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { searchRoutes } from './search'
 import {
   effectiveVisibility,
@@ -27,16 +34,20 @@ type Role = 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN'
 interface Variables {
   identity: { uid: string; email: string; emailVerified: boolean }
   profile: typeof profiles.$inferSelect
+  serviceIdentity: VerifiedServiceIdentity
 }
 
 export type AppContext = { Bindings: Env; Variables: Variables }
 
 /**
- * Build the Hono app with an injectable token verifier. Production passes
- * the Google JWKS verifier; tests pass a local-JWKS verifier so protected
- * routes are exercised without Google-signed tokens.
+ * Build the Hono app with injectable user and workload token verifiers.
+ * Tests pass local JWKS verifiers so both protected boundaries are exercised
+ * without Google-signed tokens.
  */
-export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
+export function createApp(
+  verifierFor: (projectId: string) => TokenVerifier,
+  serviceVerifier: ServiceTokenVerifier = productionServiceVerifier(),
+) {
   const app = new Hono<AppContext>()
 
   /**
@@ -161,6 +172,40 @@ export function createApp(verifierFor: (projectId: string) => TokenVerifier) {
 
   const MANAGERS: Role[] = ['REPOSITORY_MANAGER', 'ADMIN']
 
+  /** Google workload identity boundary; never grants a user/manager profile. */
+  const requireProcessingService: MiddlewareHandler<AppContext> = async (
+    c,
+    next,
+  ) => {
+    const audience = c.env.PROCESSING_SERVICE_AUDIENCE?.trim()
+    const serviceAccount = c.env.PROCESSING_SERVICE_ACCOUNT?.trim()
+    if (!audience || !serviceAccount) {
+      return c.json({ error: 'service_auth_not_configured' }, 503)
+    }
+    const header = c.req.header('authorization')
+    if (!header?.startsWith('Bearer ')) {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    try {
+      c.set(
+        'serviceIdentity',
+        await verifyServiceToken(
+          header.slice('Bearer '.length),
+          serviceVerifier,
+          audience,
+          serviceAccount,
+        ),
+      )
+    } catch {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    await next()
+  }
+
+  app.route(
+    '/api/internal/processing',
+    serviceProcessingRoutes(requireProcessingService),
+  )
   app.use('/api/processing/*', requireAuth)
   app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))
   // Search reads are public; preparation stays manager-only.

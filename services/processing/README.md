@@ -113,3 +113,16 @@ discard earlier paid results. Extracted snippets and credentials are never
 written or printed. Review the report before recording any conclusions. The
 temporary evaluation cap was restored to 20 requests/day after the 2026-10-02
 run; repeating all 25 probes therefore requires a separately approved window.
+
+## Cloud Run Job preparation
+
+`cloud_runner.py` and the adjacent `Dockerfile` implement the approved bounded
+pull design for a future Cloud Run Job. The job uses its metadata-server Google
+ID token to claim work through Worker-only endpoints; it receives no Neon, R2,
+Firebase-manager, or service-account-key credential. See
+`docs/cloud-run-processing.md` for the identity contract and activation gates.
+
+This code is locally tested but **not deployed**. Billing, the PHP 250 budget
+alert, project/region selection, Google APIs, service account, image registry,
+Cloud Run Job, and schedule are still activation work. Do not treat the checked-
+in Dockerfile as proof that any cloud resource exists.

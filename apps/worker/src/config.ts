@@ -23,12 +23,7 @@ export interface R2BucketLike {
   put(
     key: string,
     value:
-      | ReadableStream
-      | ArrayBuffer
-      | ArrayBufferView
-      | string
-      | Blob
-      | null,
+      ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob | null,
     options?: { httpMetadata?: { contentType?: string } },
   ): Promise<R2ObjectHead>
   get(key: string): Promise<R2ObjectBodyLike | null>
@@ -64,6 +59,10 @@ export interface Env {
    * endpoints degrade to keyword results instead of failing.
    */
   GEMINI_API_KEY?: string
+  /** Exact audience requested from the Cloud Run metadata identity endpoint. */
+  PROCESSING_SERVICE_AUDIENCE?: string
+  /** Exact dedicated Cloud Run Job service-account email. */
+  PROCESSING_SERVICE_ACCOUNT?: string
   /** Test/dev REO recipient. Unset until the mailbox decision lands. */
   REO_MAILBOX?: string
 }
