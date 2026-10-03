@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   decisions,
@@ -356,6 +356,10 @@ needsDb('review workflow', () => {
       .from(researchRecords)
       .where(eq(researchRecords.submissionId, id))
     expect(records).toHaveLength(1)
+    const currentYear = await db.execute(sql`
+      select extract(year from current_date)::integer as year
+    `)
+    expect(records[0].year).toBe((currentYear.rows[0] as { year: number }).year)
     const files = await db
       .select()
       .from(recordFiles)

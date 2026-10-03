@@ -36,6 +36,8 @@ export const researchRecords = pgTable('research_records', {
     .references(() => submissions.id),
   title: text('title').notNull(),
   abstract: text('abstract'),
+  /** Calendar year when REO accepted the paper into the repository. */
+  year: integer('year').notNull(),
   /** Managers set this at review time; PUBLIC is the default. */
   visibility: recordVisibility('visibility').notNull().default('PUBLIC'),
   /**

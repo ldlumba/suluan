@@ -21,13 +21,13 @@ const fileSchema = z
     'Only PDF or DOCX documents are accepted.',
   )
   .refine((f) => f.size > 0, 'The selected file is empty.')
-  .refine(
-    (f) => f.size <= MAX_FILE_BYTES,
-    'The file exceeds the 30 MB limit.',
-  )
+  .refine((f) => f.size <= MAX_FILE_BYTES, 'The file exceeds the 30 MB limit.')
   .refine((f) => {
     const expected = EXTENSION_FOR_TYPE[f.type]
-    return expected !== undefined && f.name.split('.').pop()?.toLowerCase() === expected
+    return (
+      expected !== undefined &&
+      f.name.split('.').pop()?.toLowerCase() === expected
+    )
   }, 'The file name does not match its document type.')
 
 export const submissionFormSchema = z.object({
@@ -36,8 +36,6 @@ export const submissionFormSchema = z.object({
   // Empty string = "no selection"; mapped to undefined before sending.
   schoolId: z.string().optional(),
   courseId: z.string().optional(),
-  year: z.string().trim().max(9).optional(),
-  researchType: z.string().trim().max(100).optional(),
   file: fileSchema,
 })
 

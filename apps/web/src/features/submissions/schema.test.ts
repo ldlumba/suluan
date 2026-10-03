@@ -16,21 +16,27 @@ const base = {
   authors: 'Doe, J.',
   schoolId: '',
   courseId: '',
-  year: '2026',
-  researchType: 'Thesis',
 }
 
 describe('submission form schema', () => {
   it('accepts a valid PDF submission', () => {
-    expect(submissionFormSchema.safeParse({ ...base, file: pdf() }).success).toBe(true)
+    expect(
+      submissionFormSchema.safeParse({ ...base, file: pdf() }).success,
+    ).toBe(true)
   })
 
   it('accepts a valid DOCX submission', () => {
-    expect(submissionFormSchema.safeParse({ ...base, file: docx() }).success).toBe(true)
+    expect(
+      submissionFormSchema.safeParse({ ...base, file: docx() }).success,
+    ).toBe(true)
   })
 
   it('rejects missing titles', () => {
-    const result = submissionFormSchema.safeParse({ ...base, title: '  ', file: pdf() })
+    const result = submissionFormSchema.safeParse({
+      ...base,
+      title: '  ',
+      file: pdf(),
+    })
     expect(result.success).toBe(false)
   })
 

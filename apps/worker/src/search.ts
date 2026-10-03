@@ -66,12 +66,12 @@ export function searchRoutes(
       const rows = await db.execute(sql`
         with query as (select websearch_to_tsquery('simple', ${q}) as terms),
         eligible as (
-          select r.id, r.title, r.submission_id, s.authors, s.year, i.id as index_id,
+          select r.id, r.title, r.submission_id, s.authors, r.year, i.id as index_id,
             case when i.id is not null then 'READY'
               when j.status = 'FAILED' then 'FAILED' else 'PENDING' end as full_text_status,
             ${visibilityCase()} as visibility,
             to_tsvector('simple', r.title || ' ' || coalesce(s.authors, '')
-              || ' ' || coalesce(s.year, '')) as metadata
+              || ' ' || r.year::text) as metadata
           from research_records r join submissions s on s.id = r.submission_id
           left join processing_jobs j on j.record_id = r.id
           left join keyword_indexes i on i.record_id = r.id
@@ -79,7 +79,8 @@ export function searchRoutes(
             and i.chunker_version = ${CHUNKER_VERSION} and j.status = 'EXTRACTED'
           where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
         )
-        select e.id, e.title, e.submission_id as "submissionId", e.authors, e.year,
+        select e.id, e.title, e.submission_id as "submissionId", e.authors,
+          e.year::text as year,
           e.visibility, e.full_text_status as "fullTextStatus",
           left(best.content, 400) as snippet
         from eligible e cross join query
@@ -113,9 +114,9 @@ export function searchRoutes(
     requireManager,
     zValidator('json', indexSchema),
     async (c) => {
-    const { recordId } = c.req.valid('json')
-    const db = createDb(c.env.DATABASE_URL)
-    const candidates = await db.execute(sql`
+      const { recordId } = c.req.valid('json')
+      const db = createDb(c.env.DATABASE_URL)
+      const candidates = await db.execute(sql`
       select r.id, j.claim_token as "claimToken", j.result
       from research_records r join submissions s on s.id = r.submission_id
       join processing_jobs j on j.record_id = r.id
@@ -127,12 +128,12 @@ export function searchRoutes(
             and i.chunker_version = ${CHUNKER_VERSION}
         ) order by r.id limit ${INDEX_BATCH + 1}
     `)
-    let indexed = 0
-    for (const row of candidates.rows.slice(0, INDEX_BATCH)) {
-      const source = row.result as { text: string; sha256: string }
-      const chunks = chunkText(source.text)
-      if (!chunks.length) continue
-      const result = await db.execute(sql`
+      let indexed = 0
+      for (const row of candidates.rows.slice(0, INDEX_BATCH)) {
+        const source = row.result as { text: string; sha256: string }
+        const chunks = chunkText(source.text)
+        if (!chunks.length) continue
+        const result = await db.execute(sql`
         with snapshot as (
           insert into keyword_indexes
             (record_id, extraction_claim_token, chunker_version, source_sha256)
@@ -157,11 +158,12 @@ export function searchRoutes(
           from snapshot
         ) select id from snapshot
       `)
-      indexed += result.rows.length
-    }
-    c.header('Cache-Control', 'private, no-store')
-    return c.json({ indexed, hasMore: candidates.rows.length > INDEX_BATCH })
-  })
+        indexed += result.rows.length
+      }
+      c.header('Cache-Control', 'private, no-store')
+      return c.json({ indexed, hasMore: candidates.rows.length > INDEX_BATCH })
+    },
+  )
 
   /**
    * Semantic search. Public by default like keyword search, and filtered through
@@ -235,7 +237,9 @@ export function searchRoutes(
           page,
           hasMore: false,
           semanticStatus:
-            err instanceof EmbeddingError ? 'provider_error' : ('unavailable' as const),
+            err instanceof EmbeddingError
+              ? 'provider_error'
+              : ('unavailable' as const),
           reason:
             err instanceof EmbeddingError
               ? err.message
@@ -269,7 +273,8 @@ export function searchRoutes(
           where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
           order by b.record_id, b.distance asc
         )
-        select r.id, r.title, r.submission_id as "submissionId", s.authors, s.year,
+        select r.id, r.title, r.submission_id as "submissionId", s.authors,
+          r.year::text as year,
           ${visibilityCase()} as visibility,
           'READY' as "fullTextStatus",
           left(ranked.snippet, 400) as snippet,

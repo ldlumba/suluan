@@ -21,7 +21,9 @@ function renderPage(user: unknown) {
   } as never)
   render(
     <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
     >
       <MemoryRouter initialEntries={['/submissions']}>
         <MySubmissionsPage />
@@ -35,7 +37,6 @@ const decided = {
   title: 'ILAW - Test Paper',
   authors: 'Author',
   year: '2026',
-  researchType: 'Thesis',
   status: 'ACCEPTED' as const,
   createdAt: '2026-10-01T00:00:00.000Z',
   updatedAt: '2026-10-01T00:00:00.000Z',
@@ -61,8 +62,11 @@ describe('MySubmissionsPage', () => {
     renderPage({ email: 'u@ua.edu.ph' })
     expect(await screen.findByText('ILAW - Test Paper')).toBeInTheDocument()
     expect(screen.getByText('Accepted')).toBeInTheDocument()
+    expect(screen.getByText(/Accepted 2026/)).toBeInTheDocument()
     expect(screen.getByText(/Solid methodology/)).toBeInTheDocument()
-    expect(screen.getByText(/access restrictions until 2027-01-01/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/access restrictions until 2027-01-01/),
+    ).toBeInTheDocument()
   })
 
   it('renders a pending submission with no remarks', async () => {
@@ -71,12 +75,15 @@ describe('MySubmissionsPage', () => {
     ])
     renderPage({ email: 'u@ua.edu.ph' })
     expect(await screen.findByText('Awaiting REO review')).toBeInTheDocument()
+    expect(screen.queryByText(/Accepted 2026/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Reviewer remarks/)).not.toBeInTheDocument()
   })
 
   it('surfaces API errors instead of an empty success state', async () => {
     vi.mocked(apiFetch).mockRejectedValue(new ApiError(401, 'Session expired.'))
     renderPage({ email: 'u@ua.edu.ph' })
-    expect(await screen.findByRole('alert')).toHaveTextContent('Session expired.')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Session expired.',
+    )
   })
 })

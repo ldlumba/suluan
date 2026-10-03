@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from '@/components/ui/card'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 
@@ -9,7 +14,6 @@ interface MySubmission {
   title: string
   authors: string | null
   year: string | null
-  researchType: string | null
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
   createdAt: string
   updatedAt: string
@@ -42,7 +46,8 @@ export function MySubmissionsPage() {
       apiFetch<MySubmission[]>('/api/submissions/mine', await getIdToken()),
   })
 
-  if (loading) return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
+  if (loading)
+    return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
   if (!user) {
     return (
       <Card>
@@ -59,15 +64,19 @@ export function MySubmissionsPage() {
   return (
     <Card>
       <CardHeader>
-        <h1 className="text-2xl font-semibold tracking-tight">My submissions</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          My submissions
+        </h1>
         <CardDescription>
-          Status and reviewer remarks for papers you submitted. You will also
-          be emailed when a decision is recorded.
+          Status and reviewer remarks for papers you submitted. You will also be
+          emailed when a decision is recorded.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {mine.isLoading && (
-          <p className="text-sm text-muted-foreground">Loading your submissions…</p>
+          <p className="text-sm text-muted-foreground">
+            Loading your submissions…
+          </p>
         )}
         {mine.isError && (
           <p role="alert" className="text-sm text-destructive">
@@ -93,7 +102,10 @@ export function MySubmissionsPage() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {item.authors || 'Authors not listed'} · {item.year || 'Year not listed'}
+              {item.authors || 'Authors not listed'}
+              {item.status === 'ACCEPTED' && item.year
+                ? ` · Accepted ${item.year}`
+                : ''}
               {' · '}
               Submitted {new Date(item.createdAt).toLocaleDateString()}
             </p>

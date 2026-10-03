@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -39,7 +44,8 @@ const FRIENDLY_ERRORS: Record<string, string> = {
     'File storage is temporarily unavailable. Please try again in a moment.',
   unknown_school: 'The selected school is no longer available.',
   unknown_course: 'The selected course is no longer available.',
-  course_school_mismatch: 'The selected course does not belong to the selected school.',
+  course_school_mismatch:
+    'The selected course does not belong to the selected school.',
 }
 
 export function NewSubmissionPage() {
@@ -48,7 +54,9 @@ export function NewSubmissionPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
   // One idempotency key per form attempt: retries reuse it, a fresh form mints one.
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID(),
+  )
 
   const form = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionFormSchema),
@@ -57,11 +65,10 @@ export function NewSubmissionPage() {
       authors: '',
       schoolId: '',
       courseId: '',
-      year: '',
-      researchType: '',
     },
   })
   const selectedSchoolId = useWatch({ control: form.control, name: 'schoolId' })
+  const selectedCourseId = useWatch({ control: form.control, name: 'courseId' })
 
   const schoolsQuery = useQuery({
     queryKey: ['schools'],
@@ -78,10 +85,16 @@ export function NewSubmissionPage() {
   )
 
   useEffect(() => {
-    form.setValue('courseId', '')
-  }, [selectedSchoolId, form])
+    if (
+      selectedCourseId &&
+      !courses.some((course) => course.id === selectedCourseId)
+    ) {
+      form.setValue('courseId', '')
+    }
+  }, [courses, form, selectedCourseId])
 
-  if (loading) return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
+  if (loading)
+    return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
   if (!user) {
     return (
       <Card>
@@ -99,9 +112,12 @@ export function NewSubmissionPage() {
     return (
       <Card>
         <CardHeader>
-          <h1 className="text-2xl font-semibold tracking-tight">Submission received</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Submission received
+          </h1>
           <CardDescription>
-            Your paper is pending REO review. You will be notified of the decision by email.
+            Your paper is pending REO review. You will be notified of the
+            decision by email.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -140,8 +156,6 @@ export function NewSubmissionPage() {
       if (values.authors) form.append('authors', values.authors)
       if (values.schoolId) form.append('schoolId', values.schoolId)
       if (values.courseId) form.append('courseId', values.courseId)
-      if (values.year) form.append('year', values.year)
-      if (values.researchType) form.append('researchType', values.researchType)
 
       const created = await apiFetch<{ id: string; status: string }>(
         '/api/submissions',
@@ -157,144 +171,206 @@ export function NewSubmissionPage() {
       } else if (err instanceof ApiError) {
         setSubmitError(err.message)
       } else {
-        setSubmitError('The submission could not be completed. Please try again.')
+        setSubmitError(
+          'The submission could not be completed. Please try again.',
+        )
       }
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <h1 className="text-2xl font-semibold tracking-tight">Submit research</h1>
-        <CardDescription>
-          Your paper goes to REO review first. Nothing is published until it is accepted.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" {...form.register('title')} />
-            {form.formState.errors.title && (
-              <p role="alert" className="text-sm text-destructive">
-                {form.formState.errors.title.message}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="authors">Authors</Label>
-            <Textarea
-              id="authors"
-              placeholder="One per line, or comma-separated"
-              {...form.register('authors')}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <Card>
+        <CardHeader>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Submit research
+          </h1>
+          <CardDescription>
+            Your paper goes to REO review first. Nothing is published until it
+            is accepted.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label>School</Label>
-              <Controller
-                control={form.control}
-                name="schoolId"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    items={schools.map((s) => ({ value: s.id, label: s.name }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a school" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {schools.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <Label htmlFor="title">Title</Label>
+              <Input id="title" {...form.register('title')} />
+              {form.formState.errors.title && (
+                <p role="alert" className="text-sm text-destructive">
+                  {form.formState.errors.title.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="authors">Authors</Label>
+              <Textarea
+                id="authors"
+                placeholder="One per line, or comma-separated"
+                {...form.register('authors')}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Course</Label>
-              <Controller
-                control={form.control}
-                name="courseId"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={courses.length === 0}
-                    items={courses.map((c) => ({ value: c.id, label: c.name }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          courses.length === 0 ? 'Select a school first' : 'Select a course'
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="year">Year</Label>
-              <Input id="year" placeholder="2026" {...form.register('year')} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>School</Label>
+                <Controller
+                  control={form.control}
+                  name="schoolId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value)
+                        form.setValue('courseId', '')
+                      }}
+                      items={schools.map((s) => ({
+                        value: s.id,
+                        label: s.name,
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a school" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {schools.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Course</Label>
+                <Controller
+                  control={form.control}
+                  name="courseId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={courses.length === 0}
+                      items={courses.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            courses.length === 0
+                              ? 'Select a school first'
+                              : 'Select a course'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {courses.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="researchType">Research type</Label>
+              <Label htmlFor="file">Document (PDF or DOCX, up to 30 MB)</Label>
               <Input
-                id="researchType"
-                placeholder="e.g. Thesis, Capstone"
-                {...form.register('researchType')}
+                id="file"
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={(e) =>
+                  form.setValue('file', e.target.files?.[0] as File, {
+                    shouldValidate: true,
+                  })
+                }
               />
+              {form.formState.errors.file && (
+                <p role="alert" className="text-sm text-destructive">
+                  {form.formState.errors.file.message as string}
+                </p>
+              )}
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="file">Document (PDF or DOCX, up to 30 MB)</Label>
-            <Input
-              id="file"
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={(e) => form.setValue('file', e.target.files?.[0] as File, {
-                shouldValidate: true,
-              })}
-            />
-            {form.formState.errors.file && (
+            {submitError && (
               <p role="alert" className="text-sm text-destructive">
-                {form.formState.errors.file.message as string}
+                {submitError}
               </p>
             )}
-          </div>
 
-          {submitError && (
+            <Button type="submit" disabled={phase === 'uploading'}>
+              {phase === 'uploading' ? 'Uploading…' : 'Submit for review'}
+            </Button>
+            {submissionId && (
+              <p className="text-xs text-muted-foreground">
+                Reference: {submissionId}
+              </p>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="lg:sticky lg:top-6">
+        <CardHeader>
+          <h2 className="text-base font-semibold">Schools and courses</h2>
+          <CardDescription>
+            Select a course here to fill both catalog fields. The paper year is
+            assigned automatically when REO accepts it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {schoolsQuery.isLoading && (
+            <p className="text-sm text-muted-foreground">Loading catalog…</p>
+          )}
+          {schoolsQuery.isError && (
             <p role="alert" className="text-sm text-destructive">
-              {submitError}
+              The school catalog could not be loaded.
             </p>
           )}
-
-          <Button type="submit" disabled={phase === 'uploading'}>
-            {phase === 'uploading' ? 'Uploading…' : 'Submit for review'}
-          </Button>
-          {submissionId && (
-            <p className="text-xs text-muted-foreground">Reference: {submissionId}</p>
-          )}
-        </form>
-      </CardContent>
-    </Card>
+          {schools.map((school) => (
+            <section key={school.id} aria-labelledby={`school-${school.id}`}>
+              <h3
+                id={`school-${school.id}`}
+                className="mb-1.5 text-sm font-medium"
+              >
+                {school.name}
+              </h3>
+              <div className="space-y-1">
+                {school.courses.map((course) => {
+                  const selected = course.id === selectedCourseId
+                  return (
+                    <Button
+                      key={course.id}
+                      type="button"
+                      size="sm"
+                      variant={selected ? 'secondary' : 'ghost'}
+                      aria-pressed={selected}
+                      className="h-auto w-full justify-start whitespace-normal py-1.5 text-left"
+                      onClick={() => {
+                        form.setValue('schoolId', school.id, {
+                          shouldValidate: true,
+                        })
+                        form.setValue('courseId', course.id, {
+                          shouldValidate: true,
+                        })
+                      }}
+                    >
+                      {course.name}
+                    </Button>
+                  )
+                })}
+              </div>
+            </section>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

@@ -137,6 +137,37 @@ try {
     console.log('FAIL decisions.remarks must be NOT NULL')
     failures.push('decisions.remarks nullable')
   }
+
+  const { rows: recordYear } = await client.query(
+    `select data_type, is_nullable from information_schema.columns
+     where table_name = 'research_records' and column_name = 'year'`,
+  )
+  if (
+    recordYear[0]?.data_type === 'integer' &&
+    recordYear[0]?.is_nullable === 'NO'
+  ) {
+    console.log('ok   research_records.year is integer NOT NULL')
+  } else {
+    console.log('FAIL research_records.year must be integer NOT NULL')
+    failures.push('research_records.year')
+  }
+
+  const { rows: catalog } = await client.query(
+    `select count(distinct s.id)::int as schools, count(c.id)::int as courses
+     from schools s join courses c on c.school_id = s.id
+     where s.name in (
+       'School of Health, Arts and Sciences', 'School of Education',
+       'School of Business', 'School of Technological Studies'
+     )`,
+  )
+  if (catalog[0]?.schools === 4 && catalog[0]?.courses === 24) {
+    console.log('ok   institutional catalog = 4 schools / 24 courses')
+  } else {
+    console.log(
+      'FAIL institutional catalog must contain 4 schools / 24 courses',
+    )
+    failures.push('institutional catalog')
+  }
 } finally {
   await client.end()
 }

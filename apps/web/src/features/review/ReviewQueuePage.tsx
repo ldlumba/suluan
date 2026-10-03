@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -27,11 +32,13 @@ interface QueueItem {
   id: string
   title: string
   authors: string | null
-  year: string | null
-  researchType: string | null
   createdAt: string
   submitterEmail: string | null
-  files: { fileName: string; mimeType: string | null; sizeBytes: number | null }[]
+  files: {
+    fileName: string
+    mimeType: string | null
+    sizeBytes: number | null
+  }[]
 }
 
 function formatBytes(size: number | null): string {
@@ -49,9 +56,9 @@ export function ReviewQueuePage() {
   const [decideError, setDecideError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   // Visibility defaults to PUBLIC so accepting never silently hides a paper.
-  const [visibility, setVisibility] = useState<'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'>(
-    'PUBLIC',
-  )
+  const [visibility, setVisibility] = useState<
+    'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
+  >('PUBLIC')
   const [embargoUntil, setEmbargoUntil] = useState('')
 
   const VISIBILITY_OPTIONS = [
@@ -99,13 +106,17 @@ export function ReviewQueuePage() {
     },
     onError: (err) => {
       setDecideError(
-        err instanceof ApiError ? err.message : 'The decision could not be recorded.',
+        err instanceof ApiError
+          ? err.message
+          : 'The decision could not be recorded.',
       )
     },
   })
 
-  if (loading) return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
-  if (!user) return <p className="text-sm text-muted-foreground">Sign in to continue.</p>
+  if (loading)
+    return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
+  if (!user)
+    return <p className="text-sm text-muted-foreground">Sign in to continue.</p>
   if (profile !== null && !isManager) {
     return (
       <Card>
@@ -120,7 +131,8 @@ export function ReviewQueuePage() {
     return (
       <Card>
         <CardContent className="pt-6 text-sm">
-          Your permissions could not be loaded. Please sign out and sign in again.
+          Your permissions could not be loaded. Please sign out and sign in
+          again.
         </CardContent>
       </Card>
     )
@@ -156,9 +168,12 @@ export function ReviewQueuePage() {
     <>
       <Card>
         <CardHeader>
-          <h1 className="text-2xl font-semibold tracking-tight">Review queue</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Review queue
+          </h1>
           <CardDescription>
-            Pending submissions. Remarks are required before accepting or rejecting.
+            Pending submissions. Remarks are required before accepting or
+            rejecting.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -176,27 +191,37 @@ export function ReviewQueuePage() {
             </p>
           )}
           {!queueQuery.isLoading && items.length === 0 && (
-            <p className="text-sm text-muted-foreground">No pending submissions.</p>
+            <p className="text-sm text-muted-foreground">
+              No pending submissions.
+            </p>
           )}
           {items.map((item) => (
             <div key={item.id} className="space-y-2 rounded-lg border p-4">
               <div className="font-medium">{item.title}</div>
               <div className="text-sm text-muted-foreground">
-                {item.authors ?? 'Authors not listed'} · {item.year ?? 'Year not listed'}
-                {' · '}
+                {item.authors ?? 'Authors not listed'} ·{' '}
                 {item.submitterEmail ?? 'Submitter unknown'}
               </div>
               <div className="text-sm text-muted-foreground">
-                {item.files.map((f) => `${f.fileName} (${formatBytes(f.sizeBytes)})`).join(', ')}
+                {item.files
+                  .map((f) => `${f.fileName} (${formatBytes(f.sizeBytes)})`)
+                  .join(', ')}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => void download(item)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void download(item)}
+                >
                   Download paper
                 </Button>
-                <Button size="sm" onClick={() => {
-                  setDeciding(item)
-                  resetDecisionFields()
-                }}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setDeciding(item)
+                    resetDecisionFields()
+                  }}
+                >
                   Review
                 </Button>
               </div>
@@ -205,7 +230,12 @@ export function ReviewQueuePage() {
         </CardContent>
       </Card>
 
-      <Dialog open={deciding !== null} onOpenChange={(open) => { if (!open) setDeciding(null) }}>
+      <Dialog
+        open={deciding !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeciding(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Decide: {deciding?.title}</DialogTitle>
@@ -232,7 +262,10 @@ export function ReviewQueuePage() {
                 setVisibility(value as 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED')
                 if (value === 'PUBLIC') setEmbargoUntil('')
               }}
-              items={VISIBILITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              items={VISIBILITY_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
             >
               <SelectTrigger id="visibility">
                 <SelectValue />

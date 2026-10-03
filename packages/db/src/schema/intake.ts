@@ -46,7 +46,9 @@ export const submissions = pgTable('submissions', {
   authors: text('authors'),
   schoolId: uuid('school_id').references(() => schools.id),
   courseId: uuid('course_id').references(() => courses.id),
+  /** @deprecated New submissions derive repository year at acceptance. */
   year: text('year'),
+  /** @deprecated Retained for migration safety; new submissions do not write it. */
   researchType: text('research_type'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()

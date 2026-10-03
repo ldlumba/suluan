@@ -12,8 +12,6 @@ export const submissionFormFieldsSchema = z.object({
   authors: z.string().trim().max(2000).optional(),
   schoolId: z.string().uuid().optional(),
   courseId: z.string().uuid().optional(),
-  year: z.string().trim().max(9).optional(),
-  researchType: z.string().trim().max(100).optional(),
 })
 
 export const decideSchema = z
@@ -40,7 +38,10 @@ export const decideSchema = z
     (value) =>
       value.embargoUntil === undefined ||
       (value.status === 'REJECTED' ? true : value.embargoUntil > todayUtc()),
-    { message: 'The embargo date must be in the future.', path: ['embargoUntil'] },
+    {
+      message: 'The embargo date must be in the future.',
+      path: ['embargoUntil'],
+    },
   )
 
 /** UTC date string; the API compares against Postgres current_date. */

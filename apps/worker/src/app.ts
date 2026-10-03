@@ -226,7 +226,7 @@ export function createApp(
     const db = createDb(c.env.DATABASE_URL)
     const me = c.get('profile')
     const rows = await db.execute(sql`
-      select s.id, s.title, s.authors, s.year, s.research_type as "researchType",
+      select s.id, s.title, s.authors, r.year::text as year,
         s.status, s.created_at as "createdAt", s.updated_at as "updatedAt",
         d.remarks, d.decided_at as "decidedAt",
         r.id as "recordId", r.visibility, r.embargo_until as "embargoUntil",
@@ -257,8 +257,8 @@ export function createApp(
     c.json({ status: 'ok', scope: 'admin' }),
   )
 
-  // School/course catalog for the submission form. Read-only; catalog
-  // contents remain TBD and these tables ship empty until seeded.
+  // Migration-owned institutional school/course catalog for the submission
+  // form. Read-only in the browser; server validation remains authoritative.
   app.get('/api/schools', requireAuth, async (c) => {
     const db = createDb(c.env.DATABASE_URL)
     const rows = await db.query.schools.findMany({
@@ -269,10 +269,9 @@ export function createApp(
       rows.map((s) => ({
         id: s.id,
         name: s.name,
-        courses: s.courses.map((course) => ({
-          id: course.id,
-          name: course.name,
-        })),
+        courses: s.courses
+          .map((course) => ({ id: course.id, name: course.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
       })),
     )
   })
@@ -329,8 +328,6 @@ export function createApp(
       authors: text('authors'),
       schoolId: text('schoolId'),
       courseId: text('courseId'),
-      year: text('year'),
-      researchType: text('researchType'),
     })
     if (!fields.success) {
       return c.json({ error: 'invalid_fields' }, 400)
@@ -385,8 +382,6 @@ export function createApp(
           authors: meta.authors,
           schoolId: meta.schoolId,
           courseId: meta.courseId,
-          year: meta.year,
-          researchType: meta.researchType,
           r2Key: key,
           fileName: validated.fileName,
           mimeType: validated.mimeType,
@@ -451,8 +446,6 @@ export function createApp(
           id: s.id,
           title: s.title,
           authors: s.authors,
-          year: s.year,
-          researchType: s.researchType,
           createdAt: s.createdAt,
           submitterEmail: s.submitter.email,
           files: s.files,

@@ -17,8 +17,6 @@ export interface NewSubmissionInput {
   authors?: string
   schoolId?: string
   courseId?: string
-  year?: string
-  researchType?: string
   r2Key: string
   fileName: string
   mimeType: string
@@ -39,11 +37,10 @@ export async function createSubmissionAtomic(
     WITH new_submission AS (
       INSERT INTO submissions
         (submitter_id, status, idempotency_key, title, authors, school_id,
-         course_id, year, research_type)
+         course_id)
       VALUES (${input.submitterId}, 'PENDING', ${input.idempotencyKey},
         ${input.title}, ${input.authors ?? null}, ${input.schoolId ?? null},
-        ${input.courseId ?? null}, ${input.year ?? null},
-        ${input.researchType ?? null})
+        ${input.courseId ?? null})
       RETURNING id
     ),
     new_file AS (
@@ -128,8 +125,9 @@ export async function recordDecisionAtomic(
     ),
     new_record AS (
       INSERT INTO research_records
-        (submission_id, title, visibility, embargo_until)
-      SELECT id, ${input.title}, ${visibility}, ${embargo}
+        (submission_id, title, year, visibility, embargo_until)
+      SELECT id, ${input.title}, extract(year from current_date)::integer,
+        ${visibility}, ${embargo}
       FROM upd
       ${accepted ? sql`` : sql`WHERE false`}
       RETURNING id

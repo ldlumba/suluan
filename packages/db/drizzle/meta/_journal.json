@@ -57,6 +57,13 @@
       "when": 1790854082991,
       "tag": "0007_demonic_shadow_king",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791069867967,
+      "tag": "0008_magical_human_torch",
+      "breakpoints": true
     }
   ]
 }
