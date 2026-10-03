@@ -205,6 +205,30 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(captured["timeout"], 10)
 
 
+    def test_cloud_runner_sends_browser_compatible_user_agent(self):
+        import urllib.error
+
+        captured = {}
+
+        class FakeResponse:
+            status = 204
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        class Opener:
+            def open(self, request, timeout):
+                captured["ua"] = request.get_header("User-agent")
+                return FakeResponse()
+
+        client = ServiceWorkerClient("https://worker.example", lambda: "token")
+        client.opener = Opener()
+        self.assertIsNone(client.json("/api/internal/processing/claim", {}))
+        self.assertIn("SULUAN-Processing-Job", captured["ua"])
+
     def test_cloud_runner_error_reports_path_body_and_token_claims(self):
         import base64
         import urllib.error

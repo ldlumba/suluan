@@ -18,6 +18,11 @@ METADATA_IDENTITY_URL = (
     "service-accounts/default/identity"
 )
 
+# workers.dev enforces a browser-integrity check that rejects bare
+# non-browser clients (Cloudflare error 1010) before the Worker runs.
+# Identify the job honestly while remaining an fetchable client.
+USER_AGENT = "Mozilla/5.0 (compatible; SULUAN-Processing-Job/1.0)"
+
 
 class ServiceWorkerClient:
     def __init__(self, base, token_provider):
@@ -35,7 +40,10 @@ class ServiceWorkerClient:
     def request(self, path, body=None):
         token = self.token_provider()
         self.last_token = token or ""
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "User-Agent": USER_AGENT,
+        }
         data = None
         if body is not None:
             headers["Content-Type"] = "application/json"
