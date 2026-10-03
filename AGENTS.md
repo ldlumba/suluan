@@ -73,7 +73,60 @@ Do not add Supabase, a separate vector/graph DB, Elasticsearch, MongoDB, Redis, 
 
 ## Stage roadmap
 
-Stages 0–3 are established, plus dev-verified discovery/processing slices: **0 local bootstrap — done 2026-09-30** (React/Vite scaffold, repo layout, `.env.example` placeholders, lint/typecheck/test/format setup) → 1 Neon DB → 2 Firebase auth + Worker authorization → 3 submission/review + outbox notifications → keyword-first discovery (2026-10-01) → local extraction slice (2026-10-01) → semantic embedding infrastructure (2026-10-01, production use deferred) → Cloud Run dev activation smoke-tested (2026-10-03, manual trigger only). Later work is proposed dependency order only: Scheduler policy, failure-recovery/access validation, production ownership/billing/domains, semantic relevance validation on a larger corpus, and Gmail production delivery. Complete and verify each stage's checks (denied role escalation, cross-user/restricted-file access, pending/rejected leakage, duplicate deliveries, email/ingestion failure recovery) before expanding scope.
+Owner-approved continuation route (2026-10-03). Complete each exit gate before
+advancing; a later stage does not waive unresolved security, policy, or recovery
+work from an earlier one.
+
+- **Stage 0 — Local bootstrap: DONE (2026-09-30).** Monorepo, frontend
+  foundation, local configuration placeholders, and quality checks.
+- **Stage 1 — Neon database: DONE (2026-09-30).** Domain-separated schema,
+  migrations, roles, workflow state, and audit foundations.
+- **Stage 2 — Authentication/authorization: DONE (2026-09-30).** Firebase
+  Google sign-in, UA-domain validation, Neon permissions, and Worker authz.
+- **Stage 3 — Submission/review: DONE (2026-10-01).** Private R2 uploads,
+  durable submission/decision writes, REO review, outbox notifications, and
+  submitter status UI. Production Gmail delivery remains a later-stage item.
+- **Stage 4 — Discovery/processing baseline: DONE IN DEV (2026-10-03).**
+  Visibility-aware keyword search, semantic infrastructure, local recovery
+  runner, and bounded Cloud Run extraction are implemented. Manual Cloud Run
+  execution passed end to end. Semantic production use remains gated on Stage 8.
+- **Stage 5 — Pilot test design: NEXT.** Select approximately 20–50 authorized,
+  non-sensitive representative PDF/DOCX fixtures (normal, large, mixed-text,
+  scanned/image-only, malformed, and encrypted); define expected outcomes,
+  result logging, and pass thresholds before execution. **Exit:** the corpus is
+  authorized, reproducible, privacy-safe, and covers success/failure cases.
+- **Stage 6 — Isolated staging environment.** Create separate staging Neon,
+  private R2, Worker/secrets, Firebase config, Cloud Run Job/image policy, and
+  budget monitoring. Never reuse production data or commit secrets. Test
+  migrations and rollback. **Exit:** upload → review → acceptance → extraction
+  → indexing → search succeeds without using development resources.
+- **Stage 7 — Reliability/security hardening.** Verify pending/rejected
+  non-leakage; PUBLIC/UA_ONLY/RESTRICTED/embargo enforcement; denied restricted
+  downloads; idempotent submissions, decisions, results, and indexes; lease
+  reclaim/stale-token rejection; safe malformed/encrypted/oversize/image-only
+  failures; interruption recovery; notification isolation; and audit context.
+  Define Scheduler frequency, overlap, retries/dead-letter, alerting, recovery,
+  and log-retention/redaction before any automation. **Exit:** all critical
+  authorization, leakage, idempotency, and recovery checks pass.
+- **Stage 8 — Larger corpus pilot.** Process the approved corpus in bounded
+  staging batches; measure duration, failures, recovery, indexing/search,
+  visibility, and cost. Evaluate semantic retrieval with an independent/blinded
+  realistic query holdout including clean negatives; do not tune and validate on
+  the same queries. **Exit:** no unauthorized exposure or unexplained loss/
+  duplication, acceptable extraction/recovery and cost, dependable keyword
+  search; semantic stays disabled unless its independent gate passes.
+- **Stage 9 — Production/institutional readiness.** Resolve institutional cloud
+  and billing ownership, two trusted admins, production first-admin process,
+  identity/domain policy, real catalogs, retention/withdrawal/replacement/
+  deletion and backup/restore policies, Gmail/REO authorization, privacy/data
+  processing approval, observability/incident ownership, and semantic approval.
+  **Exit:** resources, credentials, policies, and operations are institutionally
+  owned and production-ready, not dependent on one developer account.
+- **Stage 10 — Controlled production pilot.** Launch to a small authorized
+  cohort with conservative limits, active cost/failure review, documented
+  rollback, keyword search as the dependable path, and semantic disabled unless
+  Stage 8 passed. **Exit:** complete the agreed observation period without a
+  critical security, workflow, data-loss, or cost issue before wider rollout.
 
 ## Maintaining this file
 

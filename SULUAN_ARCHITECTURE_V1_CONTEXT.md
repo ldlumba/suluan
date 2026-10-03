@@ -139,20 +139,28 @@ No Supabase account, paid vector/graph service, paid email provider, VPS, custom
 
 ## 9. Development stages
 
-Only Stage 0–2 numbering is established in the source. Later rows are a **proposed dependency order**, not a previously approved numbered roadmap.
+Stages 0–2 came from the original source. Stage 3 reflects the completed
+submission/review slice, and the owner approved the Stage 4–10 continuation
+route on 2026-10-03. Complete each exit gate before advancing.
 
 | Stage | Deliverable / credential boundary |
 |---|---|
 | **0 — Local bootstrap** | React/Vite scaffold, repository layout, documentation and agent guidance, local configuration placeholders, test/check setup. No production access or full cloud-secret bundle. |
 | **1 — Database** | Neon development connection, migrations, domain separation, roles, organization data, workflow/audit foundations. Supply development database credentials only. |
 | **2 — Authentication** | Firebase development setup, Google identity validation, Worker authorization, and role boundaries. |
-| Proposed: submission/review + email | Private R2 uploads, pending intake, remarks and decisions, durable jobs, Gmail test authorization, failure recovery. |
-| Proposed: document processing | Cloud Run extraction and indexing-state management, authenticated queue delivery, retriable ingestion. |
-| Proposed: semantic search | Add Gemini development credentials, embeddings/pgvector, hybrid retrieval and filters; retain useful metadata discovery during ingestion failure. |
-| Proposed: assistant and research tools | Enforced AI limits, cited answers, graph, descriptive analytics, citations, and agreed import/integration scope. |
-| Proposed: pilot readiness | Workflow/access validation, recovery and backup checks, cost monitoring, institutional sender/ownership, and production configuration. |
+| **3 — Submission/review** | Private R2 uploads, pending intake, remarks and decisions, durable outbox notifications, and submitter status. Production Gmail delivery remains later work. |
+| **4 — Discovery/processing baseline** | Development keyword/visibility search, semantic infrastructure, local recovery, and manually triggered bounded Cloud Run extraction. Semantic production use remains gated. |
+| **5 — Pilot test design** | Authorized 20–50-document representative corpus, privacy review, expected outcomes, result log, and pass thresholds. |
+| **6 — Isolated staging** | Separate Neon, R2, Worker/secrets, Firebase config, Cloud Run Job/image policy, and budget monitoring; prove the end-to-end path without dev resources. |
+| **7 — Reliability/security hardening** | Access/leakage/idempotency/recovery/failure tests plus approved scheduling, retry, overlap, monitoring, and logging policy before automation. |
+| **8 — Larger corpus pilot** | Bounded staging corpus run, extraction/search/cost evidence, and independent/blinded semantic relevance evaluation. |
+| **9 — Production/institutional readiness** | Institutional ownership/admins, production identity/catalog/policy, Gmail authorization, privacy, backup/restore, observability, and incident responsibility. |
+| **10 — Controlled production pilot** | Small authorized cohort, conservative limits, active monitoring, rollback, and an observation gate before wider rollout. |
 
-Complete and verify each dependency before expanding scope. Important checks include denied role escalation, cross-user/restricted-file access, pending/rejected retrieval leakage, duplicate queue deliveries, email failures, and ingestion failures after acceptance. Use development fixtures/resources for these checks.
+Important checks include denied role escalation, cross-user/restricted-file
+access, pending/rejected retrieval leakage, duplicate deliveries, email
+failures, and ingestion failures after acceptance. Use authorized fixtures and
+the environment assigned to the current stage.
 
 ## 10. Open / TBD decisions
 
@@ -173,6 +181,8 @@ Store this file in the repository documentation and reference its actual path fr
 Do not treat this document as proof that accounts, cloud resources, tables, integrations, or tests already exist. Implement the governed submission workflow before exposing AI features; use the smallest service set that satisfies it.
 
 ## 12. Recorded amendments
+
+- **2026-10-03 — Owner-approved production-readiness continuation route.** Stages 0–3 remain the established bootstrap/database/auth/submission-review sequence. Stage 4 records the development discovery/processing baseline as complete; Stage 5 pilot test design is next; Stage 6 creates an isolated staging environment; Stage 7 gates reliability/security and any scheduling policy; Stage 8 runs a bounded larger-corpus pilot plus independent/blinded semantic relevance validation; Stage 9 resolves production and institutional ownership/policy; Stage 10 is a controlled production pilot before wider rollout. Each stage has an explicit exit gate and later work does not waive unresolved earlier safeguards. Semantic production use remains disabled unless Stage 8 passes; Scheduler remains undeployed until Stage 7 defines and validates frequency, overlap, retry/dead-letter, monitoring, and recovery behavior.
 
 - **2026-10-03 — Development Cloud Run activation verified; manual trigger retained.** The bounded pull design from the earlier 2026-10-03 amendment is now deployed and smoke-tested in development: manual Job `suluan-processing` (`asia-southeast1`), execution `suluan-processing-lssfx`, fixture `[CLOUD TEST] Processing smoke test` reached `Full text searchable` after keyword preparation. The PHP 250 monthly budget alert is set. Two activation faults were fixed: missing Job environment variables on first creation, and Cloudflare edge error 1010 rejecting the bare Python client before the Worker ran (runner now sends a browser-compatible `User-Agent`). Scheduler stays undeployed; manual `gcloud run jobs execute` is the approved development trigger. No production scheduling, region, retry, or observability decision is made by this entry.
 
