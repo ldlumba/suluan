@@ -74,32 +74,63 @@ course: BS Tourism Management
 ---
 """,
             )
-            items, errors, warnings = build_plan(
+            items, errors, warnings, skipped = build_plan(
                 root, "https://worker.example", catalog()
             )
             self.assertEqual(errors, [])
             self.assertEqual(warnings, [])
+            self.assertEqual(skipped, [])
             self.assertEqual(len(items), 1)
             self.assertEqual(items[0].selection.school, "School of Business")
             self.assertEqual(items[0].selection.school_id, SCHOOL_ID)
             self.assertEqual(items[0].selection.course_id, COURSE_ID)
 
-    def test_reports_legacy_doc_and_missing_manifest_before_upload(self):
+    def test_reports_legacy_doc_but_skips_unmanifested_by_default(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.write_pair(root, stem="legacy", suffix=".doc")
             (root / "orphan.pdf").write_bytes(b"paper")
-            items, errors, _ = build_plan(root, "https://worker.example", catalog())
+            items, errors, _, skipped = build_plan(
+                root, "https://worker.example", catalog()
+            )
             self.assertEqual(items, [])
             self.assertTrue(any("legacy .doc is unsupported" in error for error in errors))
+            self.assertEqual(skipped[0]["document"], "orphan.pdf")
+            self.assertEqual(skipped[0]["reason"], "no manifest (out of import scope)")
+
+    def test_strict_mode_rejects_unmanifested_documents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "orphan.pdf").write_bytes(b"paper")
+            items, errors, _, skipped = build_plan(
+                root, "https://worker.example", catalog(), strict=True
+            )
+            self.assertEqual(items, [])
+            self.assertEqual(skipped, [])
             self.assertTrue(any("matching .md manifest is missing" in error for error in errors))
+
+    def test_no_title_marker_always_skips_even_with_invalid_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_pair(
+                root,
+                stem="Abines - [NO TITLE]",
+                metadata="not valid front matter",
+            )
+            items, errors, _, skipped = build_plan(
+                root, "https://worker.example", catalog(), strict=True
+            )
+            self.assertEqual(items, [])
+            self.assertEqual(errors, [])
+            self.assertEqual(skipped[0]["reason"], "marked [NO TITLE]")
 
     def test_empty_folder_is_not_a_successful_plan(self):
         with tempfile.TemporaryDirectory() as directory:
-            items, errors, _ = build_plan(
+            items, errors, _, skipped = build_plan(
                 Path(directory), "https://worker.example", catalog()
             )
             self.assertEqual(items, [])
+            self.assertEqual(skipped, [])
             self.assertEqual(
                 errors, ["No importable PDF/DOCX + Markdown pairs were found"]
             )
@@ -114,7 +145,7 @@ course: BS Tourism Management
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.write_pair(root)
-            items, errors, _ = build_plan(root, "https://worker.example", catalog())
+            items, errors, _, _ = build_plan(root, "https://worker.example", catalog())
             self.assertEqual(errors, [])
             body, content_type = multipart_body(items[0])
             self.assertIn("multipart/form-data", content_type)

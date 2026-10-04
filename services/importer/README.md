@@ -22,9 +22,10 @@ Copy `services/importer/manifest-template.md` as the starting point for each
 paper, then rename it to match the document stem.
 
 PDF and DOCX are accepted up to 30 MiB. Legacy `.doc` files are reported and
-must be converted to DOCX before import. Subfolders are supported. A document
-without a matching manifest is an error; an unmatched Markdown file is a warning
-and is ignored.
+must be converted to DOCX before import. Subfolders are supported. A manifest is
+the opt-in marker: documents without one are listed as skipped and do not block
+the run. A filename containing `[NO TITLE]` (case-insensitive) is always skipped,
+even if a manifest exists. An unmatched Markdown file is a warning and is ignored.
 
 ```markdown
 ---
@@ -70,10 +71,22 @@ services/importer/.venv/Scripts/python.exe services/importer/importer.py `
   --api https://suluan-api.ctrlfinder.workers.dev
 ```
 
-It validates every manifest and file, resolves the live catalog, hashes every
-document, and writes `suluan-import-report.json` in the supplied folder. It
-uploads nothing. Resolve every error and review the report before proceeding.
-Warnings do not block the run but must still be reviewed.
+It validates every opted-in manifest and file, resolves the live catalog, hashes
+every importable document, and writes `suluan-import-report.json` in the supplied
+folder. It uploads nothing. The report separates `ready`, `skipped`, `errors`,
+and `warnings`, with a reason and source folder for every skip. Resolve every
+error and review both skipped and ready lists before proceeding. Warnings and
+intentional skips do not block the run.
+
+For a final completeness audit, add `--strict`. It converts unmanifested
+documents into errors while continuing to skip `[NO TITLE]` files:
+
+```powershell
+services/importer/.venv/Scripts/python.exe services/importer/importer.py `
+  "D:\path\to\papers" `
+  --api https://suluan-api.ctrlfinder.workers.dev `
+  --strict
+```
 
 ## Apply
 

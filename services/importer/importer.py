@@ -265,9 +265,23 @@ def deterministic_key(api_base, relative_path, digest):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, identity))
 
 
-def build_plan(root, api_base, catalog):
+def skipped_item(root, path, reason):
+    relative = path.relative_to(root)
+    parent = relative.parent.as_posix()
+    return {
+        "document": relative.as_posix(),
+        "folder": parent if parent != "." else "",
+        "reason": reason,
+    }
+
+
+def build_plan(root, api_base, catalog, strict=False):
     root = root.resolve()
-    manifests = [path for path in root.rglob("*.md") if path.is_file()]
+    manifests = [
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.casefold() == ".md"
+    ]
     documents = [
         path
         for path in root.rglob("*")
@@ -277,20 +291,39 @@ def build_plan(root, api_base, catalog):
     document_map = {}
     errors = []
     warnings = []
+    skipped = []
     for path in manifests:
         manifest_map.setdefault(file_key(root, path), []).append(path)
     for path in documents:
         document_map.setdefault(file_key(root, path), []).append(path)
 
+    excluded_keys = set()
     for key, paths in document_map.items():
+        no_title = [path for path in paths if "[no title]" in path.name.casefold()]
+        if no_title:
+            skipped.extend(
+                skipped_item(root, path, "marked [NO TITLE]") for path in paths
+            )
+            excluded_keys.add(key)
+            continue
         if not manifest_map.get(key):
-            errors.append(f"{paths[0].relative_to(root)}: matching .md manifest is missing")
+            if strict:
+                errors.extend(
+                    f"{path.relative_to(root)}: matching .md manifest is missing"
+                    for path in paths
+                )
+            else:
+                skipped.extend(
+                    skipped_item(root, path, "no manifest (out of import scope)")
+                    for path in paths
+                )
+            excluded_keys.add(key)
     for key, paths in manifest_map.items():
         if not document_map.get(key):
             warnings.append(f"{paths[0].relative_to(root)}: no matching document; ignored")
 
     items = []
-    for key in sorted(set(manifest_map) & set(document_map)):
+    for key in sorted((set(manifest_map) & set(document_map)) - excluded_keys):
         manifest_paths = manifest_map[key]
         document_paths = document_map[key]
         label = manifest_paths[0].relative_to(root)
@@ -331,9 +364,9 @@ def build_plan(root, api_base, catalog):
             )
         except (ImportValidationError, OSError) as error:
             errors.append(f"{label}: {error}")
-    if not items and not errors:
+    if not items and not errors and not skipped:
         errors.append("No importable PDF/DOCX + Markdown pairs were found")
-    return items, errors, warnings
+    return items, errors, warnings, skipped
 
 
 def multipart_body(item):
@@ -390,7 +423,7 @@ def report_item(root, item):
         "sizeBytes": item.size_bytes,
         "sha256": item.sha256,
         "idempotencyKey": item.idempotency_key,
-        "status": "validated",
+        "status": "ready",
     }
 
 
@@ -416,6 +449,11 @@ def main():
     )
     parser.add_argument("--pace-seconds", type=float, default=1.0)
     parser.add_argument("--report", type=Path)
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat unmanifested documents as errors; [NO TITLE] remains skipped",
+    )
     args = parser.parse_args()
     if not args.folder.is_dir():
         parser.error("folder must be an existing directory")
@@ -433,25 +471,29 @@ def main():
         raise SystemExit(str(error)) from None
 
     root = args.folder.resolve()
-    items, errors, warnings = build_plan(root, client.base, catalog)
+    items, errors, warnings, skipped = build_plan(
+        root, client.base, catalog, strict=args.strict
+    )
     report_path = (args.report or root / "suluan-import-report.json").resolve()
     report = {
         "mode": "apply" if args.apply else "dry-run",
         "api": client.base,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "summary": {
-            "validated": len(items),
+            "ready": len(items),
+            "skipped": len(skipped),
             "errors": len(errors),
             "warnings": len(warnings),
         },
         "errors": errors,
         "warnings": warnings,
+        "skipped": skipped,
         "items": [report_item(root, item) for item in items],
     }
     write_report(report_path, report)
     print(
-        f"Validated {len(items)} paper(s): {len(errors)} error(s), "
-        f"{len(warnings)} warning(s). Report: {report_path}"
+        f"Ready {len(items)} paper(s), skipped {len(skipped)}: "
+        f"{len(errors)} error(s), {len(warnings)} warning(s). Report: {report_path}"
     )
     if errors:
         raise SystemExit(2)
