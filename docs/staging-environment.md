@@ -2,11 +2,12 @@
 
 ## Status
 
-**Provisioned and technically verified 2026-10-04; governance hold remains.**
+**DONE (2026-10-04).**
 The isolated resources, migration/recovery proof, and generated-fixture exit
-tests below passed. Stage 6 is not marked fully complete until the owner names a
-second trusted staging administrator. Staging does not reuse development Neon,
-R2, Worker, Firebase, or Cloud Run resources.
+tests below passed. Staging does not reuse development Neon, R2, Worker,
+Firebase, or Cloud Run resources. Owner decision 2026-10-04: proceed with the
+single provisioned staging administrator; multi-administrator coverage is a
+Stage 9 production-readiness item, not a Stage 6 gate.
 
 The approved topology uses the existing owner accounts and billing account; it
 does not require another Google login or billing account:
@@ -41,7 +42,7 @@ does not require another Google login or billing account:
 
 ## Operator prerequisites
 
-Items 1–7 were completed on 2026-10-04. Item 8 remains open:
+All items were completed on 2026-10-04:
 
 1. Authenticate Firebase CLI with the intended owner: `firebase login`.
 2. Create or confirm GCP/Firebase project `suluan-staging` under the same owner.
@@ -54,9 +55,11 @@ Items 1–7 were completed on 2026-10-04. Item 8 remains open:
    to `apps/web/.env.staging.local`.
 7. Create Neon Free project `suluan-staging` in `ap-southeast-1`. Record its
    direct endpoint for migrations and pooled endpoint for the Worker.
-8. Identify two trusted staging administrators. One staging administrator is
-   provisioned; the second identity remains owner-supplied. Production
-   provisioning remains separately TBD.
+
+Provisioning used the single staging administrator
+(`ld_lumba.student@ua.edu.ph`). No second staging administrator is required;
+two trusted admins remain a Stage 9 production-readiness item. Production
+provisioning remains separately TBD.
 
 ## Repository configuration
 
@@ -96,7 +99,7 @@ resource names.
    `PROCESSING_SERVICE_ACCOUNT`.
 9. Deploy the staging Worker and verify CORS allows only localhost:5174.
 10. Create the staging web `.env.staging.local`, start `npm run dev:staging`,
-    sign in, and provision administrators through the dev/staging-only script.
+    sign in, and provision the staging administrator through the dev/staging-only script.
 
 ## Migration and recovery proof
 
@@ -194,8 +197,9 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   as one PowerShell value; the Job configuration was corrected before any job
   could be claimed, and subsequent executions succeeded.
 
-### Remaining gate
+### Stage 6 complete
 
-- The owner must supply and authorize one additional trusted staging
-  administrator. Do not invent an identity, reuse a personal non-UA account, or
-  treat the non-production promotion script as a production provisioning path.
+- No remaining Stage 6 gate. Multi-administrator coverage is deferred to
+  Stage 9 production/institutional readiness. Do not invent an identity, reuse
+  a personal non-UA account, or treat the non-production promotion script as a
+  production provisioning path.

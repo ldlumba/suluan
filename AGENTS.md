@@ -96,20 +96,22 @@ work from an earlier one.
   encrypted cases. `docs/pilot-corpus-manifest.csv` and the result-log template
   define reproducibility, expected outcomes, and pass thresholds. No paper
   content is committed and execution remains gated on isolated staging.
-- **Stage 6 — Isolated staging environment: TECHNICALLY VERIFIED; GOVERNANCE
-  HOLD (2026-10-04).** Separate staging Neon, private R2, Worker/Queue/secrets,
+- **Stage 6 — Isolated staging environment: DONE (2026-10-04).** Separate staging Neon, private R2, Worker/Queue/secrets,
   Firebase, Cloud Run Job/image, and project-scoped budget alert are provisioned.
   Clean migrations, no-op reapply, Neon snapshot-to-temporary-branch restore,
   generated upload/review/extraction/index/search/download, rejected non-
   derivation, and restricted anonymous denial passed without development
-  resources. Scheduler, Gemini, OCR, and Gmail remain disabled. One trusted
-  staging administrator is provisioned; owner identification of a second is the
-  remaining Stage 6 gate. See `docs/staging-environment.md`.
-- **Stage 7 — Reliability/security hardening.** Verify pending/rejected
+  resources. Scheduler, Gemini, OCR, and Gmail remain disabled. A single staging
+  administrator is provisioned; owner decision 2026-10-04 is to proceed with no
+  second staging account. Two trusted admins remain a Stage 9 item. See `docs/staging-environment.md`.
+- **Stage 7 — Reliability/security hardening: NEXT.** Verify pending/rejected
   non-leakage; PUBLIC/UA_ONLY/RESTRICTED/embargo enforcement; denied restricted
   downloads; idempotent submissions, decisions, results, and indexes; lease
   reclaim/stale-token rejection; safe malformed/encrypted/oversize/image-only
   failures; interruption recovery; notification isolation; and audit context.
+  Clarify that `ADMIN` and `REPOSITORY_MANAGER` are currently
+  enforcement-identical (`MANAGERS` in `apps/worker/src/app.ts`), so the role
+  hierarchy is documentation-only until an ADMIN-only operation exists.
   Define Scheduler frequency, overlap, retries/dead-letter, alerting, recovery,
   and log-retention/redaction before any automation. **Exit:** all critical
   authorization, leakage, idempotency, and recovery checks pass.
