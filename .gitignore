@@ -2,6 +2,9 @@ node_modules
 dist
 dist-ssr
 *.local
+.venv/
+__pycache__/
+*.pyc
 
 # Environment files: placeholders only may be committed
 .env
@@ -17,6 +20,8 @@ dist-ssr
 # Logs
 logs
 *.log
+suluan-import-report.json
+suluan-import-report.json.tmp
 
 # Editor / OS
 .vscode/*
