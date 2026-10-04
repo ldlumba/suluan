@@ -1,0 +1,28 @@
+name = "suluan-api-staging"
+main = "src/index.ts"
+compatibility_date = "2026-09-30"
+
+# Staging deliberately has no scheduled trigger. Scheduler frequency,
+# overlap, retry/dead-letter, monitoring, and recovery remain Stage 7 TBDs.
+
+# Non-secret staging configuration only. The exact local frontend origin is
+# intentionally separate from development. Never use a wildcard here.
+[vars]
+ALLOWED_DOMAINS = "ua.edu.ph"
+ALLOWED_ORIGINS = "http://localhost:5174"
+
+# Private staging storage. Browser access remains Worker-authorized only.
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "suluan-staging"
+
+# Staging notification delivery keeps the current log adapter. Queue
+# consumption is enabled; only the unapproved scheduled recovery sweep is off.
+[[queues.producers]]
+binding = "NOTIFICATIONS"
+queue = "suluan-notifications-staging"
+
+[[queues.consumers]]
+queue = "suluan-notifications-staging"
+max_batch_size = 5
+max_retries = 3

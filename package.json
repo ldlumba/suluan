@@ -9,8 +9,11 @@
   ],
   "scripts": {
     "dev": "npm run dev -w web",
+    "dev:staging": "npm run dev:staging -w web",
     "dev:worker": "npm run dev -w @suluan/worker",
     "dev:worker:remote": "npm run dev:remote -w @suluan/worker",
+    "deploy:worker:staging": "npm run deploy:staging -w @suluan/worker",
+    "deploy:worker:staging:dry-run": "npm run deploy:staging:dry-run -w @suluan/worker",
     "build": "npm run build -w web",
     "preview": "npm run preview -w web",
     "lint": "npm run lint --workspaces --if-present",

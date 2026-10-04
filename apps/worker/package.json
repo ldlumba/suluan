@@ -7,6 +7,8 @@
     "dev": "wrangler dev",
     "dev:remote": "wrangler dev --remote",
     "deploy": "wrangler deploy --dry-run",
+    "deploy:staging": "wrangler deploy -c wrangler.staging.toml",
+    "deploy:staging:dry-run": "wrangler deploy -c wrangler.staging.toml --dry-run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"

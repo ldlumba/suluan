@@ -90,16 +90,21 @@ work from an earlier one.
   Visibility-aware keyword search, semantic infrastructure, local recovery
   runner, and bounded Cloud Run extraction are implemented. Manual Cloud Run
   execution passed end to end. Semantic production use remains gated on Stage 8.
-- **Stage 5 — Pilot test design: NEXT.** Select approximately 20–50 authorized,
-  non-sensitive representative PDF/DOCX fixtures (normal, large, mixed-text,
-  scanned/image-only, malformed, and encrypted); define expected outcomes,
-  result logging, and pass thresholds before execution. **Exit:** the corpus is
-  authorized, reproducible, privacy-safe, and covers success/failure cases.
-- **Stage 6 — Isolated staging environment.** Create separate staging Neon,
-  private R2, Worker/secrets, Firebase config, Cloud Run Job/image policy, and
-  budget monitoring. Never reuse production data or commit secrets. Test
-  migrations and rollback. **Exit:** upload → review → acceptance → extraction
-  → indexing → search succeeds without using development resources.
+- **Stage 5 — Pilot test design: DONE (2026-10-04).** The approved design in
+  `docs/pilot-test-design.md` fixes a privacy-safe 40-fixture set: 36 authorized
+  legacy papers identified by hash plus four generated image-only/malformed/
+  encrypted cases. `docs/pilot-corpus-manifest.csv` and the result-log template
+  define reproducibility, expected outcomes, and pass thresholds. No paper
+  content is committed and execution remains gated on isolated staging.
+- **Stage 6 — Isolated staging environment: TECHNICALLY VERIFIED; GOVERNANCE
+  HOLD (2026-10-04).** Separate staging Neon, private R2, Worker/Queue/secrets,
+  Firebase, Cloud Run Job/image, and project-scoped budget alert are provisioned.
+  Clean migrations, no-op reapply, Neon snapshot-to-temporary-branch restore,
+  generated upload/review/extraction/index/search/download, rejected non-
+  derivation, and restricted anonymous denial passed without development
+  resources. Scheduler, Gemini, OCR, and Gmail remain disabled. One trusted
+  staging administrator is provisioned; owner identification of a second is the
+  remaining Stage 6 gate. See `docs/staging-environment.md`.
 - **Stage 7 — Reliability/security hardening.** Verify pending/rejected
   non-leakage; PUBLIC/UA_ONLY/RESTRICTED/embargo enforcement; denied restricted
   downloads; idempotent submissions, decisions, results, and indexes; lease

@@ -1,0 +1,8 @@
+# Staging placeholders only. Copy to `.dev.vars.staging` if an operator needs
+# local tooling to read the values; that file is git-ignored. Remote Worker
+# values are set with `wrangler secret put -c wrangler.staging.toml`.
+# Never add GEMINI_API_KEY: semantic preparation is disabled for this pilot.
+DATABASE_URL=
+FIREBASE_PROJECT_ID=suluan-staging
+PROCESSING_SERVICE_AUDIENCE=https://suluan-api-staging.ctrlfinder.workers.dev
+PROCESSING_SERVICE_ACCOUNT=suluan-processing-staging@suluan-staging.iam.gserviceaccount.com

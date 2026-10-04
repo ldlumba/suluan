@@ -1,5 +1,6 @@
 import io
 import json
+import tempfile
 import unittest
 import zipfile
 from email.message import Message
@@ -9,6 +10,7 @@ import pymupdf
 from docx import Document
 
 from extraction import ExtractionError, extract
+from pilot_fixtures import build_pilot_fixtures
 from cloud_runner import (
     ServiceWorkerClient,
     decode_jwt_payload,
@@ -70,6 +72,22 @@ class ExtractionTests(unittest.TestCase):
             data = doc.tobytes(encryption=pymupdf.PDF_ENCRYPT_AES_256, owner_pw="owner", user_pw="user")
         with self.assertRaisesRegex(ExtractionError, "ENCRYPTED_DOCUMENT"):
             extract(data, PDF)
+
+    def test_stage_five_generated_failure_fixtures(self):
+        expected = {
+            "F01": (PDF, "NO_EXTRACTABLE_TEXT"),
+            "F02": (PDF, "INVALID_DOCUMENT"),
+            "F03": (PDF, "ENCRYPTED_DOCUMENT"),
+            "F04": (DOCX, "INVALID_DOCUMENT"),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            fixtures = build_pilot_fixtures(directory)
+            self.assertEqual(set(fixtures), set(expected))
+            for fixture_id, path in fixtures.items():
+                mime_type, error_code = expected[fixture_id]
+                with self.subTest(fixture_id=fixture_id):
+                    with self.assertRaisesRegex(ExtractionError, error_code):
+                        extract(path.read_bytes(), mime_type)
 
     def test_zip_entry_limit_before_parsing(self):
         data = io.BytesIO()
