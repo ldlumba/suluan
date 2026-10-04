@@ -127,7 +127,7 @@ needsDb('restricted keyword discovery', () => {
           status: 'EXTRACTED',
           claimToken: crypto.randomUUID(),
           result: {
-            text: `photovoltaic ${tag} <script>alert('untrusted')</script> study evidence`,
+            text: `photovoltaic ${tag}\n\n<script>alert('untrusted')</script> study   evidence ${'supporting material '.repeat(30)}`,
             sha256: 'a'.repeat(64),
             parser: 'test/1',
             warnings: [],
@@ -209,10 +209,19 @@ needsDb('restricted keyword discovery', () => {
     expect(fullText.status).toBe(200)
     expect(fullText.headers.get('cache-control')).toContain('no-store')
     const fullTextBody = (await fullText.json()) as {
-      items: { id: string; fullTextStatus: string }[]
+      items: { id: string; fullTextStatus: string; snippet: string | null }[]
     }
     expect(fullTextBody.items.map((x) => x.id)).toEqual([accepted.recordId])
     expect(fullTextBody.items[0].fullTextStatus).toBe('READY')
+    expect(fullTextBody.items[0].snippet).not.toMatch(/\s{2,}/)
+    expect(fullTextBody.items[0].snippet).toMatch(/…$/)
+    expect(fullTextBody.items[0].snippet!.length).toBeLessThanOrEqual(401)
+    const browseBody = (await (
+      await request('/api/search/records?q=&sort=newest', manager)
+    ).json()) as { items: { id: string; snippet: string | null }[] }
+    expect(
+      browseBody.items.find((item) => item.id === accepted.recordId)?.snippet,
+    ).toBeNull()
     for (const query of [`Study ${tag}`, `Author ${tag}`]) {
       const response = await request(
         `/api/search/records?q=${encodeURIComponent(query)}`,

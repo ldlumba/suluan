@@ -99,10 +99,17 @@ export function searchRoutes(
           e.school_name as "schoolName", e.course_name as "courseName",
           e.year::text as year,
           e.visibility, e.full_text_status as "fullTextStatus",
-          left(best.content, 400) as snippet
+          case
+            when ${q} = '' or best.content is null then null
+            when char_length(best.content) <= 400 then best.content
+            else rtrim(regexp_replace(
+              left(best.content, 400), '[[:space:]]+[^[:space:]]*$', ''
+            )) || '…'
+          end as snippet
         from eligible e cross join query
         left join lateral (
-          select d.content, ts_rank_cd(d.search_vector, query.terms) as rank
+          select regexp_replace(btrim(d.content), '[[:space:]]+', ' ', 'g') as content,
+            ts_rank_cd(d.search_vector, query.terms) as rank
           from document_chunks d where d.index_id = e.index_id
             and (${q} = '' or d.search_vector @@ query.terms)
           order by rank desc, d.ordinal limit 1
@@ -288,7 +295,9 @@ export function searchRoutes(
         with best as (
           select e.semantic_index_id, k.record_id,
             min(e.embedding <=> cast(${queryVector} as vector)) as distance,
-            (array_agg(d.content order by e.embedding <=> cast(${queryVector} as vector)))[1] as snippet
+            regexp_replace(btrim((array_agg(
+              d.content order by e.embedding <=> cast(${queryVector} as vector)
+            ))[1]), '[[:space:]]+', ' ', 'g') as snippet
           from document_embeddings e
           join document_chunks d on d.id = e.chunk_id
           join semantic_indexes si on si.id = e.semantic_index_id
@@ -310,7 +319,13 @@ export function searchRoutes(
           r.year::text as year,
           ${visibilityCase()} as visibility,
           'READY' as "fullTextStatus",
-          left(ranked.snippet, 400) as snippet,
+          case
+            when ranked.snippet is null then null
+            when char_length(ranked.snippet) <= 400 then ranked.snippet
+            else rtrim(regexp_replace(
+              left(ranked.snippet, 400), '[[:space:]]+[^[:space:]]*$', ''
+            )) || '…'
+          end as snippet,
           ranked.distance
         from ranked
         join research_records r on r.id = ranked.record_id

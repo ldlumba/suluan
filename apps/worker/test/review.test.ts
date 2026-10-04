@@ -346,6 +346,12 @@ needsDb('review workflow', () => {
 
   it('lists pending submissions for managers', async () => {
     const { id } = await submit('Awaiting review')
+    // Production queues can legitimately contain more than the 50-row page.
+    // Put this fixture first rather than assuming a fresh global database.
+    await testDb()
+      .update(submissions)
+      .set({ createdAt: new Date(0) })
+      .where(eq(submissions.id, id))
     const res = await get('/api/review/queue', managerToken)
     expect(res.status).toBe(200)
     const queue = (await res.json()) as { id: string; submitterEmail: string }[]

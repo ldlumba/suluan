@@ -26,8 +26,10 @@ triggered when a paper is accepted or extracted.
 - PostgreSQL keyword search only. The `simple` configuration matches words
   without English stemming; semantic meaning/synonym matching is not supported.
 - Searches title/author/year metadata and document chunks; returns one result
-  per accepted paper and, for fully searchable papers only, a plain-text
-  excerpt of the best matching chunk (no HTML highlighting). Papers pending
+  per accepted paper. A non-empty query returns, for fully searchable papers
+  only, a whitespace-normalized plain-text excerpt of the best matching chunk,
+  trimmed at a word boundary (no HTML highlighting). Blank browse mode is
+  metadata-only and never displays arbitrary document front matter. Papers pending
   extraction or preparation, or with failed extraction, appear metadata-only
   with an explicit status label; they never contribute snippets or keyword
   ranking, and pending/rejected submissions remain fully excluded.
