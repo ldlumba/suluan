@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
-import { processingJobs, researchRecords, submissions } from '@suluan/db/schema'
+import {
+  courses,
+  processingJobs,
+  researchRecords,
+  schools,
+  submissions,
+} from '@suluan/db/schema'
 import {
   setupTestAuth,
   insertProfile,
@@ -22,6 +28,10 @@ needsDb('restricted keyword discovery', () => {
   let t: TestAuth
   let manager: string
   let user: string
+  let courseId: string
+  let courseName: string
+  let schoolId: string
+  let schoolName: string
   const tag = crypto.randomUUID().replaceAll('-', '')
   const uid = `test-search-${tag}`
   const userUid = `test-search-user-${tag}`
@@ -32,6 +42,17 @@ needsDb('restricted keyword discovery', () => {
     await insertProfile(testDb(), uid, `${uid}@ua.edu.ph`, 'REPOSITORY_MANAGER')
     manager = await t.mintToken({ sub: uid, email: `${uid}@ua.edu.ph` })
     user = await t.mintToken({ sub: userUid, email: `${userUid}@ua.edu.ph` })
+    const [catalog] = await testDb()
+      .select({
+        courseId: courses.id,
+        courseName: courses.name,
+        schoolId: schools.id,
+        schoolName: schools.name,
+      })
+      .from(courses)
+      .innerJoin(schools, eq(schools.id, courses.schoolId))
+      .limit(1)
+    ;({ courseId, courseName, schoolId, schoolName } = catalog)
   })
   afterAll(async () => {
     const db = testDb()
@@ -57,14 +78,18 @@ needsDb('restricted keyword discovery', () => {
   async function fixture(
     status: 'PENDING' | 'ACCEPTED' | 'REJECTED',
     extracted = true,
+    title = `Study ${tag}`,
+    authors = `Author ${tag}`,
   ) {
     const form = new FormData()
     form.append(
       'file',
       new File(['test'], 'paper.pdf', { type: 'application/pdf' }),
     )
-    form.append('title', `Study ${tag}`)
-    form.append('authors', `Author ${tag}`)
+    form.append('title', title)
+    form.append('authors', authors)
+    form.append('schoolId', schoolId)
+    form.append('courseId', courseId)
     form.append('idempotencyKey', crypto.randomUUID())
     const res = await t.app.request(
       '/api/submissions',
@@ -125,6 +150,34 @@ needsDb('restricted keyword discovery', () => {
     expect((await request('/api/search/index', null, {})).status).toBe(401)
     expect((await request('/api/search/index', user, {})).status).toBe(403)
   })
+  dbIt('validates sorting and orders keyword matches by title', async () => {
+    const sortTag = `sort${crypto.randomUUID().replaceAll('-', '')}`
+    const zulu = await fixture(
+      'ACCEPTED',
+      false,
+      `Zulu ${sortTag}`,
+      `Author ${sortTag}`,
+    )
+    const alpha = await fixture(
+      'ACCEPTED',
+      false,
+      `Alpha ${sortTag}`,
+      `Author ${sortTag}`,
+    )
+    const response = await request(
+      `/api/search/records?q=${sortTag}&sort=title`,
+      manager,
+    )
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { items: { id: string }[] }
+    expect(body.items.map((item) => item.id)).toEqual([
+      alpha.recordId,
+      zulu.recordId,
+    ])
+    expect((await request('/api/search/records?sort=invalid', manager)).status).toBe(
+      400,
+    )
+  })
   dbIt('indexes idempotently, matches full text and metadata, and excludes pending/rejected/queued records', async () => {
     const accepted = await fixture('ACCEPTED')
     const queued = await fixture('ACCEPTED', false)
@@ -167,7 +220,13 @@ needsDb('restricted keyword discovery', () => {
       )
       expect(response.status).toBe(200)
       const body = (await response.json()) as {
-        items: { id: string; fullTextStatus: string; snippet: string | null }[]
+        items: {
+          id: string
+          fullTextStatus: string
+          snippet: string | null
+          schoolName: string | null
+          courseName: string | null
+        }[]
       }
       // Both records match by metadata; their relative order is rank detail.
       expect(body.items.map((x) => x.id).sort()).toEqual(
@@ -176,6 +235,8 @@ needsDb('restricted keyword discovery', () => {
       const pending = body.items.find((x) => x.id === queued.recordId)!
       expect(pending.fullTextStatus).toBe('PENDING')
       expect(pending.snippet).toBeNull()
+      expect(pending.schoolName).toBe(schoolName)
+      expect(pending.courseName).toBe(courseName)
     }
     // Failed extraction keeps the accepted record visible by metadata only:
     // labeled FAILED, no snippet, excluded from full-text ranking.

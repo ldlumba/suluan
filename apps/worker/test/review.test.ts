@@ -6,6 +6,7 @@ import {
   notifications,
   outboxEvents,
   researchRecords,
+  recordAuthors,
   recordFiles,
   submissionFiles,
   submissions,
@@ -91,7 +92,10 @@ needsDb('review workflow', () => {
     return t.app.request(path, { headers }, t.testEnv())
   }
 
-  async function submit(title: string): Promise<{ id: string; key: string }> {
+  async function submit(
+    title: string,
+    authors?: string,
+  ): Promise<{ id: string; key: string }> {
     const file = new File(['x'.repeat(777)], 'paper.pdf', {
       type: 'application/pdf',
     })
@@ -99,6 +103,7 @@ needsDb('review workflow', () => {
     form.append('file', file)
     form.append('idempotencyKey', crypto.randomUUID())
     form.append('title', title)
+    if (authors) form.append('authors', authors)
     const res = await t.app.request(
       '/api/submissions',
       {
@@ -122,6 +127,36 @@ needsDb('review workflow', () => {
 
   it('hides the review queue from ordinary users', async () => {
     expect((await get('/api/review/queue', userToken)).status).toBe(403)
+  })
+
+  it('normalizes newline-delimited authors when a paper is accepted', async () => {
+    const { id } = await submit(
+      'Normalized repository authors',
+      'Cruz, Lorenzo S.\nSecond Author',
+    )
+    expect(
+      (
+        await post('/api/decisions', managerToken, {
+          submissionId: id,
+          status: 'ACCEPTED',
+          remarks: 'Approved',
+        })
+      ).status,
+    ).toBe(201)
+    const db = testDb()
+    const [record] = await db
+      .select()
+      .from(researchRecords)
+      .where(eq(researchRecords.submissionId, id))
+    const authors = await db
+      .select({ name: recordAuthors.name, position: recordAuthors.position })
+      .from(recordAuthors)
+      .where(eq(recordAuthors.recordId, record.id))
+      .orderBy(recordAuthors.position)
+    expect(authors).toEqual([
+      { name: 'Cruz, Lorenzo S.', position: 0 },
+      { name: 'Second Author', position: 1 },
+    ])
   })
 
   it('restricts processing operations to managers', async () => {

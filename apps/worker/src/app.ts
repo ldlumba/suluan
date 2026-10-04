@@ -503,6 +503,7 @@ export function createApp(
           status: body.status,
           remarks: body.remarks,
           title: submission.title,
+          authors: submission.authors,
           r2Key: submission.files[0].r2Key,
           fileName: submission.files[0].fileName,
           mimeType: submission.files[0].mimeType,

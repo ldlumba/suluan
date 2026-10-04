@@ -38,6 +38,8 @@ const semanticItem = {
   id: 'rec-1',
   title: 'Solar panel efficiency in humid climates',
   authors: 'Dela Cruz',
+  schoolName: 'School of Technological Studies',
+  courseName: 'BS Information Technology',
   year: '2026',
   snippet: 'Measured output under high humidity.',
   fullTextStatus: 'READY' as const,
@@ -81,11 +83,39 @@ describe('keyword search', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
-        '/api/search/records?q=solar+power&page=1',
+        '/api/search/records?q=solar+power&page=1&sort=relevance',
         'test-token',
       ),
     )
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  })
+  it('clears the query into newest-first browse mode', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
+    renderPage('USER', '/search?q=solar+power')
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/search/records?q=&page=1&sort=newest',
+        'test-token',
+      ),
+    )
+    expect(screen.getByLabelText('Keywords, study title, or author')).toHaveValue(
+      '',
+    )
+  })
+  it('shows school and course beneath authors and year', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [semanticItem],
+      page: 1,
+      hasMore: false,
+    })
+    renderPage('USER')
+    expect(
+      await screen.findByText(
+        'School of Technological Studies · BS Information Technology',
+      ),
+    ).toBeInTheDocument()
   })
   it('shows API permission errors instead of an empty-results success state', async () => {
     vi.mocked(apiFetch).mockRejectedValue(

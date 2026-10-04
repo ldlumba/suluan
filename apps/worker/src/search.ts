@@ -25,6 +25,11 @@ const querySchema = z.object({
   q: z.string().trim().max(200).default(''),
   page: z.coerce.number().int().min(1).max(1000).default(1),
 })
+const keywordQuerySchema = querySchema.extend({
+  sort: z
+    .enum(['relevance', 'title', 'newest', 'oldest', 'course'])
+    .default('relevance'),
+})
 const indexSchema = z.object({ recordId: z.string().uuid().optional() })
 const PAGE_SIZE = 10
 /**
@@ -57,22 +62,33 @@ export function searchRoutes(
   app.get(
     '/records',
     optionalAuth,
-    zValidator('query', querySchema),
+    zValidator('query', keywordQuerySchema),
     async (c) => {
-      const { q, page } = c.req.valid('query')
+      const { q, page, sort } = c.req.valid('query')
       const db = createDb(c.env.DATABASE_URL)
       const profile = c.get('profile')
       const viewer = viewerRoleFor(profile?.role ?? null)
       const rows = await db.execute(sql`
         with query as (select websearch_to_tsquery('simple', ${q}) as terms),
         eligible as (
-          select r.id, r.title, r.submission_id, s.authors, r.year, i.id as index_id,
+          select r.id, r.title, r.submission_id,
+            coalesce(authors.names, s.authors) as authors,
+            school.name as school_name, course.name as course_name,
+            r.year, r.created_at, i.id as index_id,
             case when i.id is not null then 'READY'
               when j.status = 'FAILED' then 'FAILED' else 'PENDING' end as full_text_status,
             ${visibilityCase()} as visibility,
-            to_tsvector('simple', r.title || ' ' || coalesce(s.authors, '')
+            to_tsvector('simple', r.title || ' '
+              || coalesce(authors.names, s.authors, '') || ' '
+              || coalesce(school.name, '') || ' ' || coalesce(course.name, '')
               || ' ' || r.year::text) as metadata
           from research_records r join submissions s on s.id = r.submission_id
+          left join schools school on school.id = s.school_id
+          left join courses course on course.id = s.course_id
+          left join lateral (
+            select string_agg(a.name, ', ' order by a.position, a.id) as names
+            from record_authors a where a.record_id = r.id
+          ) authors on true
           left join processing_jobs j on j.record_id = r.id
           left join keyword_indexes i on i.record_id = r.id
             and i.extraction_claim_token = j.claim_token
@@ -80,6 +96,7 @@ export function searchRoutes(
           where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
         )
         select e.id, e.title, e.submission_id as "submissionId", e.authors,
+          e.school_name as "schoolName", e.course_name as "courseName",
           e.year::text as year,
           e.visibility, e.full_text_status as "fullTextStatus",
           left(best.content, 400) as snippet
@@ -91,7 +108,21 @@ export function searchRoutes(
           order by rank desc, d.ordinal limit 1
         ) best on true
         where ${q} = '' or e.metadata @@ query.terms or best.content is not null
-        order by (ts_rank_cd(e.metadata, query.terms) * 2 + coalesce(best.rank, 0)) desc, e.id
+        order by
+          case when ${sort} = 'relevance' and ${q} <> '' then
+            ts_rank_cd(e.metadata, query.terms) * 2 + coalesce(best.rank, 0)
+          end desc,
+          case when ${sort} = 'title' then lower(e.title) end asc,
+          case when ${sort} = 'newest'
+            or (${sort} = 'relevance' and ${q} = '') then e.year end desc,
+          case when ${sort} = 'newest'
+            or (${sort} = 'relevance' and ${q} = '') then e.created_at end desc,
+          case when ${sort} = 'oldest' then e.year end asc,
+          case when ${sort} = 'oldest' then e.created_at end asc,
+          case when ${sort} = 'course' then lower(e.course_name) end asc nulls last,
+          case when ${sort} = 'course' then lower(e.school_name) end asc nulls last,
+          case when ${sort} = 'course' then lower(e.title) end asc,
+          e.id
         limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
       `)
       // Anonymous results are identical for everyone and short-lived
@@ -273,7 +304,9 @@ export function searchRoutes(
           where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
           order by b.record_id, b.distance asc
         )
-        select r.id, r.title, r.submission_id as "submissionId", s.authors,
+        select r.id, r.title, r.submission_id as "submissionId",
+          coalesce(authors.names, s.authors) as authors,
+          school.name as "schoolName", course.name as "courseName",
           r.year::text as year,
           ${visibilityCase()} as visibility,
           'READY' as "fullTextStatus",
@@ -282,6 +315,12 @@ export function searchRoutes(
         from ranked
         join research_records r on r.id = ranked.record_id
         join submissions s on s.id = r.submission_id
+        left join schools school on school.id = s.school_id
+        left join courses course on course.id = s.course_id
+        left join lateral (
+          select string_agg(a.name, ', ' order by a.position, a.id) as names
+          from record_authors a where a.record_id = r.id
+        ) authors on true
         where ranked.distance <= ${MAX_SEMANTIC_DISTANCE}
         order by ranked.distance asc, r.id
         limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}

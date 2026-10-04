@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useSearchParams } from 'react-router'
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,6 +13,13 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 
@@ -23,10 +30,25 @@ interface SearchItem {
   id: string
   title: string
   authors: string | null
+  schoolName: string | null
+  courseName: string | null
   year: string | null
   snippet: string | null
   fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
   visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
+}
+
+const SORT_OPTIONS = [
+  { value: 'relevance', label: 'Relevance' },
+  { value: 'title', label: 'Title A–Z' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'course', label: 'Course A–Z' },
+] as const
+type SearchSort = (typeof SORT_OPTIONS)[number]['value']
+
+function isSearchSort(value: string | null): value is SearchSort {
+  return SORT_OPTIONS.some((option) => option.value === value)
 }
 interface KeywordResult {
   items: SearchItem[]
@@ -67,12 +89,19 @@ export function SearchPage() {
   const page =
     Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 1000 ? rawPage : 1
   const mode = params.get('mode') === 'semantic' ? 'semantic' : 'keyword'
+  const requestedSort = params.get('sort')
+  const sort: SearchSort = isSearchSort(requestedSort)
+    ? requestedSort
+    : q
+      ? 'relevance'
+      : 'newest'
   const manager =
     profile?.role === 'ADMIN' || profile?.role === 'REPOSITORY_MANAGER'
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     values: { q },
   })
+  const formQuery = useWatch({ control: form.control, name: 'q' })
   const client = useQueryClient()
   const semantic = useQuery({
     queryKey: ['semantic-search', profile?.id, profile?.role, q, page],
@@ -92,14 +121,14 @@ export function SearchPage() {
     semantic.data !== undefined &&
     semantic.data.semanticStatus !== 'ready'
   const keyword = useQuery({
-    queryKey: ['keyword-search', profile?.id, profile?.role, q, page],
+    queryKey: ['keyword-search', profile?.id, profile?.role, q, page, sort],
     // Enabled in keyword mode, and also once semantic has reported a downgrade:
     // the fallback query can only start AFTER the semantic answer arrives.
     enabled: (mode === 'keyword' || semanticUnavailable) && q.length <= 200,
     retry: false,
     queryFn: async () =>
       apiFetch<KeywordResult>(
-        `/api/search/records?${new URLSearchParams({ q, page: String(page) })}`,
+        `/api/search/records?${new URLSearchParams({ q, page: String(page), sort })}`,
         await getIdToken(),
       ),
   })
@@ -224,13 +253,34 @@ export function SearchPage() {
             setParams(
               mode === 'semantic'
                 ? { q: values.q, page: '1', mode: 'semantic' }
-                : { q: values.q, page: '1' },
+                : { q: values.q, page: '1', sort },
             ),
           )}
         >
           <Label htmlFor="search-query">Keywords, study title, or author</Label>
           <div className="flex gap-2">
-            <Input id="search-query" {...form.register('q')} />
+            <div className="relative flex-1">
+              <Input
+                id="search-query"
+                className="pr-10"
+                {...form.register('q')}
+              />
+              {formQuery && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-1/2 right-1 size-8 -translate-y-1/2"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    form.setValue('q', '')
+                    setParams({ page: '1', sort: 'newest' })
+                  }}
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </Button>
+              )}
+            </div>
             <Button type="submit">
               <Search className="size-4" aria-hidden="true" />
               Search
@@ -254,7 +304,7 @@ export function SearchPage() {
               type="button"
               size="sm"
               variant={mode === 'keyword' ? 'default' : 'outline'}
-              onClick={() => setParams({ q, page: '1' })}
+              onClick={() => setParams({ q, page: '1', sort })}
             >
               Keyword
             </Button>
@@ -267,6 +317,29 @@ export function SearchPage() {
               Semantic
             </Button>
           </div>
+          {mode === 'keyword' && (
+            <div className="max-w-56 space-y-2 pt-2">
+              <Label htmlFor="search-sort">Sort papers</Label>
+              <Select
+                value={sort}
+                onValueChange={(value) =>
+                  setParams({ q, page: '1', sort: value as SearchSort })
+                }
+                items={SORT_OPTIONS.map((option) => ({ ...option }))}
+              >
+                <SelectTrigger id="search-sort">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </form>
         {notice && (
           <p role="status" className="text-sm text-muted-foreground">
@@ -315,6 +388,12 @@ export function SearchPage() {
                     {item.authors || 'Authors not listed'} ·{' '}
                     {item.year || 'Year not listed'}
                   </p>
+                  {(item.schoolName || item.courseName) && (
+                    <p className="text-sm text-muted-foreground">
+                      {item.schoolName || 'School not listed'} ·{' '}
+                      {item.courseName || 'Course not listed'}
+                    </p>
+                  )}
                   {/* Extracted text is untrusted: React text rendering only, never HTML. */}
                   {item.fullTextStatus === 'READY' && item.snippet && (
                     <p className="whitespace-pre-wrap break-words text-sm">
@@ -332,7 +411,7 @@ export function SearchPage() {
                   setParams(
                     mode === 'semantic'
                       ? { q, page: String(page - 1), mode: 'semantic' }
-                      : { q, page: String(page - 1) },
+                      : { q, page: String(page - 1), sort },
                   )
                 }
               >
@@ -346,7 +425,7 @@ export function SearchPage() {
                   setParams(
                     mode === 'semantic'
                       ? { q, page: String(page + 1), mode: 'semantic' }
-                      : { q, page: String(page + 1) },
+                      : { q, page: String(page + 1), sort },
                   )
                 }
               >

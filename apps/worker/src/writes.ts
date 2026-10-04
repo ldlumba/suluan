@@ -77,6 +77,7 @@ export interface NewDecisionInput {
   status: 'ACCEPTED' | 'REJECTED'
   remarks: string
   title: string
+  authors?: string | null
   r2Key: string
   fileName: string
   mimeType: string | null
@@ -131,6 +132,15 @@ export async function recordDecisionAtomic(
       FROM upd
       ${accepted ? sql`` : sql`WHERE false`}
       RETURNING id
+    ),
+    new_record_authors AS (
+      INSERT INTO record_authors (record_id, name, position)
+      SELECT nr.id, btrim(author.name), (author.ordinality - 1)::integer
+      FROM new_record nr
+      CROSS JOIN LATERAL regexp_split_to_table(
+        ${input.authors ?? null}, E'\\r?\\n'
+      ) WITH ORDINALITY AS author(name, ordinality)
+      WHERE btrim(author.name) <> ''
     ),
     new_record_file AS (
       INSERT INTO record_files (record_id, r2_key, file_name, mime_type)

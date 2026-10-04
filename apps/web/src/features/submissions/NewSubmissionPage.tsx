@@ -206,7 +206,7 @@ export function NewSubmissionPage() {
               <Label htmlFor="authors">Authors</Label>
               <Textarea
                 id="authors"
-                placeholder="One per line, or comma-separated"
+                placeholder="One author per line"
                 {...form.register('authors')}
               />
             </div>
