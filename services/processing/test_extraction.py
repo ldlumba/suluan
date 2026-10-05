@@ -20,6 +20,7 @@ from cloud_runner import (
     run_claims,
 )
 from runner import bounded_extract, WorkerClient, run_job
+from operator_client import OperatorWorkerClient
 from semantic_prepare import run_batches
 
 PDF = "application/pdf"
@@ -104,7 +105,20 @@ class ExtractionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             WorkerClient("https://example.com", "test-token")
         with self.assertRaises(ValueError):
+            OperatorWorkerClient("https://example.com", "test-token")
+        with self.assertRaises(ValueError):
+            OperatorWorkerClient(
+                "http://example.com", "test-token", allow_remote=True
+            )
+        with self.assertRaises(ValueError):
             ServiceWorkerClient("http://example.com", lambda: "test-token")
+
+    def test_semantic_operator_requires_explicit_https_remote_opt_in(self):
+        client = OperatorWorkerClient(
+            "https://worker.example", "test-token", allow_remote=True
+        )
+        self.assertEqual(client.base, "https://worker.example")
+        self.assertEqual(client.token, "test-token")
 
     def test_runner_downloads_claimed_file_and_posts_fenced_result(self):
         data = self.pdf("Integration fixture")

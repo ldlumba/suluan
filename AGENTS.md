@@ -122,20 +122,19 @@ work from an earlier one.
   retention; Cloud Run scheduling stays undeployed. Gmail revocation drill
   deferred to the Stage 9 sender rotation (unit behavior pinned by tests).
   See `docs/staging-environment.md`.
-- **Stage 8 — Larger corpus pilot: IN PROGRESS (started 2026-10-05).** Run
-  `20261005T103129Z` verified all 36 authorized hashes (after the reviewed P33
-  baseline revision), generated F01–F04, passed the 20-test processing suite,
-  and uploaded all 40 fixtures through the normal staging submission route.
-  Every row remained `PENDING`; an immediate importer replay returned the same
-  40 submission IDs with no duplicates. Individual review, bounded extraction,
-  keyword preparation, download/visibility checks, probes, and the separate
-  blinded semantic gate remain. Process the corpus in bounded staging batches;
-  measure duration, failures, recovery, indexing/search, visibility, and cost.
-  Evaluate semantic retrieval with an independent/blinded realistic query
-  holdout including clean negatives; do not tune and validate on the same
-  queries. **Exit:** no unauthorized exposure or unexplained loss/duplication,
-  acceptable extraction/recovery and cost, dependable keyword search; semantic
-  stays disabled unless its independent gate passes.
+- **Stage 8 — Larger corpus pilot: DONE, SEMANTIC FAILED CLOSED (2026-10-05).**
+  Run `20261005T103129Z` passed the governed 40-fixture staging workflow: exact
+  36/36 extraction baselines, four exact safe failures, 36 snapshots/1,224
+  chunks, 40/40 byte-identical manager downloads, visibility denials, replay
+  idempotency, 21/21 rank-1 keyword probes, and 5/5 clean negatives. One
+  pre-claim Cloud Run 401 recovered on explicit retry with no loss/duplication.
+  P04's accidental PUBLIC choice was recorded and tested, never directly
+  rewritten. The frozen 25-query semantic holdout was not scored because
+  Cloudflare Worker calls intermittently failed Gemini's location policy; the
+  runtime path therefore failed availability before ranking could pass. The
+  Gemini secret and temporary request-limit override were removed and semantic
+  is verified unconfigured. See `docs/stage8-pilot-results.md`. Any retry needs
+  an explicit region-stable architecture revision; keyword remains dependable.
 - **Stage 9 — Production/institutional readiness.** Resolve institutional cloud
   and billing ownership, two trusted admins, production first-admin process,
   identity/domain policy, real catalogs, retention/withdrawal/replacement/

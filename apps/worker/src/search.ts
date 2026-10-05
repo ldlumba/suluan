@@ -21,7 +21,11 @@ import {
   toVectorLiteral,
 } from './embeddings'
 import { normalizeKeyword } from './keywords'
-import { consumeQuota, consumeQueryQuota, DEV_LIMITS } from './quota'
+import {
+  consumeQuota,
+  consumeQueryQuota,
+  embeddingLimits,
+} from './quota'
 
 const querySchema = z.object({
   q: z.string().trim().max(200).default(''),
@@ -265,10 +269,14 @@ export function searchRoutes(
           semanticStatus: 'unconfigured' as const,
         })
       }
-      const quota = await consumeQueryQuota(db, {
-        viewer,
-        profileId: profile?.id ?? null,
-      })
+      const quota = await consumeQueryQuota(
+        db,
+        {
+          viewer,
+          profileId: profile?.id ?? null,
+        },
+        embeddingLimits(c.env.EMBEDDING_DAILY_REQUEST_LIMIT),
+      )
       if (!quota.allowed) {
         // Do not call Gemini. Keyword results are served by the caller.
         return c.json({
@@ -419,12 +427,13 @@ export function searchRoutes(
         content: string
       }[]
       const records = [...new Set(rows.map((r) => r.record_id))]
+      const limits = embeddingLimits(c.env.EMBEDDING_DAILY_REQUEST_LIMIT)
       // Bound the per-call paper count as well as the input count.
       const allowed = new Set(records.slice(0, EMBED_PAPER_BATCH))
       const targets = rows.filter((r) => allowed.has(r.record_id))
       const remaining = Math.max(
         0,
-        Math.min(targets.length, EMBED_INPUT_BATCH, DEV_LIMITS.maxInputs),
+        Math.min(targets.length, EMBED_INPUT_BATCH, limits.maxInputs),
       )
       const work = targets.slice(0, remaining)
 
@@ -434,7 +443,7 @@ export function searchRoutes(
         'all',
         1,
         work.length,
-        DEV_LIMITS,
+        limits,
       )
       if (!quota.allowed) {
         return c.json({

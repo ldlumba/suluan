@@ -12,7 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 
-from runner import WorkerClient
+from operator_client import OperatorWorkerClient
 
 QUERY_FILE = pathlib.Path(__file__).with_name("semantic_relevance_queries.json")
 DEFAULT_OUTPUT = pathlib.Path("logs/semantic-relevance.json")
@@ -240,6 +240,11 @@ def main():
     parser.add_argument("--queries", type=pathlib.Path, default=QUERY_FILE)
     parser.add_argument("--output", type=pathlib.Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--interval", type=float, default=3)
+    parser.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="Explicitly allow sending the manager token to a validated HTTPS origin",
+    )
     args = parser.parse_args()
     if args.interval < 1:
         parser.error("--interval must be at least 1 second")
@@ -250,7 +255,11 @@ def main():
     token = os.environ.get("SULUAN_ID_TOKEN") or getpass.getpass(
         "Manager Firebase ID token (hidden): "
     )
-    client = WorkerClient(args.api, token)
+    client = OperatorWorkerClient(
+        args.api,
+        token,
+        allow_remote=args.allow_remote,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     def save(report):

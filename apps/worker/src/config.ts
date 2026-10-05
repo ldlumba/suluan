@@ -59,6 +59,13 @@ export interface Env {
    * endpoints degrade to keyword results instead of failing.
    */
   GEMINI_API_KEY?: string
+  /**
+   * Optional environment-specific request cap for the shared embedding quota.
+   * Inputs remain fixed at the code-owned 2,000/day cost bound. Values are
+   * parsed and clamped server-side; staging temporarily uses 100 only for the
+   * owner-approved Stage 8 evaluation, then removes the override.
+   */
+  EMBEDDING_DAILY_REQUEST_LIMIT?: string
   /** Exact audience requested from the Cloud Run metadata identity endpoint. */
   PROCESSING_SERVICE_AUDIENCE?: string
   /** Exact dedicated Cloud Run Job service-account email. */

@@ -7,7 +7,7 @@ import os
 import time
 import urllib.error
 
-from runner import WorkerClient
+from operator_client import OperatorWorkerClient
 
 
 def run_batches(client, *, max_batches=20, interval=30, sleep=time.sleep, emit=print):
@@ -40,9 +40,13 @@ def error_message(error):
         payload = json.load(error)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return f"Worker returned HTTP {error.code}"
+    # The Worker truncates provider details and never includes credentials or
+    # document text. Prefer that stable diagnostic over the generic operator
+    # message so a stopped run can distinguish quota, billing, and availability.
+    reason = payload.get("reason")
     message = payload.get("message")
     code = payload.get("error")
-    detail = message if isinstance(message, str) else code
+    detail = reason if isinstance(reason, str) else message if isinstance(message, str) else code
     return f"Worker returned HTTP {error.code}: {detail or 'request failed'}"
 
 
@@ -51,6 +55,11 @@ def main():
     parser.add_argument("--api", default="http://localhost:8787")
     parser.add_argument("--interval", type=int, default=30)
     parser.add_argument("--max-batches", type=int, default=20)
+    parser.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="Explicitly allow sending the manager token to a validated HTTPS origin",
+    )
     args = parser.parse_args()
     if args.interval < 30:
         parser.error("--interval must be at least 30 seconds")
@@ -60,7 +69,11 @@ def main():
     token = os.environ.get("SULUAN_ID_TOKEN") or getpass.getpass(
         "Manager Firebase ID token (hidden): "
     )
-    client = WorkerClient(args.api, token)
+    client = OperatorWorkerClient(
+        args.api,
+        token,
+        allow_remote=args.allow_remote,
+    )
     try:
         run_batches(
             client,

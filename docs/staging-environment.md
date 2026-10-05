@@ -277,7 +277,7 @@ After this exit, Stage 7 reliability/security hardening runs before the full
 - The live Gmail revocation drill is deferred to the Stage 9 sender rotation;
   `invalid_grant` handling is pinned by unit tests.
 
-### Stage 8 bounded pilot started — 2026-10-05
+### Stage 8 bounded pilot — completed 2026-10-05
 
 - Run `20261005T103129Z` matched all 36 authorized source hashes after the
   reviewed P33 baseline revision, generated F01–F04, and passed the 20-test
@@ -289,6 +289,14 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   the normal Worker route. An immediate apply replay returned the same 40 IDs;
   the manager queue contained exactly those 40 pending submissions, providing
   the run's submission-idempotency evidence without bypassing review.
-- Individual manager decisions, bounded Cloud Run extraction, keyword
-  preparation, downloads/visibility checks, and discovery probes remain.
-  Semantic preparation is still disabled and is a separate Stage 8 gate.
+- All 40 fixtures received individual manager acceptance. The governed corpus
+  gates passed: 36 exact extraction baselines, four exact safe failures, 36
+  keyword snapshots/1,224 chunks, 40 byte-identical manager downloads, access
+  denials, idempotent replays, 21/21 positive keyword probes, and 5/5 clean
+  negatives. All 80 outbox rows were processed and all notifications were sent.
+- The separate frozen semantic gate failed closed: Worker requests
+  intermittently received Gemini `FAILED_PRECONDITION` for unsupported request
+  location. Preparation stopped at 949 pilot vectors; ranking was not treated as
+  passed. The key and temporary quota override were removed, and Worker
+  `2c011e64` verifies semantic as unconfigured. Full aggregate evidence is in
+  `docs/stage8-pilot-results.md`.

@@ -41,6 +41,18 @@ export interface QuotaLimits {
  */
 export const DEV_LIMITS: QuotaLimits = { maxRequests: 20, maxInputs: 2000 }
 
+/**
+ * Resolve a temporary environment override without making the cost-bearing
+ * input cap configurable. Invalid values fail safe to the normal 20-request
+ * limit, and even an approved override cannot exceed 100 requests/day.
+ */
+export function embeddingLimits(raw: string | undefined): QuotaLimits {
+  if (!raw || !/^\d+$/.test(raw)) return DEV_LIMITS
+  const maxRequests = Number(raw)
+  if (!Number.isSafeInteger(maxRequests) || maxRequests < 1) return DEV_LIMITS
+  return { maxRequests: Math.min(maxRequests, 100), maxInputs: DEV_LIMITS.maxInputs }
+}
+
 /** Approved production query-side limits, applied to search calls only. */
 export const QUERY_LIMITS: Record<'anonymous' | 'authenticated', QuotaLimits> = {
   anonymous: { maxRequests: 20, maxInputs: 20 },
@@ -130,8 +142,9 @@ export interface QueryQuotaRequest {
 export async function consumeQueryQuota(
   db: Db,
   request: QueryQuotaRequest,
+  devLimits: QuotaLimits = DEV_LIMITS,
 ): Promise<QuotaResult> {
-  const dev = await consumeQuota(db, 'dev_global', 'all', 1, 1, DEV_LIMITS)
+  const dev = await consumeQuota(db, 'dev_global', 'all', 1, 1, devLimits)
   if (!dev.allowed) return dev
 
   if (request.viewer === 'PUBLIC') {
