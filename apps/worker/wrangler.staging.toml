@@ -2,8 +2,11 @@ name = "suluan-api-staging"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
-# Staging deliberately has no scheduled trigger. Scheduler frequency,
-# overlap, retry/dead-letter, monitoring, and recovery remain Stage 7 TBDs.
+# Owner-approved 2026-10-05: 5-minute scheduled recovery sweep in staging.
+# Overlap is safe by atomic claim+lease; retry/dead-letter, alerting, and
+# recovery policy remain Stage 7 TBDs.
+[triggers]
+crons = ["*/5 * * * *"]
 
 # Non-secret staging configuration only. The exact local frontend origin is
 # intentionally separate from development. Never use a wildcard here.
@@ -17,7 +20,7 @@ binding = "DOCUMENTS"
 bucket_name = "suluan-staging"
 
 # Staging notification delivery keeps the current log adapter. Queue
-# consumption is enabled; only the unapproved scheduled recovery sweep is off.
+# consumption and the scheduled recovery sweep are enabled.
 [[queues.producers]]
 binding = "NOTIFICATIONS"
 queue = "suluan-notifications-staging"

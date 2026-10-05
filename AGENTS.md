@@ -101,7 +101,9 @@ work from an earlier one.
   Clean migrations, no-op reapply, Neon snapshot-to-temporary-branch restore,
   generated upload/review/extraction/index/search/download, rejected non-
   derivation, and restricted anonymous denial passed without development
-  resources. Scheduler, Gemini, OCR, and Gmail remain disabled. A single staging
+  resources. Scheduler, Gemini, OCR, and Gmail remain disabled except for the
+  owner-approved 2026-10-05 staging Worker 5-minute outbox recovery sweep
+  (Cloud Run scheduling stays undeployed). A single staging
   administrator is provisioned; owner decision 2026-10-04 is to proceed with no
   second staging account. Two trusted admins remain a Stage 9 item. See `docs/staging-environment.md`.
 - **Stage 7 — Reliability/security hardening: NEXT.** Verify pending/rejected

@@ -33,8 +33,10 @@ does not require another Google login or billing account:
   JSON key or a shared processing secret.
 - Do not configure `GEMINI_API_KEY`, create semantic embeddings, enable OCR, or
   run the assistant evaluation.
-- Do not create a Scheduler job or Worker cron. Scheduling and automated
-  recovery policy remain Stage 7 TBDs.
+- Owner-approved 2026-10-05: the staging Worker runs the 5-minute scheduled
+  outbox recovery sweep (`*/5 * * * *` in `wrangler.staging.toml`). Overlap is
+  safe by atomic claim+lease. Cloud Run Scheduler jobs, retry/dead-letter,
+  alerting, and recovery policy remain Stage 7 TBDs.
 - Keep the Gmail sender disabled; staging notification delivery uses the log
   adapter and an isolated queue.
 - Do not copy development database rows or R2 objects wholesale. Stage 5 uses
@@ -135,7 +137,9 @@ Stage 6 is complete only when all of the following are recorded:
 - pending/rejected and restricted-access smoke checks show no leakage;
 - replay creates no duplicate intake, record, job, snapshot, or chunks;
 - staging budget monitoring is active;
-- Scheduler, Gemini, OCR, and Gmail production delivery remain disabled.
+- Cloud Run Scheduler jobs, Gemini, OCR, and Gmail production delivery remain
+  disabled (the staging Worker 5-minute outbox sweep was owner-approved
+  2026-10-05).
 
 After this exit, Stage 7 reliability/security hardening runs before the full
 40-fixture Stage 5 corpus is executed in Stage 8.
