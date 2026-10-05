@@ -162,6 +162,7 @@ export function searchRoutes(
       const attempted =
         c.req.header('authorization')?.startsWith('Bearer ') ?? false
       c.header('Cache-Control', cacheControlFor(viewer, attempted, 30))
+      c.header('Vary', 'Authorization')
       return c.json({
         items: rows.rows.slice(0, PAGE_SIZE),
         page,
@@ -251,6 +252,7 @@ export function searchRoutes(
       const attempted =
         c.req.header('authorization')?.startsWith('Bearer ') ?? false
       c.header('Cache-Control', cacheControlFor(viewer, attempted, 30))
+      c.header('Vary', 'Authorization')
 
       // An empty query has nothing to embed; defer to keyword listing.
       if (!q) {

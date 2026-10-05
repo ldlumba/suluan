@@ -1,3 +1,4 @@
+import { createElement, lazy, Suspense } from 'react'
 import { RootLayout } from './layouts/RootLayout'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -7,6 +8,12 @@ import { NewSubmissionPage } from '@/features/submissions/NewSubmissionPage'
 import { ReviewQueuePage } from '@/features/review/ReviewQueuePage'
 import { SearchPage } from '@/features/search/SearchPage'
 import { MySubmissionsPage } from '@/features/submissions/MySubmissionsPage'
+
+const graphPage = lazy(() =>
+  import('@/features/graph/GraphPage').then((module) => ({
+    default: module.GraphPage,
+  })),
+)
 
 /**
  * Route configuration, kept separate from the browser router instance so
@@ -20,6 +27,14 @@ export const routes = [
       { path: '/signin', element: <SignInPage /> },
       // Search is public discovery: no ProtectedRoute wrapper.
       { path: '/search', element: <SearchPage /> },
+      {
+        path: '/graph',
+        element: (
+          <Suspense fallback={<p role="status">Loading graph…</p>}>
+            {createElement(graphPage)}
+          </Suspense>
+        ),
+      },
       {
         path: '/submissions',
         element: (

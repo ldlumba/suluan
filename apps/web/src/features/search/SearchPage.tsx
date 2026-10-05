@@ -2,10 +2,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { useSearchParams } from 'react-router'
-import { Search, X } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router'
+import { Network, Search, X } from 'lucide-react'
 import { z } from 'zod'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -479,6 +479,13 @@ export function SearchPage() {
                       {item.snippet}
                     </p>
                   )}
+                  <Link
+                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                    to={`/graph?record=${encodeURIComponent(item.id)}`}
+                  >
+                    <Network className="size-4" aria-hidden="true" />
+                    View relationships
+                  </Link>
                 </li>
               ))}
             </ul>

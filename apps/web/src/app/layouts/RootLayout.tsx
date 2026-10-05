@@ -27,6 +27,12 @@ export function RootLayout() {
               Search
             </Link>
             <Link
+              to="/graph"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Graph
+            </Link>
+            <Link
               to="/submit"
               className="text-sm text-muted-foreground hover:text-foreground"
             >

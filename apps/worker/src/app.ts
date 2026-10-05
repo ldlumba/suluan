@@ -24,6 +24,7 @@ import { decideSchema, submissionFormFieldsSchema } from './schemas'
 import { prepareSubmissionKeywords } from './keywords'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { searchRoutes } from './search'
+import { graphRoutes } from './graph'
 import {
   cacheControlFor,
   effectiveVisibility,
@@ -221,6 +222,8 @@ export function createApp(
     '/api/search',
     searchRoutes(optionalAuth, requireAuth, requireRole(...MANAGERS)),
   )
+  // Live metadata graph. Every response is viewer-specific and read-only.
+  app.route('/api/graph', graphRoutes(optionalAuth))
 
   /**
    * Submitter status view (owner-approved 2026-10-01): a signed-in submitter

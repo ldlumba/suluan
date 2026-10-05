@@ -135,6 +135,14 @@ work from an earlier one.
   Gemini secret and temporary request-limit override were removed and semantic
   is verified unconfigured. See `docs/stage8-pilot-results.md`. Any retry needs
   an explicit region-stable architecture revision; keyword remains dependable.
+- **Knowledge Graph discovery v1 implemented 2026-10-05.** The public `/graph`
+  view opens from search results and renders a bounded paper-centered metadata
+  neighborhood with React Flow. `GET /api/graph/neighborhood` is read-only,
+  depth-capped at 2, and starts every hop from the shared effective-visibility
+  predicate; unauthorized centers return 404 and cannot leak through related
+  nodes or counts. Author aliases, exports/snapshots, citation edges, semantic
+  fusion, and the REO aggregate/counts view remain out of this slice. See
+  `docs/knowledge-graph-design.md`.
 - **Stage 9 — Production/institutional readiness.** Resolve institutional cloud
   and billing ownership, two trusted admins, production first-admin process,
   identity/domain policy, real catalogs, retention/withdrawal/replacement/

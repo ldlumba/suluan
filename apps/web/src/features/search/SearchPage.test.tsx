@@ -118,6 +118,9 @@ describe('keyword search', () => {
         'School of Technological Studies · BS Information Technology',
       ),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /View relationships/i }),
+    ).toHaveAttribute('href', '/graph?record=rec-1')
   })
   it('renders author keywords and applies the exact-match filter', async () => {
     vi.mocked(apiFetch).mockResolvedValue({

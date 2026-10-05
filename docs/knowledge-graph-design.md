@@ -1,4 +1,4 @@
-# SULUAN Knowledge Graph — design v1 (planning)
+# SULUAN Knowledge Graph — design v1
 
 Owner direction 2026-10-05: metadata entity graph, not a citation network.
 Plan now; build only after the Stage 7 reliability/security exit gate, on the
@@ -6,6 +6,11 @@ Stage 8 corpus (the first dataset with testable structure). No new
 infrastructure: reads come from existing Neon tables, rendering uses React
 Flow (already in the locked frontend stack). A graph database would violate
 the locked stack and is not proposed.
+
+Implementation status (2026-10-05): the discovery slice is implemented as a
+paper-centered, depth-1/2 neighborhood at `GET /api/graph/neighborhood` and the
+public `/graph` React Flow view. Search results link into the graph. The REO
+aggregate/counts slice remains later work.
 
 ## 1. What the graph is and is not
 
@@ -73,9 +78,11 @@ No write paths. No mutation, no curation UI, no feedback loop in v1.
 
 - **Discovery view (build first):** paper-centered ego graph. Open from a
   search result ("related papers"), expand one hop at a time, rank neighbors
-  by shared-keyword count then shared authorship. Serves every role,
-  including REO reviewers checking related work during review. Bounded
-  queries are the simplest to gate correctly.
+  by shared-keyword count, shared authorship, then same course. The course
+  fallback keeps pre-keyword records connected without pretending they are
+  topically similar. Serves every role, including REO reviewers checking
+  related work during review. Bounded queries are the simplest to gate
+  correctly.
 - **REO aggregates view (build second):** concentration charts + top
   co-occurring keyword pairs, per the counts endpoint. Reuses the same API;
   its only new work is presentation.
@@ -135,3 +142,9 @@ drive-by addition to graph UI work.
    (`?keyword=`) bidirectionally, or is graph→search enough for v1?
 3. Retention: the graph is computed live, so no retention policy beyond the
    underlying tables — confirm no snapshot/export requirement from REO.
+
+Owner-approved implementation defaults (2026-10-05): author identity remains
+literal under the documented trim/lowercase/whitespace normalization; v1 links
+graph → search rather than adding search-side graph filters; and no graph
+snapshot/export is created. These choices add no inferred identity, retained
+derivative, or write path.

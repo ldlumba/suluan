@@ -300,3 +300,20 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   passed. The key and temporary quota override were removed, and Worker
   `2c011e64` verifies semantic as unconfigured. Full aggregate evidence is in
   `docs/stage8-pilot-results.md`.
+
+### Knowledge Graph discovery — 2026-10-05
+
+- Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,
+  paper-centered `/api/graph/neighborhood` route. The local staging frontend
+  opened it from repository search and rendered the Stage 8 metadata graph
+  with React Flow without browser errors.
+- A public Stage 8 paper returned a bounded four-paper neighborhood on the
+  first browse page. The lower-priority same-course path kept pre-keyword
+  records connected while shared author keywords and authors remain the first
+  ranking signals.
+- A live restricted-center probe returned anonymous `404` and manager `200`.
+  Anonymous and authenticated responses emit `Vary: Authorization` plus their
+  respective public/private cache policy, preventing an anonymous browser
+  cache entry from masking a newly authenticated graph view.
+- No graph rows, snapshots, inferred aliases, citation edges, embeddings, or
+  other derivatives were written. REO aggregate counts remain later work.
