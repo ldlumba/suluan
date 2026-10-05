@@ -79,6 +79,25 @@ function fail(message) {
   process.exit(1)
 }
 
+/**
+ * Retry network-level failures (resets, timeouts) on Google calls. HTTP
+ * error statuses are returned, not retried: a 4xx will not heal by asking
+ * again, and blindly retrying the token exchange could burn a single-use
+ * authorization code.
+ */
+async function fetchWithRetry(what, attempt, retries = 3) {
+  try {
+    return await attempt()
+  } catch (err) {
+    if (retries <= 1) {
+      fail(`${what} failed: network unreachable (${err.cause?.code ?? err.message}); check the connection and re-run`)
+    }
+    console.log(`${what} hit a network error, retrying...`)
+    await new Promise((r) => setTimeout(r, 1500))
+    return fetchWithRetry(what, attempt, retries - 1)
+  }
+}
+
 async function wranglerSecretPut(name, value, cwd) {
   await new Promise((resolve, reject) => {
     const child = spawn('wrangler', ['secret', 'put', name, '-c', STAGING_CONFIG], {
@@ -138,17 +157,21 @@ async function waitForCode(server, expectedState) {
 }
 
 async function exchangeCode({ clientId, clientSecret, code, redirectUri }) {
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-    }).toString(),
-  })
+  const res = await fetchWithRetry(
+    'token exchange',
+    () =>
+      fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }).toString(),
+      }),
+  )
   if (!res.ok) fail(`token exchange failed: HTTP ${res.status}`)
   const data = await res.json()
   if (!data.refresh_token) {
@@ -160,9 +183,13 @@ async function exchangeCode({ clientId, clientSecret, code, redirectUri }) {
 }
 
 async function confirmSenderMailbox(accessToken, sender) {
-  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-    headers: { authorization: `Bearer ${accessToken}` },
-  })
+  const res = await fetchWithRetry(
+    'mailbox verification',
+    () =>
+      fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+        headers: { authorization: `Bearer ${accessToken}` },
+      }),
+  )
   if (!res.ok) fail(`could not verify mailbox: HTTP ${res.status}`)
   const { emailAddress } = await res.json()
   if (typeof emailAddress !== 'string' || emailAddress.toLowerCase() !== sender.toLowerCase()) {
