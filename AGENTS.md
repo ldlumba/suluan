@@ -168,6 +168,15 @@ work from an earlier one.
   included exact remarks; anonymous search returned no result for the rejected
   title. This is staging evidence, not institutional sender approval; rotation
   to an REO mailbox remains Stage 9.
+- **REO email attachments (2026-10-05):** new-submission mail resolves canonical
+  authors/school/course/file metadata from Neon at dispatch time and attaches
+  the private R2 PDF/DOCX only when Gmail is active and the source file is at
+  most 10 MiB. The queue consumer is the only reader; R2 stays private and no
+  key enters the outbox or email. The 10 MiB source ceiling leaves Worker/Gmail
+  headroom for MIME plus Gmail API base64 expansion. Larger files send metadata
+  with an explicit SULUAN-review fallback and never fail submission. A hosted,
+  authenticated review link remains later work; rejected-file retention stays
+  deferred.
 
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
 - Record approved changes to the architecture baseline with rationale and date in `SULUAN_ARCHITECTURE_V1_CONTEXT.md`.

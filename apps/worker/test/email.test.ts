@@ -30,7 +30,12 @@ function okJson(body: unknown, status = 200): Response {
 describe('encodeMimeMessage', () => {
   it('builds a decodable message with the expected headers', () => {
     const text = decodeRaw(
-      encodeMimeMessage(CONFIG.sender, 'reo@ua.edu.ph', 'Hello', 'Line one\nLine two'),
+      encodeMimeMessage(
+        CONFIG.sender,
+        'reo@ua.edu.ph',
+        'Hello',
+        'Line one\nLine two',
+      ),
     )
     expect(text).toContain('From: sender@ua.edu.ph')
     expect(text).toContain('To: reo@ua.edu.ph')
@@ -41,7 +46,12 @@ describe('encodeMimeMessage', () => {
 
   it('encodes non-ASCII subjects so titles survive transport', () => {
     const text = decodeRaw(
-      encodeMimeMessage(CONFIG.sender, 'reo@ua.edu.ph', 'Pag-aaral ng wikàng Filipino', 'body'),
+      encodeMimeMessage(
+        CONFIG.sender,
+        'reo@ua.edu.ph',
+        'Pag-aaral ng wikàng Filipino',
+        'body',
+      ),
     )
     expect(text).toContain('Subject: =?UTF-8?B?')
     expect(text).not.toContain('Subject: Pag-aaral')
@@ -50,6 +60,43 @@ describe('encodeMimeMessage', () => {
   it('emits URL-safe base64 without padding', () => {
     const raw = encodeMimeMessage(CONFIG.sender, 'a@b.c', 's', 'body')
     expect(raw).toMatch(/^[A-Za-z0-9-_]+$/)
+  })
+
+  it('builds multipart MIME with a base64 attachment', () => {
+    const text = decodeRaw(
+      encodeMimeMessage(CONFIG.sender, 'reo@ua.edu.ph', 'Paper', 'Review it.', {
+        fileName: 'study.pdf',
+        mimeType: 'application/pdf',
+        bytes: new Uint8Array([0, 1, 2, 255]),
+      }),
+    )
+    expect(text).toContain('Content-Type: multipart/mixed;')
+    expect(text).toContain('Content-Type: text/plain; charset="UTF-8"')
+    expect(text).toContain('Content-Type: application/pdf; name="study.pdf"')
+    expect(text).toContain(
+      'Content-Disposition: attachment; filename="study.pdf"',
+    )
+    expect(text).toContain('AAEC/w==')
+    expect(text).toContain('Review it.')
+  })
+
+  it('prevents subject and attachment-name header injection', () => {
+    const text = decodeRaw(
+      encodeMimeMessage(
+        CONFIG.sender,
+        'reo@ua.edu.ph',
+        'Safe\r\nBcc: bad@example.com',
+        'body',
+        {
+          fileName: 'paper\r\nX-Bad: yes.pdf',
+          mimeType: 'application/pdf',
+          bytes: new Uint8Array([1]),
+        },
+      ),
+    )
+    expect(text).toContain('Subject: Safe Bcc: bad@example.com')
+    expect(text).not.toContain('\r\nBcc: bad@example.com')
+    expect(text).not.toContain('\r\nX-Bad: yes.pdf')
   })
 })
 

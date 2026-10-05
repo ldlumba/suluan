@@ -231,6 +231,11 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   returned zero results for the rejected title. The rejected submission remains
   in the REO-only staging archive by policy; it created no public search result.
 
+The next deployed Worker revision enriches REO mail with authors and canonical
+school/course/file metadata and attaches source PDF/DOCX files up to 10 MiB.
+This code path requires a post-deploy staging MIME/attachment verification; the
+successful delivery evidence above predates attachments.
+
 ### Stage 6 complete
 
 - No remaining Stage 6 gate. Multi-administrator coverage is deferred to

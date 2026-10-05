@@ -14,6 +14,13 @@ for that mailbox and updating secrets — no code change.
   half-configured sender never silently sends — it stays on log output.
 - Email is notification-only: a send failure records `FAILED`, the decision
   stands, and the sweep retries. No duplicate acceptance on retry.
+- New-submission mail resolves authoritative metadata from Neon at dispatch
+  time and, with Gmail active, reads the private R2 object only when the source
+  file is at most 10 MiB. It sends multipart MIME with the PDF/DOCX attached.
+  The R2 key is never placed in the outbox or email. Larger files send metadata
+  and state clearly that REO must use SULUAN; submission still succeeds. The
+  ceiling leaves memory/message headroom for MIME and Gmail API base64
+  expansion. A hosted authenticated review link remains later work.
 
 ## One-time setup (operator, browser + console)
 

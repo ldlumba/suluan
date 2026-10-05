@@ -11,9 +11,15 @@ import {
   submissionFiles,
   submissions,
   processingJobs,
+  courses,
+  schools,
 } from '@suluan/db/schema'
-import { logEmailAdapter } from '../src/email'
-import { processOutboxEvent, sweepOutbox } from '../src/notifications'
+import { logEmailAdapter, type EmailDraft } from '../src/email'
+import {
+  MAX_EMAIL_ATTACHMENT_BYTES,
+  processOutboxEvent,
+  sweepOutbox,
+} from '../src/notifications'
 import {
   deleteAuditEvents,
   deleteProfiles,
@@ -95,6 +101,7 @@ needsDb('review workflow', () => {
   async function submit(
     title: string,
     authors?: string,
+    catalog?: { schoolId: string; courseId: string },
   ): Promise<{ id: string; key: string }> {
     const file = new File(['x'.repeat(777)], 'paper.pdf', {
       type: 'application/pdf',
@@ -104,6 +111,10 @@ needsDb('review workflow', () => {
     form.append('idempotencyKey', crypto.randomUUID())
     form.append('title', title)
     if (authors) form.append('authors', authors)
+    if (catalog) {
+      form.append('schoolId', catalog.schoolId)
+      form.append('courseId', catalog.courseId)
+    }
     const res = await t.app.request(
       '/api/submissions',
       {
@@ -494,6 +505,98 @@ needsDb('review workflow', () => {
     )
   })
 
+  it('sends complete submission metadata and the R2 paper to REO', async () => {
+    const db = testDb()
+    const [catalog] = await db
+      .select({
+        schoolId: schools.id,
+        schoolName: schools.name,
+        courseId: courses.id,
+        courseName: courses.name,
+      })
+      .from(courses)
+      .innerJoin(schools, eq(schools.id, courses.schoolId))
+      .limit(1)
+    const { id } = await submit('Traditional review', 'Author One', catalog)
+    const [event] = await db
+      .select()
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.aggregateId, id),
+          eq(outboxEvents.eventType, 'submission.created'),
+        ),
+      )
+    let delivered: EmailDraft | undefined
+    const adapter = {
+      name: 'test-attachment',
+      supportsAttachments: true,
+      async send(draft: EmailDraft) {
+        delivered = draft
+        return { providerMessageId: 'test-attachment-id' }
+      },
+    }
+    expect(
+      await processOutboxEvent(
+        db,
+        event.id,
+        adapter,
+        'reo@ua.edu.ph',
+        t.testEnv().DOCUMENTS,
+      ),
+    ).toBe('sent')
+    expect(delivered?.body).toContain('Submitter: author@ua.edu.ph')
+    expect(delivered?.body).toContain('Authors: Author One')
+    expect(delivered?.body).toContain(`School: ${catalog.schoolName}`)
+    expect(delivered?.body).toContain(`Course: ${catalog.courseName}`)
+    expect(delivered?.body).toContain('Document: paper.pdf (attached)')
+    expect(delivered?.attachment).toMatchObject({
+      fileName: 'paper.pdf',
+      mimeType: 'application/pdf',
+    })
+    expect(delivered?.attachment?.bytes).toHaveLength(777)
+  })
+
+  it('does not fetch or attach a paper above the email threshold', async () => {
+    const { id } = await submit('Large email fallback', 'Author Two')
+    const db = testDb()
+    await db
+      .update(submissionFiles)
+      .set({ sizeBytes: MAX_EMAIL_ATTACHMENT_BYTES + 1 })
+      .where(eq(submissionFiles.submissionId, id))
+    const [event] = await db
+      .select()
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.aggregateId, id),
+          eq(outboxEvents.eventType, 'submission.created'),
+        ),
+      )
+    let delivered: EmailDraft | undefined
+    const adapter = {
+      name: 'test-attachment',
+      supportsAttachments: true,
+      async send(draft: EmailDraft) {
+        delivered = draft
+        return { providerMessageId: 'test-large-id' }
+      },
+    }
+    expect(
+      await processOutboxEvent(
+        db,
+        event.id,
+        adapter,
+        'reo@ua.edu.ph',
+        t.testEnv().DOCUMENTS,
+      ),
+    ).toBe('sent')
+    expect(delivered?.attachment).toBeUndefined()
+    expect(delivered?.body).toContain(
+      'exceeds the 10 MB email attachment limit',
+    )
+  })
+
   it('sends decision notifications to the submitter address', async () => {
     const { id } = await submit('Decision mail')
     await post('/api/decisions', managerToken, {
@@ -534,6 +637,7 @@ needsDb('review workflow', () => {
       .where(eq(outboxEvents.aggregateId, id))
     const failing = {
       name: 'test',
+      supportsAttachments: false,
       async send(): Promise<{ providerMessageId: string }> {
         throw new Error('temporary sender failure')
       },
@@ -619,6 +723,7 @@ needsDb('review workflow', () => {
     let sends = 0
     const adapter = {
       name: 'test',
+      supportsAttachments: false,
       async send() {
         sends++
         entered()

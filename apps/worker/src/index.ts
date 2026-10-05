@@ -46,6 +46,7 @@ async function handleQueue(
         msg.body.outboxId,
         email,
         env.REO_MAILBOX,
+        env.DOCUMENTS,
       )
       console.log(`outbox ${msg.body.outboxId}: ${outcome}`)
       if (outcome === 'busy') msg.retry()

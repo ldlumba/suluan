@@ -5,14 +5,29 @@
  */
 export interface EmailAdapter {
   name: string
-  send(opts: { to: string; subject: string; body: string }): Promise<{
+  supportsAttachments: boolean
+  send(opts: EmailDraft): Promise<{
     providerMessageId: string
   }>
+}
+
+export interface EmailAttachment {
+  fileName: string
+  mimeType: string
+  bytes: Uint8Array
+}
+
+export interface EmailDraft {
+  to: string
+  subject: string
+  body: string
+  attachment?: EmailAttachment
 }
 
 export function logEmailAdapter(): EmailAdapter {
   return {
     name: 'log',
+    supportsAttachments: false,
     async send({ to, subject }) {
       console.log(`[email:log] to=${to} subject=${subject}`)
       return { providerMessageId: `log-${crypto.randomUUID()}` }
@@ -46,9 +61,16 @@ export function gmailEmailAdapter(
 ): EmailAdapter {
   return {
     name: 'gmail',
-    async send({ to, subject, body }) {
+    supportsAttachments: true,
+    async send({ to, subject, body, attachment }) {
       const accessToken = await refreshAccessToken(config, fetchFn)
-      const raw = encodeMimeMessage(config.sender, to, subject, body)
+      const raw = encodeMimeMessage(
+        config.sender,
+        to,
+        subject,
+        body,
+        attachment,
+      )
       const res = await fetchFn(
         'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
         {
@@ -133,8 +155,38 @@ export function encodeMimeMessage(
   to: string,
   subject: string,
   body: string,
+  attachment?: EmailAttachment,
 ): string {
   const normalizedBody = body.replace(/\r?\n/g, '\r\n')
+  if (attachment) {
+    const boundary = `suluan-${crypto.randomUUID()}`
+    const safeName = attachment.fileName.replace(/[\r\n"]/g, '_')
+    const encodedName = encodeRfc5987Value(attachment.fileName)
+    const mimeType = attachment.mimeType.replace(/[\r\n]/g, '')
+    const attachmentBody = wrapBase64(base64EncodeBytes(attachment.bytes))
+    const message = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${encodeSubject(subject)}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      normalizedBody,
+      `--${boundary}`,
+      `Content-Type: ${mimeType}; name="${safeName}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${safeName}"; filename*=UTF-8''${encodedName}`,
+      '',
+      attachmentBody,
+      `--${boundary}--`,
+      '',
+    ].join('\r\n')
+    return base64UrlEncode(message)
+  }
   const header = [
     `From: ${from}`,
     `To: ${to}`,
@@ -149,15 +201,34 @@ export function encodeMimeMessage(
 }
 
 function encodeSubject(subject: string): string {
-  if (/^[\x20-\x7e]*$/.test(subject)) return subject
-  return `=?UTF-8?B?${base64Encode(subject)}?=`
+  const safe = subject.replace(/[\r\n]+/g, ' ')
+  if (/^[\x20-\x7e]*$/.test(safe)) return safe
+  return `=?UTF-8?B?${base64Encode(safe)}?=`
 }
 
 function base64Encode(text: string): string {
-  const bytes = new TextEncoder().encode(text)
+  return base64EncodeBytes(new TextEncoder().encode(text))
+}
+
+function base64EncodeBytes(bytes: Uint8Array): string {
   let binary = ''
   for (const byte of bytes) binary += String.fromCharCode(byte)
   return btoa(binary)
+}
+
+function wrapBase64(encoded: string): string {
+  const lines: string[] = []
+  for (let i = 0; i < encoded.length; i += 76) {
+    lines.push(encoded.slice(i, i + 76))
+  }
+  return lines.join('\r\n')
+}
+
+function encodeRfc5987Value(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
 }
 
 function base64UrlEncode(text: string): string {
@@ -174,7 +245,10 @@ export function isGmailConfigured(env: {
   GMAIL_REFRESH_TOKEN?: string
   GMAIL_SENDER?: string
 }): boolean {
-  return [env.GMAIL_CLIENT_ID, env.GMAIL_CLIENT_SECRET, env.GMAIL_REFRESH_TOKEN, env.GMAIL_SENDER].every(
-    (v) => typeof v === 'string' && v.trim().length > 0,
-  )
+  return [
+    env.GMAIL_CLIENT_ID,
+    env.GMAIL_CLIENT_SECRET,
+    env.GMAIL_REFRESH_TOKEN,
+    env.GMAIL_SENDER,
+  ].every((v) => typeof v === 'string' && v.trim().length > 0)
 }
