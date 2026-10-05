@@ -13,6 +13,7 @@
  */
 import { execFile, spawn } from 'node:child_process'
 import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -22,7 +23,12 @@ const STAGING_CONFIG = 'wrangler.staging.toml'
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
 const workerDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const repoRoot = path.dirname(path.dirname(workerDir))
+const require = createRequire(import.meta.url)
+const wranglerCli = path.join(
+  path.dirname(require.resolve('wrangler/package.json')),
+  'bin',
+  'wrangler.js',
+)
 
 /**
  * Single stdin reader for every prompt. An earlier version mixed Node's
@@ -101,10 +107,17 @@ async function fetchWithRetry(what, attempt, retries = 3) {
 
 async function wranglerSecretPut(name, value, cwd) {
   await new Promise((resolve, reject) => {
-    const child = spawn('wrangler', ['secret', 'put', name, '-c', STAGING_CONFIG], {
-      cwd,
-      stdio: ['pipe', 'inherit', 'inherit'],
-    })
+    // Invoke Wrangler's JavaScript entry point directly. npm exposes package
+    // binaries as .cmd shims on Windows, which cannot be spawned by the bare
+    // `wrangler` name the same way as Unix executables.
+    const child = spawn(
+      process.execPath,
+      [wranglerCli, 'secret', 'put', name, '-c', STAGING_CONFIG],
+      {
+        cwd,
+        stdio: ['pipe', 'inherit', 'inherit'],
+      },
+    )
     child.on('error', (err) =>
       reject(
         new Error(
@@ -120,6 +133,21 @@ async function wranglerSecretPut(name, value, cwd) {
     child.stdin.end(value, 'utf8')
   })
   console.log(`stored ${name}`)
+}
+
+async function confirmWranglerAvailable() {
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [wranglerCli, '--version'], {
+      cwd: workerDir,
+      stdio: 'ignore',
+    })
+    child.on('error', (err) => reject(new Error(`could not start Wrangler: ${err.message}`)))
+    child.on('close', (code) =>
+      code === 0
+        ? resolve()
+        : reject(new Error(`Wrangler preflight exited with code ${code}`)),
+    )
+  })
 }
 
 function openBrowser(url) {
@@ -207,6 +235,10 @@ async function confirmSenderMailbox(accessToken, sender) {
     fail('consent did not include the Gmail send scope; re-run and approve sending mail')
   }
 }
+
+// Fail before asking for credentials or opening consent if local secret
+// storage cannot run.
+await confirmWranglerAvailable()
 
 const clientId = await prompt('OAuth client ID', { secret: true })
 if (!clientId) fail('client ID is required')
