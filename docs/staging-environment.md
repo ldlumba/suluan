@@ -231,10 +231,13 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   returned zero results for the rejected title. The rejected submission remains
   in the REO-only staging archive by policy; it created no public search result.
 
-The next deployed Worker revision enriches REO mail with authors and canonical
-school/course/file metadata and attaches source PDF/DOCX files up to 10 MiB.
-This code path requires a post-deploy staging MIME/attachment verification; the
-successful delivery evidence above predates attachments.
+- Worker `6aac2080-f02e-4919-9f98-3962b7238dbb` enriched REO mail with authors
+  and canonical school/course/file metadata and attached a generated 872-byte
+  PDF. Gmail rendered every field, reported one scanned attachment, and exposed
+  preview/download controls for the correct filename. Submission and subsequent
+  rejection both returned HTTP 201; rejection avoided repository/processing
+  derivatives. Source PDF/DOCX files above 10 MiB continue as metadata-only
+  notifications with an explicit SULUAN fallback.
 
 ### Stage 6 complete
 

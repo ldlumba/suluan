@@ -79,6 +79,13 @@ Anonymous search returned no record for the rejected title. The
 revocation/failure-isolation drill remains a separate Stage 7 check; do not
 revoke the working grant merely to repeat successful-delivery verification.
 
+Attachment delivery was live-verified on 2026-10-05 with staging Worker
+`6aac2080-f02e-4919-9f98-3962b7238dbb`. Gmail displayed the submitter, multiline
+authors, canonical School of Technological Studies / BS Information Technology,
+and the generated PDF filename, then recognized the MIME part as one scanned,
+previewable/downloadable attachment. The submission was rejected after the
+check, so it produced no repository/processing derivative.
+
 ## Rotation and revocation
 
 - Rotate by repeating steps 3–4 with a fresh refresh token; no redeploy of

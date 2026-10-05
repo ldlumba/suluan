@@ -176,7 +176,9 @@ work from an earlier one.
   headroom for MIME plus Gmail API base64 expansion. Larger files send metadata
   with an explicit SULUAN-review fallback and never fail submission. A hosted,
   authenticated review link remains later work; rejected-file retention stays
-  deferred.
+  deferred. Staging Worker `6aac2080-f02e-4919-9f98-3962b7238dbb` live-verified
+  the complete metadata body and a Gmail-recognized/downloadable generated PDF
+  attachment; the fixture was then rejected to avoid repository derivatives.
 
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
 - Record approved changes to the architecture baseline with rationale and date in `SULUAN_ARCHITECTURE_V1_CONTEXT.md`.
