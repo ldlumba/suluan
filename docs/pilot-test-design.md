@@ -40,6 +40,17 @@ The paper selection is the union of:
 Union and de-duplication yield 36 papers. Re-running selection is unnecessary;
 the committed hashes freeze the approved set.
 
+### Controlled P33 baseline revision — 2026-10-05
+
+Before Stage 8 upload, the authorized source folder matched 35 of the 36
+original hashes. P33's current DOCX was 14 bytes larger than the Stage 5 copy.
+The pinned production extractor returned the unchanged baseline of 29,720
+characters with no warnings, and its course, format, and coverage role were
+unchanged. The owner approved proceeding with the recommended reviewed
+revision: P33 now records SHA-256 `b477af93fedf1b04528c5059cff5938e4527460b99c22307198390e5eae95054`
+and 1,139,016 bytes. This is an explicit manifest revision under the stop rule
+below, not a silent substitution; all other expected values remain fixed.
+
 ## Privacy and authorization review
 
 - The owner previously authorized the 139-paper source corpus as publicly

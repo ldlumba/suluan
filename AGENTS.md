@@ -122,13 +122,20 @@ work from an earlier one.
   retention; Cloud Run scheduling stays undeployed. Gmail revocation drill
   deferred to the Stage 9 sender rotation (unit behavior pinned by tests).
   See `docs/staging-environment.md`.
-- **Stage 8 — Larger corpus pilot.** Process the approved corpus in bounded
-  staging batches; measure duration, failures, recovery, indexing/search,
-  visibility, and cost. Evaluate semantic retrieval with an independent/blinded
-  realistic query holdout including clean negatives; do not tune and validate on
-  the same queries. **Exit:** no unauthorized exposure or unexplained loss/
-  duplication, acceptable extraction/recovery and cost, dependable keyword
-  search; semantic stays disabled unless its independent gate passes.
+- **Stage 8 — Larger corpus pilot: IN PROGRESS (started 2026-10-05).** Run
+  `20261005T103129Z` verified all 36 authorized hashes (after the reviewed P33
+  baseline revision), generated F01–F04, passed the 20-test processing suite,
+  and uploaded all 40 fixtures through the normal staging submission route.
+  Every row remained `PENDING`; an immediate importer replay returned the same
+  40 submission IDs with no duplicates. Individual review, bounded extraction,
+  keyword preparation, download/visibility checks, probes, and the separate
+  blinded semantic gate remain. Process the corpus in bounded staging batches;
+  measure duration, failures, recovery, indexing/search, visibility, and cost.
+  Evaluate semantic retrieval with an independent/blinded realistic query
+  holdout including clean negatives; do not tune and validate on the same
+  queries. **Exit:** no unauthorized exposure or unexplained loss/duplication,
+  acceptable extraction/recovery and cost, dependable keyword search; semantic
+  stays disabled unless its independent gate passes.
 - **Stage 9 — Production/institutional readiness.** Resolve institutional cloud
   and billing ownership, two trusted admins, production first-admin process,
   identity/domain policy, real catalogs, retention/withdrawal/replacement/

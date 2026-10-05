@@ -276,3 +276,19 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   adapter no longer prints subjects.
 - The live Gmail revocation drill is deferred to the Stage 9 sender rotation;
   `invalid_grant` handling is pinned by unit tests.
+
+### Stage 8 bounded pilot started — 2026-10-05
+
+- Run `20261005T103129Z` matched all 36 authorized source hashes after the
+  reviewed P33 baseline revision, generated F01–F04, and passed the 20-test
+  processing suite. The isolated working corpus contains 18 original DOCX,
+  18 original PDF, three generated PDF, and one generated DOCX fixture; no
+  source document or extracted text was added to Git.
+- The staging importer dry-run reported 40 ready, zero skipped, zero errors,
+  and zero warnings. The apply run created 40 `PENDING` submissions through
+  the normal Worker route. An immediate apply replay returned the same 40 IDs;
+  the manager queue contained exactly those 40 pending submissions, providing
+  the run's submission-idempotency evidence without bypassing review.
+- Individual manager decisions, bounded Cloud Run extraction, keyword
+  preparation, downloads/visibility checks, and discovery probes remain.
+  Semantic preparation is still disabled and is a separate Stage 8 gate.
