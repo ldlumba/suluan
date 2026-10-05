@@ -86,6 +86,11 @@ authors, canonical School of Technological Studies / BS Information Technology,
 and the generated PDF filename, then recognized the MIME part as one scanned,
 previewable/downloadable attachment. The submission was rejected after the
 check, so it produced no repository/processing derivative.
+The 15 MiB ceiling and new fallback line were live-verified with Worker
+`836cc94e` using a generated 15.9 MB DOCX: the REO mail carried full metadata,
+no attachment, and the exact line `(not attached: file exceeds the 15 MB email
+attachment limit; open it from the SULUAN review queue)`. The fixture was then
+rejected, so it produced no repository/processing derivative.
 
 A 9.9 MB paper exposed a CPU-limit failure the same day: per-byte base64
 encoding killed the staging queue consumer (`Exceeded CPU Limit`) before send,

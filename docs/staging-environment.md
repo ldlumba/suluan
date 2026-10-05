@@ -236,6 +236,9 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   downloadable attachment each. The first attempt on the prior build died with
   `Exceeded CPU Limit` before send; chunked base64 conversion fixed it, and
   no duplicate arrived despite the retries.
+- Worker `836cc94e` raised the ceiling to 15 MiB with the review-queue fallback
+  line; a generated 15.9 MB DOCX produced exactly that metadata-only mail and
+  was then rejected with no derivatives.
 
 - Worker `6aac2080-f02e-4919-9f98-3962b7238dbb` enriched REO mail with authors
   and canonical school/course/file metadata and attached a generated 872-byte
