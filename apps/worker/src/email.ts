@@ -211,8 +211,16 @@ function base64Encode(text: string): string {
 }
 
 function base64EncodeBytes(bytes: Uint8Array): string {
+  // Chunked conversion through a native call. An earlier per-byte loop with
+  // string concatenation burned seconds of CPU on a 9.9 MB paper and the
+  // staging queue consumer died with "Exceeded CPU Limit" (2026-10-05),
+  // leaving the outbox retrying under lease. 32 KiB windows keep even the
+  // 10 MB ceiling comfortably inside the Worker CPU budget.
+  const CHUNK = 0x8000
   let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
   return btoa(binary)
 }
 

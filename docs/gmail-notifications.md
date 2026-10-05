@@ -86,6 +86,12 @@ and the generated PDF filename, then recognized the MIME part as one scanned,
 previewable/downloadable attachment. The submission was rejected after the
 check, so it produced no repository/processing derivative.
 
+A 9.9 MB paper exposed a CPU-limit failure the same day: per-byte base64
+encoding killed the staging queue consumer (`Exceeded CPU Limit`) before send,
+leaving the outbox retrying under lease. `base64EncodeBytes` now converts in
+32 KiB native windows; keep that shape. Large-attachment delivery depends on
+it, and the 200 KiB round-trip regression test guards the chunk boundaries.
+
 ## Rotation and revocation
 
 - Rotate by repeating steps 3–4 with a fresh refresh token; no redeploy of

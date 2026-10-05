@@ -80,6 +80,29 @@ describe('encodeMimeMessage', () => {
     expect(text).toContain('Review it.')
   })
 
+  it('round-trips bytes across chunk boundaries without corruption', () => {
+    // 200 KiB spans several 32 KiB encoder windows; a boundary bug would
+    // corrupt the attachment. This guards the fix for the 2026-10-05
+    // "Exceeded CPU Limit" failure on a 9.9 MB paper.
+    const bytes = new Uint8Array(200 * 1024)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31 + 7) % 256
+    const text = decodeRaw(
+      encodeMimeMessage(CONFIG.sender, 'reo@ua.edu.ph', 'Paper', 'Review it.', {
+        fileName: 'study.pdf',
+        mimeType: 'application/pdf',
+        bytes,
+      }),
+    )
+    const match = text.match(
+      /Content-Transfer-Encoding: base64\r\nContent-Disposition: attachment[^\r\n]*\r\n\r\n([A-Za-z0-9+/=\r\n]+)\r\n--/,
+    )
+    expect(match).not.toBeNull()
+    const decoded = Uint8Array.from(atob(match![1].replace(/\r\n/g, '')), (c) =>
+      c.charCodeAt(0),
+    )
+    expect(decoded).toEqual(bytes)
+  })
+
   it('prevents subject and attachment-name header injection', () => {
     const text = decodeRaw(
       encodeMimeMessage(
