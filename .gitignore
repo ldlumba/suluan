@@ -20,6 +20,9 @@ __pycache__/
 # Wrangler dev/deploy artifacts (never commit)
 .wrangler/
 
+# Firebase Hosting deployment cache
+.firebase/
+
 # Logs
 logs
 *.log

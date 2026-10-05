@@ -101,9 +101,10 @@ work from an earlier one.
   Clean migrations, no-op reapply, Neon snapshot-to-temporary-branch restore,
   generated upload/review/extraction/index/search/download, rejected non-
   derivation, and restricted anonymous denial passed without development
-  resources. Scheduler, Gemini, OCR, and Gmail remain disabled except for the
-  owner-approved 2026-10-05 staging Worker 5-minute outbox recovery sweep
-  (Cloud Run scheduling stays undeployed). A single staging
+  resources. Scheduler, Gemini, and OCR remain disabled. The owner-approved
+  staging Worker 5-minute outbox recovery sweep and temporary UA Gmail OAuth
+  sender are active as of 2026-10-05; Cloud Run scheduling and an institutional
+  production sender stay deferred. A single staging
   administrator is provisioned; owner decision 2026-10-04 is to proceed with no
   second staging account. Two trusted admins remain a Stage 9 item. See `docs/staging-environment.md`.
 - **Stage 7 — Reliability/security hardening: NEXT.** Verify pending/rejected
@@ -153,6 +154,16 @@ work from an earlier one.
 - **Development corpus cleanup (2026-10-04):** the seven accepted non-`[CORPUS]` development records and their private R2 objects were owner-approved for removal before legacy import. The development repository now retains only the 15 `[CORPUS]` relevance fixtures (including their processing/search/semantic data). Cleanup target IDs and R2 keys are recorded outside the repo at `C:\Users\Lims\AppData\Local\Temp\opencode\suluan-dev-cleanup-2026-10-04.json`.
 
 - Outbox recovery (2026-10-01): migration 0003 adds claim tokens and expiring leases. Notification completion is recorded after dispatch; failures have a one-minute cooldown, abandoned claims expire after five minutes. A five-minute scheduled sweep enqueues up to 50 due rows, including failed initial enqueues. The cron runs automatically only on a deployed Worker; local/manual invocation uses Wrangler's scheduled-event testing. Real external email delivery remains at-least-once across a send/DB failure; the log adapter is not proof of Gmail delivery.
+- **Staging Gmail activation (2026-10-05):** the temporary
+  `ld_lumba.student@ua.edu.ph` OAuth sender is active through the Gmail API;
+  `REO_MAILBOX` currently points to the same pilot mailbox. A generated fixture
+  completed normal upload and individual acceptance, and the mailbox received
+  both the REO submission notice and the submitter decision notice with exact
+  remarks. The queue reported `sent`, which occurs only after Gmail returns a
+  message ID and the `SENT`/`gmail` notification row is persisted. OAuth uses
+  `openid email` only for consent-account verification plus Gmail's send-only
+  scope. This is staging evidence, not institutional sender approval; rotation
+  to an REO mailbox remains Stage 9.
 
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
 - Record approved changes to the architecture baseline with rationale and date in `SULUAN_ARCHITECTURE_V1_CONTEXT.md`.

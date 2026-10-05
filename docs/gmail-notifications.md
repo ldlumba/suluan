@@ -61,6 +61,13 @@ These steps need the owner's Google account; they cannot be scripted.
    trigger a send, and confirm the `notifications` row reads `FAILED` with a
    re-authorize error while the submission/decision itself is unaffected.
 
+Live verification completed 2026-10-05 for the first two checks using generated
+fixture submission `b584a45a-c852-40bb-825d-7f60cf70a804`: the pilot mailbox
+received both messages, the acceptance email contained the exact persisted
+remarks, and the queue reported `sent`. The revocation/failure-isolation drill
+remains a separate Stage 7 check; do not revoke the working grant merely to
+repeat successful-delivery verification.
+
 ## Rotation and revocation
 
 - Rotate by repeating steps 3–4 with a fresh refresh token; no redeploy of

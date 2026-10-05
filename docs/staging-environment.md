@@ -166,8 +166,10 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   service account `suluan-processing-staging@suluan-staging.iam.gserviceaccount.com`.
   Image digest is
   `sha256:780dc0e5c584fb14c227f6a0c8572fdf59a40ea2a517001cd4749a06a902b59f`.
-- No Worker cron/Scheduler, `GEMINI_API_KEY`, embeddings, OCR, service-account
-  JSON key, or Gmail production sender was configured.
+- No Cloud Run Scheduler, `GEMINI_API_KEY`, embeddings, OCR, service-account
+  JSON key, or institutional Gmail sender is configured. The staging Worker
+  has a five-minute outbox sweep and temporary UA OAuth sender approved on
+  2026-10-05.
 
 ### Database recovery
 
@@ -200,6 +202,26 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   configuration-only attempt exposed three environment assignments being passed
   as one PowerShell value; the Job configuration was corrected before any job
   could be claimed, and subsequent executions succeeded.
+
+### Gmail notification activation — 2026-10-05
+
+- Worker version `e3ffc7dd-ed19-4a71-b811-8371c98ba389` was deployed with all
+  four Gmail secrets and `REO_MAILBOX`; secret values stayed out of Git, chat,
+  browser code, and logs.
+- Generated fixture submission `b584a45a-c852-40bb-825d-7f60cf70a804`
+  returned HTTP 201 through the normal multipart endpoint. The temporary REO
+  mailbox received `New SULUAN submission: [STAGING EMAIL] Gmail Delivery Smoke
+  Test 2026-10-05` at 12:15 PM.
+- Individual `PUBLIC` acceptance returned HTTP 201 with remarks `Accepted for
+  Gmail delivery smoke verification; generated staging fixture only.` The
+  submitter received the acceptance email with those exact remarks at 12:17 PM.
+- The live queue trace recorded outbox
+  `ca853299-a5cf-42a6-a413-c20bb372cbb1: sent`. In this implementation, `sent`
+  is returned only after Gmail supplies a non-empty message ID, a notification
+  row is persisted with status `SENT` and provider `gmail`, and the outbox row
+  is completed. This verifies real Gmail delivery rather than the log adapter.
+- Sender and recipient are both `ld_lumba.student@ua.edu.ph` for staging only.
+  Re-authorization under an institutionally owned REO mailbox remains Stage 9.
 
 ### Stage 6 complete
 
