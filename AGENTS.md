@@ -171,9 +171,10 @@ work from an earlier one.
 - **REO email attachments (2026-10-05):** new-submission mail resolves canonical
   authors/school/course/file metadata from Neon at dispatch time and attaches
   the private R2 PDF/DOCX only when Gmail is active and the source file is at
-  most 10 MiB. The queue consumer is the only reader; R2 stays private and no
-  key enters the outbox or email. The 10 MiB source ceiling leaves Worker/Gmail
-  headroom for MIME plus Gmail API base64 expansion. Larger files send metadata
+  most 15 MiB. The queue consumer is the only reader; R2 stays private and no
+  key enters the outbox or email. The 15 MiB source ceiling lands near 20.5 MB
+  MIME, leaving real margin under Gmail's ~25 MB decoded-message cap (an 18 MiB
+  proposal was rejected on this math at ~25.8 MB MIME). Larger files send metadata
   with an explicit SULUAN-review fallback and never fail submission. A hosted,
   authenticated review link remains later work; rejected-file retention stays
   deferred. Staging Worker `6aac2080-f02e-4919-9f98-3962b7238dbb` live-verified

@@ -16,11 +16,12 @@ for that mailbox and updating secrets — no code change.
   stands, and the sweep retries. No duplicate acceptance on retry.
 - New-submission mail resolves authoritative metadata from Neon at dispatch
   time and, with Gmail active, reads the private R2 object only when the source
-  file is at most 10 MiB. It sends multipart MIME with the PDF/DOCX attached.
+  file is at most 15 MiB. It sends multipart MIME with the PDF/DOCX attached.
   The R2 key is never placed in the outbox or email. Larger files send metadata
-  and state clearly that REO must use SULUAN; submission still succeeds. The
-  ceiling leaves memory/message headroom for MIME and Gmail API base64
-  expansion. A hosted authenticated review link remains later work.
+  and direct REO to the SULUAN review queue; submission still succeeds. The
+  15 MiB ceiling lands near 20.5 MB MIME, with real margin under Gmail's ~25 MB
+  decoded-message cap (measured; an 18 MiB value would land near 25.8 MB and
+  risk live Gmail rejection). A hosted authenticated review link remains later work.
 
 ## One-time setup (operator, browser + console)
 

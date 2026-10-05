@@ -593,7 +593,7 @@ needsDb('review workflow', () => {
     ).toBe('sent')
     expect(delivered?.attachment).toBeUndefined()
     expect(delivered?.body).toContain(
-      'exceeds the 10 MB email attachment limit',
+      'exceeds the 15 MB email attachment limit',
     )
   })
 

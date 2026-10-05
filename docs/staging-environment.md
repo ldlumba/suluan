@@ -242,8 +242,8 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   PDF. Gmail rendered every field, reported one scanned attachment, and exposed
   preview/download controls for the correct filename. Submission and subsequent
   rejection both returned HTTP 201; rejection avoided repository/processing
-  derivatives. Source PDF/DOCX files above 10 MiB continue as metadata-only
-  notifications with an explicit SULUAN fallback.
+  derivatives. Source PDF/DOCX files above 15 MiB continue as metadata-only
+  notifications pointing REO at the SULUAN review queue.
 
 ### Stage 6 complete
 

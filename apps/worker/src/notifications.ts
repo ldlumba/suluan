@@ -5,11 +5,15 @@ import type { EmailAdapter, EmailAttachment } from './email'
 import type { R2BucketLike } from './config'
 
 /**
- * Conservative ceiling for the source file before MIME/base64 expansion.
- * Gmail and Worker memory limits apply to the encoded message, not just the
- * R2 object. Ten MiB leaves headroom for both nested encodings and metadata.
+ * Ceiling for the source file before MIME/base64 expansion. Gmail's ~25 MB
+ * message cap applies to the decoded MIME, which runs ~1.37x the source
+ * size (base64 plus line wrapping): 15 MiB lands near 20.5 MB, leaving
+ * real margin for Gmail's exact byte counting. An earlier 18 MiB proposal
+ * was rejected on this math (it lands near 25.8 MB MIME). Worker CPU and
+ * 128 MB isolate memory are comfortable at this size with the chunked
+ * base64 encoder; do not raise this without re-measuring both.
  */
-export const MAX_EMAIL_ATTACHMENT_BYTES = 10 * 1024 * 1024
+export const MAX_EMAIL_ATTACHMENT_BYTES = 15 * 1024 * 1024
 
 export interface OutboxMessage {
   outboxId: string
@@ -94,7 +98,7 @@ async function dispatchNotification(
       ? attachment
         ? `${details.fileName} (attached)`
         : details.sizeBytes > MAX_EMAIL_ATTACHMENT_BYTES
-          ? `${details.fileName} (not attached: file exceeds the 10 MB email attachment limit; review it in SULUAN)`
+          ? `${details.fileName} (not attached: file exceeds the 15 MB email attachment limit; open it from the SULUAN review queue)`
           : `${details.fileName} (available in SULUAN; attachment unavailable for this sender)`
       : '(not available)'
     draft = {
