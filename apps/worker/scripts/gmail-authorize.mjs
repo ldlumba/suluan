@@ -197,7 +197,8 @@ async function confirmSenderMailbox(accessToken, sender) {
   const info = await res.json()
   if (typeof info.email !== 'string' || info.email.toLowerCase() !== sender.toLowerCase()) {
     fail(
-      `consent came from a different mailbox; expected the sender address and will store nothing`,
+      `consent came from ${info.email ?? '(unknown account)'}, not ${sender}; ` +
+        `re-run and approve as the sender address, then this run stores nothing`,
     )
   }
   const granted = typeof info.scope === 'string' ? info.scope.split(' ') : []
