@@ -222,6 +222,14 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   is completed. This verifies real Gmail delivery rather than the log adapter.
 - Sender and recipient are both `ld_lumba.student@ua.edu.ph` for staging only.
   Re-authorization under an institutionally owned REO mailbox remains Stage 9.
+- A follow-up submission from a different authenticated UA account proved the
+  recipient split and rejection path. The configured REO mailbox received the
+  new-submission notice identifying the submitter; after individual rejection,
+  only the submitter's mailbox received `Update on your SULUAN submission` with
+  `Decision: REJECTED` and the exact reviewer remarks. The authenticated status
+  page showed the same outcome and remarks, while anonymous keyword search
+  returned zero results for the rejected title. The rejected submission remains
+  in the REO-only staging archive by policy; it created no public search result.
 
 ### Stage 6 complete
 

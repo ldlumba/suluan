@@ -162,7 +162,11 @@ work from an earlier one.
   remarks. The queue reported `sent`, which occurs only after Gmail returns a
   message ID and the `SENT`/`gmail` notification row is persisted. OAuth uses
   `openid email` only for consent-account verification plus Gmail's send-only
-  scope. This is staging evidence, not institutional sender approval; rotation
+  scope. A second-account staging check then proved recipient separation and
+  the rejection path: the REO notice reached the configured review mailbox,
+  while the rejection notice reached only the different UA submitter and
+  included exact remarks; anonymous search returned no result for the rejected
+  title. This is staging evidence, not institutional sender approval; rotation
   to an REO mailbox remains Stage 9.
 
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
