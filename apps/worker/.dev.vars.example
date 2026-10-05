@@ -16,3 +16,10 @@ ALLOWED_ORIGINS=http://localhost:5173
 # account and deployed Worker audience exist; no private key is stored here.
 PROCESSING_SERVICE_AUDIENCE=
 PROCESSING_SERVICE_ACCOUNT=
+# Gmail sender (owner-approved 2026-10-05, temporary UA mailbox). All four are
+# Worker secrets in deployed environments; keep empty locally unless testing
+# delivery. Never commit values. See docs/gmail-notifications.md.
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+GMAIL_REFRESH_TOKEN=
+GMAIL_SENDER=

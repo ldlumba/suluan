@@ -1,7 +1,12 @@
 import { productionVerifier } from './auth'
 import { createApp } from './app'
 import { createDb } from './db'
-import { logEmailAdapter } from './email'
+import {
+  gmailEmailAdapter,
+  isGmailConfigured,
+  logEmailAdapter,
+  type EmailAdapter,
+} from './email'
 import {
   processOutboxEvent,
   sweepOutbox,
@@ -10,6 +15,17 @@ import {
 import type { Env, QueueMessageLike } from './config'
 
 const app = createApp(productionVerifier)
+
+/** Gmail when its secrets exist, otherwise the auditable log adapter. */
+function selectEmailAdapter(env: Env): EmailAdapter {
+  if (!isGmailConfigured(env)) return logEmailAdapter()
+  return gmailEmailAdapter({
+    clientId: env.GMAIL_CLIENT_ID as string,
+    clientSecret: env.GMAIL_CLIENT_SECRET as string,
+    refreshToken: env.GMAIL_REFRESH_TOKEN as string,
+    sender: env.GMAIL_SENDER as string,
+  })
+}
 
 /**
  * Queue consumer: claims one outbox row per message and dispatches it.
@@ -22,8 +38,7 @@ async function handleQueue(
   env: Env,
 ) {
   const db = createDb(env.DATABASE_URL)
-  // Log adapter until the Gmail sender is authorized (Architecture v1 §12).
-  const email = logEmailAdapter()
+  const email = selectEmailAdapter(env)
   for (const msg of batch.messages) {
     try {
       const outcome = await processOutboxEvent(

@@ -65,6 +65,18 @@ export interface Env {
   PROCESSING_SERVICE_ACCOUNT?: string
   /** Test/dev REO recipient. Unset until the mailbox decision lands. */
   REO_MAILBOX?: string
+  /**
+   * Gmail sender (owner-approved 2026-10-05, temporary UA mailbox).
+   * Server-side only, via `wrangler secret put` — never commit, never expose
+   * to the browser. When any of the four is missing, delivery falls back to
+   * the log adapter instead of failing. GMAIL_SENDER is the authorized UA
+   * mailbox used as the MIME From address; swapping the sender later means
+   * re-authorizing OAuth for the new mailbox, not a code change.
+   */
+  GMAIL_CLIENT_ID?: string
+  GMAIL_CLIENT_SECRET?: string
+  GMAIL_REFRESH_TOKEN?: string
+  GMAIL_SENDER?: string
 }
 
 /** Structural queue-consumer message (see R2BucketLike rationale). */

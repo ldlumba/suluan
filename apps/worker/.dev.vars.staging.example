@@ -2,7 +2,13 @@
 # local tooling to read the values; that file is git-ignored. Remote Worker
 # values are set with `wrangler secret put -c wrangler.staging.toml`.
 # Never add GEMINI_API_KEY: semantic preparation is disabled for this pilot.
+# Gmail sender secrets (owner-approved 2026-10-05, temporary UA mailbox).
+# Values live only in Worker secrets; see docs/gmail-notifications.md.
 DATABASE_URL=
 FIREBASE_PROJECT_ID=suluan-staging
 PROCESSING_SERVICE_AUDIENCE=https://suluan-api-staging.ctrlfinder.workers.dev
 PROCESSING_SERVICE_ACCOUNT=suluan-processing-staging@suluan-staging.iam.gserviceaccount.com
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+GMAIL_REFRESH_TOKEN=
+GMAIL_SENDER=
