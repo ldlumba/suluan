@@ -91,6 +91,11 @@ encoding killed the staging queue consumer (`Exceeded CPU Limit`) before send,
 leaving the outbox retrying under lease. `base64EncodeBytes` now converts in
 32 KiB native windows; keep that shape. Large-attachment delivery depends on
 it, and the 200 KiB round-trip regression test guards the chunk boundaries.
+Both 9.9 MB staging mails delivered after the fix (1:31 PM and 1:41 PM), each
+as a single copy with a Gmail-scanned, previewable/downloadable attachment;
+no at-least-once duplicate arrived. One retry fired during the deploy
+propagation window and still hit the old limit, then succeeded on the next
+sweep; allow a few minutes after deploy before judging large-mail delivery.
 
 ## Rotation and revocation
 

@@ -179,6 +179,10 @@ work from an earlier one.
   deferred. Staging Worker `6aac2080-f02e-4919-9f98-3962b7238dbb` live-verified
   the complete metadata body and a Gmail-recognized/downloadable generated PDF
   attachment; the fixture was then rejected to avoid repository derivatives.
+  A follow-up fix (`8c741ab`, Worker `2891cc9b`) replaced per-byte base64 with
+  chunked conversion after a 9.9 MB paper exceeded the queue consumer CPU
+  limit; both 9.9 MB mails then delivered as single copies with scanned
+  attachments.
 
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
 - Record approved changes to the architecture baseline with rationale and date in `SULUAN_ARCHITECTURE_V1_CONTEXT.md`.

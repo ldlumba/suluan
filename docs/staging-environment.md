@@ -230,6 +230,12 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   page showed the same outcome and remarks, while anonymous keyword search
   returned zero results for the rejected title. The rejected submission remains
   in the REO-only staging archive by policy; it created no public search result.
+- Two real 9.9 MB submissions from a second UA account then proved the large
+  path end to end on Worker `2891cc9b`: both REO mails arrived (1:31 PM and
+  1:41 PM) with full metadata and exactly one Gmail-scanned, previewable/
+  downloadable attachment each. The first attempt on the prior build died with
+  `Exceeded CPU Limit` before send; chunked base64 conversion fixed it, and
+  no duplicate arrived despite the retries.
 
 - Worker `6aac2080-f02e-4919-9f98-3962b7238dbb` enriched REO mail with authors
   and canonical school/course/file metadata and attached a generated 872-byte
