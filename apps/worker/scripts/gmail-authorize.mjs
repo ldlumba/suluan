@@ -183,19 +183,26 @@ async function exchangeCode({ clientId, clientSecret, code, redirectUri }) {
 }
 
 async function confirmSenderMailbox(accessToken, sender) {
+  // tokeninfo needs no Gmail scope: it reports which account (and scopes)
+  // the access token was issued for. users.getProfile would require a read
+  // scope we deliberately do not request.
   const res = await fetchWithRetry(
     'mailbox verification',
     () =>
-      fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-        headers: { authorization: `Bearer ${accessToken}` },
-      }),
+      fetch(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
+      ),
   )
   if (!res.ok) fail(`could not verify mailbox: HTTP ${res.status}`)
-  const { emailAddress } = await res.json()
-  if (typeof emailAddress !== 'string' || emailAddress.toLowerCase() !== sender.toLowerCase()) {
+  const info = await res.json()
+  if (typeof info.email !== 'string' || info.email.toLowerCase() !== sender.toLowerCase()) {
     fail(
       `consent came from a different mailbox; expected the sender address and will store nothing`,
     )
+  }
+  const granted = typeof info.scope === 'string' ? info.scope.split(' ') : []
+  if (!granted.includes(GMAIL_SEND_SCOPE)) {
+    fail('consent did not include the Gmail send scope; re-run and approve sending mail')
   }
 }
 
