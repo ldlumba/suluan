@@ -23,6 +23,7 @@ import {
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
 import { prepareSubmissionKeywords } from './keywords'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
+import { serviceEmbedRoutes } from './embed_claims'
 import { searchRoutes } from './search'
 import { graphRoutes } from './graph'
 import {
@@ -214,6 +215,12 @@ export function createApp(
   app.route(
     '/api/internal/processing',
     serviceProcessingRoutes(requireProcessingService),
+  )
+  // Region-stable embedding claims for the pinned-region Cloud Run Job.
+  // Same workload identity as extraction; never a user/manager profile.
+  app.route(
+    '/api/internal/embeddings',
+    serviceEmbedRoutes(requireProcessingService),
   )
   app.use('/api/processing/*', requireAuth)
   app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))

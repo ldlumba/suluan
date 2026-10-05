@@ -51,8 +51,8 @@ export const MAX_SEMANTIC_DISTANCE = 0.7
 /** Bounded per-call batch; the production pipeline prepares per paper. */
 const INDEX_BATCH = 10
 /** Semantic preparation is operator-triggered, so it is bounded hard. */
-const EMBED_PAPER_BATCH = 2
-const EMBED_INPUT_BATCH = EMBED_BATCH_SIZE
+export const EMBED_PAPER_BATCH = 2
+export const EMBED_INPUT_BATCH = EMBED_BATCH_SIZE
 
 /**
  * Keyword discovery. Public by default (owner-approved 2026-10-01): accepted

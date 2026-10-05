@@ -135,6 +135,13 @@ work from an earlier one.
   Gemini secret and temporary request-limit override were removed and semantic
   is verified unconfigured. See `docs/stage8-pilot-results.md`. Any retry needs
   an explicit region-stable architecture revision; keyword remains dependable.
+- **Region-stable embedding path implemented 2026-10-06 (live run pending).**
+  `embedding_claims` (migration 0011), `POST /api/internal/embeddings/claim`
+  + `/result` on the existing workload identity, and
+  `services/processing/embed_runner.py` move paid Gemini calls to a pinned
+  `asia-southeast1` Cloud Run Job with quota consumed at claim time. Staging
+  migration, Job creation, key installation, and the frozen-holdout evaluation
+  remain; interactive semantic search stays disabled meanwhile.
 - **Knowledge Graph discovery v1 implemented 2026-10-05.** The public `/graph`
   view opens from search results and renders a bounded paper-centered metadata
   neighborhood with React Flow. `GET /api/graph/neighborhood` is read-only,

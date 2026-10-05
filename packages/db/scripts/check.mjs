@@ -30,6 +30,7 @@ const expectedTables = [
   'semantic_indexes',
   'document_embeddings',
   'embedding_usage',
+  'embedding_claims',
 ]
 
 /** Drizzle bookkeeping lives in its own schema in current drizzle-orm. */

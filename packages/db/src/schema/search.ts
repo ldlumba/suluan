@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -164,3 +165,30 @@ export const embeddingUsage = pgTable(
   },
   (table) => [primaryKey({ columns: [table.bucket, table.actorKey, table.day] })],
 )
+
+/**
+ * Region-stable embedding reservations (2026-10-06).
+ *
+ * Cloudflare Worker egress cannot reliably satisfy Gemini's location policy,
+ * so paid embedding calls originate from a pinned-region Cloud Run Job. The
+ * Job never holds Neon credentials beyond the workload-scoped claim APIs: a
+ * reservation is created server-side AFTER quota is consumed and BEFORE any
+ * paid call, carries a single-use random claim token with a short expiry, and
+ * describes exactly which missing chunks the Job may embed. The result
+ * endpoint validates the token, the chunk set, and vector geometry, writes
+ * idempotently through UNIQUE(chunk_id), and marks the reservation used.
+ * Chunk text itself is returned in the claim response (Job memory only) and
+ * is never persisted here — only chunk IDs travel back.
+ */
+export const embeddingClaims = pgTable('embedding_claims', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  claimToken: uuid('claim_token').notNull().unique(),
+  kind: text('kind').notNull().default('prep'),
+  inputs: integer('inputs').notNull().default(0),
+  payload: jsonb('payload').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+})

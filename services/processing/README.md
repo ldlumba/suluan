@@ -122,6 +122,19 @@ ID token to claim work through Worker-only endpoints; it receives no Neon, R2,
 Firebase-manager, or service-account-key credential. See
 `docs/cloud-run-processing.md` for the identity contract and activation record.
 
+`embed_runner.py` implements the same pull design for paid embedding calls,
+which cannot originate from Cloudflare Worker egress: Gemini intermittently
+rejects Worker calls with `400 FAILED_PRECONDITION: User location is not
+supported for the API use`. The embed Job runs pinned in `asia-southeast1`,
+claims missing-chunk batches through `/api/internal/embeddings/claim` (quota
+is consumed server-side in that claim step, before any paid call), embeds one
+bounded batch per claim with `RETRIEVAL_DOCUMENT`, and posts raw vectors to
+`/api/internal/embeddings/result`. Normalization, geometry validation, and
+idempotent storage stay in the Worker; the claim token is single-use with a
+ten-minute expiry. One invocation embeds at most `--max-claims` claims
+(default 5); failures stop the run without automatic retry, and logs carry
+claim IDs and counts only — never the API key, chunk text, or vectors.
+
 Development activation is verified 2026-10-03: manual Job
 `suluan-processing` (`asia-southeast1`) execution `suluan-processing-lssfx`
 completed against the deployed Worker and remote R2, and the fixture became

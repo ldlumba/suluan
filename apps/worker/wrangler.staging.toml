@@ -15,6 +15,13 @@ crons = ["*/5 * * * *"]
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"
 ALLOWED_ORIGINS = "http://localhost:5174"
+# Temporary Stage 8 re-evaluation window (owner-approved 2026-10-06): the
+# region-stable embed Job needs about 15 preparation claims for the remaining
+# staging chunks plus 25 frozen query evaluations, which the normal 20-request
+# cap cannot cover in one controlled run. The cost-bearing input cap stays
+# code-owned at 2,000/day. Remove this override and redeploy immediately after
+# the frozen evaluation completes.
+EMBEDDING_DAILY_REQUEST_LIMIT = "100"
 
 # Private staging storage. Browser access remains Worker-authorized only.
 [[r2_buckets]]
