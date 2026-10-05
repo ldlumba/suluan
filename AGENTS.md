@@ -194,6 +194,11 @@ work from an earlier one.
   `keyword` filter with no ranking effect. No controlled vocabulary, no synonym
   merging, no backfill, no semantic integration — all deferred past Stage 8.
   System-derived topics will live in a separate table, never in keywords.
+  Staging live-verified on Worker `d280a872`: chip submit → intake rows →
+  REO mail Keywords line + attachment → queue/dialog display → accept →
+  shared concept rows → search display, filter narrowing, empty-state, and
+  clear. The filter is a controlled input with explicit Apply, not a nested
+  form (nested submission bypassed React and issued a bare `?kw=` GET).
 
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
 - Record approved changes to the architecture baseline with rationale and date in `SULUAN_ARCHITECTURE_V1_CONTEXT.md`.

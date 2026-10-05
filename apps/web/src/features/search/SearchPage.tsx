@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSearchParams } from 'react-router'
 import { Search, X } from 'lucide-react'
@@ -80,6 +81,49 @@ const SEMANTIC_NOTICE: Record<string, string> = {
   unavailable:
     'Semantic search is temporarily unavailable. Showing keyword results instead.',
   empty_query: 'Enter a description to search semantically.',
+}
+
+/**
+ * Exact-match author-keyword filter. Deliberately NOT a <form>: it lives
+ * inside the page next to the main search form, and nested forms submit
+ * natively past React's onSubmit (observed live 2026-10-05 as a bare
+ * `?kw=…` GET). A controlled input plus explicit Apply/Clear buttons has
+ * no native-submit footgun.
+ */
+function KeywordFilter({
+  initial,
+  onApply,
+}: {
+  initial: string
+  onApply: (next: string) => void
+}) {
+  const [draft, setDraft] = useState(initial)
+  return (
+    <div className="max-w-56 space-y-2 pt-1">
+      <Label htmlFor="search-keyword">
+        Filter by author keyword (exact match)
+      </Label>
+      <div className="flex gap-2">
+        <Input
+          id="search-keyword"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onApply(draft.trim())
+          }}
+          placeholder="e.g. machine learning"
+        />
+        <Button type="button" size="sm" onClick={() => onApply(draft.trim())}>
+          Apply
+        </Button>
+      </div>
+      {initial && (
+        <Button type="button" size="sm" variant="ghost" onClick={() => onApply('')}>
+          Clear keyword filter
+        </Button>
+      )}
+    </div>
+  )
 }
 
 export function SearchPage() {
@@ -361,45 +405,14 @@ export function SearchPage() {
             </div>
           )}
           {mode === 'keyword' && (
-            <form
-              className="max-w-56 space-y-2 pt-1"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const value = new FormData(e.currentTarget).get('kw')
-                const next = typeof value === 'string' ? value.trim() : ''
+            <KeywordFilter
+              initial={keywordFilter}
+              onApply={(next) =>
                 setParams(
-                  next
-                    ? { q, page: '1', sort, keyword: next }
-                    : { q, page: '1', sort },
+                  next ? { q, page: '1', sort, keyword: next } : { q, page: '1', sort },
                 )
-              }}
-            >
-              <Label htmlFor="search-keyword">
-                Filter by author keyword (exact match)
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="search-keyword"
-                  name="kw"
-                  defaultValue={keywordFilter}
-                  key={keywordFilter}
-                  placeholder="e.g. machine learning"
-                />
-                <Button type="submit" size="sm">
-                  Apply
-                </Button>
-              </div>
-              {keywordFilter && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setParams({ q, page: '1', sort })}
-                >
-                  Clear keyword filter
-                </Button>
-              )}
-            </form>
+              }
+            />
           )}
         </form>
         {notice && (
