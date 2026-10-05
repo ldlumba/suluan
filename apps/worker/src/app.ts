@@ -172,6 +172,12 @@ export function createApp(
     }
   }
 
+  /**
+   * Documentation-only grouping (Stage 7 clarification): ADMIN and
+   * REPOSITORY_MANAGER are enforcement-identical — every manager-gated
+   * route accepts both, and no ADMIN-only operation exists. The role
+   * hierarchy stays nominal until such an operation is approved.
+   */
   const MANAGERS: Role[] = ['REPOSITORY_MANAGER', 'ADMIN']
 
   /** Google workload identity boundary; never grants a user/manager profile. */

@@ -192,6 +192,43 @@ needsDb('submission intake', () => {
     expect(rows).toHaveLength(1)
   })
 
+  it('replays idempotent submissions with keywords without duplicating terms', async () => {
+    const token = await userToken('uid-replaykw', 'replaykw@ua.edu.ph')
+    const idempotencyKey = crypto.randomUUID()
+    const build = () => {
+      const form = new FormData()
+      form.append('file', pdfFile('paper.pdf', 100))
+      form.append('idempotencyKey', idempotencyKey)
+      form.append('title', 'Replay keywords')
+      form.append('keywords[]', 'Replay Alpha')
+      form.append('keywords[]', 'Replay Beta')
+      return t.app.request(
+        '/api/submissions',
+        {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+          body: form,
+        },
+        t.testEnv(),
+      )
+    }
+    const first = await build()
+    expect(first.status).toBe(201)
+    const firstBody = (await first.json()) as { id: string }
+    submissionIds.push(firstBody.id)
+    const second = await build()
+    expect(second.status).toBe(200)
+    // The replay short-circuits before the atomic write: one term set.
+    const db = testDb()
+    const rows = await db
+      .select()
+      .from(submissionKeywords)
+      .where(eq(submissionKeywords.submissionId, firstBody.id))
+    expect(
+      rows.sort((a, b) => a.position - b.position).map((r) => r.term),
+    ).toEqual(['Replay Alpha', 'Replay Beta'])
+  })
+
   it('rejects unknown schools without storing the file', async () => {
     const token = await userToken('uid-catalog', 'catalog@ua.edu.ph')
     const objectsBefore = t.r2objects.size

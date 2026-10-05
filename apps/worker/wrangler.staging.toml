@@ -19,7 +19,8 @@ ALLOWED_ORIGINS = "http://localhost:5174"
 binding = "DOCUMENTS"
 bucket_name = "suluan-staging"
 
-# Staging notification delivery keeps the current log adapter. Queue
+# Staging notification delivery uses the temporary UA Gmail OAuth sender
+# (server-side secrets, log-adapter fallback when unconfigured). Queue
 # consumption and the scheduled recovery sweep are enabled.
 [[queues.producers]]
 binding = "NOTIFICATIONS"

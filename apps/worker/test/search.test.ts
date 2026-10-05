@@ -81,6 +81,7 @@ needsDb('restricted keyword discovery', () => {
     title = `Study ${tag}`,
     authors = `Author ${tag}`,
     keywords: string[] = [],
+    visibility?: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED',
   ) {
     const form = new FormData()
     form.append(
@@ -112,6 +113,7 @@ needsDb('restricted keyword discovery', () => {
             submissionId: id,
             status,
             remarks: 'Test fixture',
+            ...(visibility ? { visibility } : {}),
           })
         ).status,
       ).toBe(201)
@@ -345,5 +347,58 @@ needsDb('restricted keyword discovery', () => {
     expect(unfiltered.items.map((x) => x.id).sort()).toEqual(
       [tagged.recordId, untagged.recordId].sort(),
     )
+  })
+  dbIt('keeps keywords out of unauthorized and rejected results', async () => {
+    const stamp = crypto.randomUUID().replaceAll('-', '')
+    const term = `Hidden Kw ${stamp}`
+    // RESTRICTED: invisible to anonymous visitors AND authenticated
+    // non-managers, even through the exact-match filter.
+    const restricted = await fixture(
+      'ACCEPTED',
+      false,
+      `Restricted Study ${stamp}`,
+      `Author ${stamp}`,
+      [term],
+      'RESTRICTED',
+    )
+    for (const token of [null, user]) {
+      const anon = (await (
+        await request(
+          `/api/search/records?q=${stamp}&keyword=${encodeURIComponent(term)}`,
+          token,
+        )
+      ).json()) as { items: { id: string }[] }
+      expect(anon.items).toEqual([])
+      const browse = (await (
+        await request(`/api/search/records?q=${stamp}`, token)
+      ).json()) as { items: { id: string }[] }
+      expect(browse.items.map((x) => x.id)).not.toContain(
+        restricted.recordId,
+      )
+    }
+    // Managers see the restricted record WITH its keywords.
+    const managed = (await (
+      await request(
+        `/api/search/records?q=${stamp}&keyword=${encodeURIComponent(term)}`,
+        manager,
+      )
+    ).json()) as { items: { id: string; keywords: string[] }[] }
+    expect(managed.items.map((x) => x.id)).toEqual([restricted.recordId])
+    expect(managed.items[0].keywords).toEqual([term])
+    // REJECTED: keywords never bridge, so the filter matches nothing.
+    await fixture(
+      'REJECTED',
+      false,
+      `Rejected Study ${stamp}`,
+      `Author ${stamp}`,
+      [`Rejected Kw ${stamp}`],
+    )
+    const rejected = (await (
+      await request(
+        `/api/search/records?q=${stamp}&keyword=${encodeURIComponent(`Rejected Kw ${stamp}`)}`,
+        manager,
+      )
+    ).json()) as { items: { id: string }[] }
+    expect(rejected.items).toEqual([])
   })
 })
