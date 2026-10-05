@@ -7,6 +7,7 @@ import type { AppContext } from './app'
 import { createDb } from './db'
 import { CHUNKER_VERSION, chunkText } from './chunking'
 import {
+  cacheControlFor,
   effectiveVisibility,
   effectiveVisibilityLevel,
   viewerRoleFor,
@@ -132,12 +133,12 @@ export function searchRoutes(
           e.id
         limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
       `)
-      // Anonymous results are identical for everyone and short-lived
-      // cacheable; authenticated results depend on role and must not be stored.
-      c.header(
-        'Cache-Control',
-        viewer === 'PUBLIC' ? 'public, max-age=30' : 'private, no-store',
-      )
+      // Anonymous responses are identical for everyone and short-lived
+      // cacheable; authenticated responses — and requests that bore an
+      // unverifiable credential — must not be stored.
+      const attempted =
+        c.req.header('authorization')?.startsWith('Bearer ') ?? false
+      c.header('Cache-Control', cacheControlFor(viewer, attempted, 30))
       return c.json({
         items: rows.rows.slice(0, PAGE_SIZE),
         page,
@@ -224,10 +225,9 @@ export function searchRoutes(
       const db = createDb(c.env.DATABASE_URL)
       const profile = c.get('profile')
       const viewer = viewerRoleFor(profile?.role ?? null)
-      c.header(
-        'Cache-Control',
-        viewer === 'PUBLIC' ? 'public, max-age=30' : 'private, no-store',
-      )
+      const attempted =
+        c.req.header('authorization')?.startsWith('Bearer ') ?? false
+      c.header('Cache-Control', cacheControlFor(viewer, attempted, 30))
 
       // An empty query has nothing to embed; defer to keyword listing.
       if (!q) {

@@ -24,6 +24,7 @@ import { decideSchema, submissionFormFieldsSchema } from './schemas'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { searchRoutes } from './search'
 import {
+  cacheControlFor,
   effectiveVisibility,
   effectiveVisibilityLevel,
   viewerRoleFor,
@@ -626,8 +627,13 @@ export function createApp(
         downloadName: buildDownloadFileName(row.title, row.fileName),
       },
       // Anonymous caching is safe for PUBLIC papers (identical for everyone);
-      // signed-in requests are role-dependent and must not be stored.
-      viewer === 'PUBLIC' ? 'public, max-age=300' : 'private, no-store',
+      // signed-in requests — and requests bearing an unverifiable credential —
+      // are role-dependent and must not be stored.
+      cacheControlFor(
+        viewer,
+        c.req.header('authorization')?.startsWith('Bearer ') ?? false,
+        300,
+      ),
     )
   })
 

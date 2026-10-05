@@ -32,6 +32,24 @@ export function visibilityLabel(level: string): string {
 }
 
 /**
+ * Cache policy for visibility-filtered reads. Anonymous responses (no
+ * credential was offered) are identical for everyone and short-lived
+ * cacheable; everything else must never be stored. In particular, a request
+ * that bore an `Authorization` header but failed verification still degrades
+ * to the anonymous body — yet a shared cache keyed by URL must not store
+ * that response as the canonical anonymous one.
+ */
+export function cacheControlFor(
+  viewer: ViewerRole,
+  authAttempted: boolean,
+  maxAgeSeconds: number,
+): string {
+  return viewer === 'PUBLIC' && !authAttempted
+    ? `public, max-age=${maxAgeSeconds}`
+    : 'private, no-store'
+}
+
+/**
  * Row-level predicate for a viewer, parameterized by table alias so callers
  * can compose it into their own query. Mirrors visibilityCase(): an embargo in
  * the future degrades PUBLIC to UA_ONLY, an elapsed embargo lifts restrictions.

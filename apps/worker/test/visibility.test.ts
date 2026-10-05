@@ -203,6 +203,31 @@ needsDb('record visibility and submitter status', () => {
     expect(mgrIds).toContain(restricted.recordId)
   })
 
+  dbIt('keeps unverifiable credentials out of shared caches', async () => {
+    const publicPaper = await acceptWith('PUBLIC')
+    const scoped = `/api/search/records?q=${tag}`
+
+    // No credential: anonymous body, publicly cacheable.
+    const anon = await get(scoped, null)
+    expect(anon.status).toBe(200)
+    expect(anon.headers.get('cache-control')).toContain('public')
+    const anonIds = ((await anon.json()) as { items: { id: string }[] }).items.map((i) => i.id)
+    expect(anonIds).toContain(publicPaper.recordId)
+
+    // Stale credential: the same anonymous body and status (degrade, don't
+    // fail), but a shared cache must not store the response.
+    const stale = await get(scoped, 'not-a-token')
+    expect(stale.status).toBe(200)
+    expect(stale.headers.get('cache-control')).toBe('private, no-store')
+    const staleIds = ((await stale.json()) as { items: { id: string }[] }).items.map((i) => i.id)
+    expect(staleIds).toEqual(anonIds)
+
+    // Same rule on downloads: the public paper still streams, privately.
+    const dl = await get(`/api/records/${publicPaper.recordId}/download`, 'not-a-token')
+    expect(dl.status).toBe(200)
+    expect(dl.headers.get('cache-control')).toBe('private, no-store')
+  })
+
   dbIt('degrades an embargoed PUBLIC record to UA-only for visitors', async () => {
     // The API no-ops a date on PUBLIC, so this defensive read-side rule is
     // arranged directly in Neon (ops imports can produce such a row).

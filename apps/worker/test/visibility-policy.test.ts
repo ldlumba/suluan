@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
-import { effectiveVisibility, viewerRoleFor, visibilityLabel } from '../src/visibility'
+import {
+  cacheControlFor,
+  effectiveVisibility,
+  viewerRoleFor,
+  visibilityLabel,
+} from '../src/visibility'
 
 const dialect = new PgDialect()
 
@@ -69,5 +74,25 @@ describe('visibilityLabel', () => {
     expect(visibilityLabel('PUBLIC')).toBe('Public')
     expect(visibilityLabel('UA_ONLY')).toMatch(/university/i)
     expect(visibilityLabel('RESTRICTED')).toMatch(/manager/i)
+  })
+})
+
+describe('cacheControlFor', () => {
+  it('caches only truly anonymous responses', () => {
+    expect(cacheControlFor('PUBLIC', false, 30)).toBe('public, max-age=30')
+    expect(cacheControlFor('PUBLIC', false, 300)).toBe('public, max-age=300')
+  })
+
+  it('never stores authenticated responses', () => {
+    expect(cacheControlFor('UA_USER', false, 30)).toBe('private, no-store')
+    expect(cacheControlFor('MANAGER', false, 30)).toBe('private, no-store')
+  })
+
+  it('never stores responses to unverifiable credentials', () => {
+    // Regression guard: optionalAuth degrades a stale/invalid token to the
+    // anonymous body, but a shared cache keyed by URL must not store that
+    // response as the canonical anonymous one.
+    expect(cacheControlFor('PUBLIC', true, 30)).toBe('private, no-store')
+    expect(cacheControlFor('PUBLIC', true, 300)).toBe('private, no-store')
   })
 })
