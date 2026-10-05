@@ -30,8 +30,9 @@ These steps need the owner's Google account; they cannot be scripted.
    `firebase login`; the page is a pilot notice, not the Stage 9 policy).
    Keep publishing status **In production** (External): going back to Testing
    would expire the refresh token every 7 days.
-3. Complete one consent flow for the UA sender mailbox with the
-   `https://www.googleapis.com/auth/gmail.send` scope and capture the
+3. Complete one consent flow for the UA sender mailbox with the standard
+   `openid email` identity scopes plus the send-only
+   `https://www.googleapis.com/auth/gmail.send` Gmail scope, and capture the
    **refresh token**. Use the committed helper — it opens the consent page,
    verifies the mailbox matches the sender, and pipes every secret straight
    into `wrangler secret put` without printing or storing values:

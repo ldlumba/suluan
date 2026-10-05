@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send'
+const OAUTH_SCOPES = ['openid', 'email', GMAIL_SEND_SCOPE]
 const STAGING_CONFIG = 'wrangler.staging.toml'
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
@@ -183,9 +184,9 @@ async function exchangeCode({ clientId, clientSecret, code, redirectUri }) {
 }
 
 async function confirmSenderMailbox(accessToken, sender) {
-  // tokeninfo needs no Gmail scope: it reports which account (and scopes)
-  // the access token was issued for. users.getProfile would require a read
-  // scope we deliberately do not request.
+  // tokeninfo reports the identity because the authorization request includes
+  // the standard `openid email` scopes. This avoids Gmail's users.getProfile,
+  // which would require a Gmail read scope we deliberately do not request.
   const res = await fetchWithRetry(
     'mailbox verification',
     () =>
@@ -228,7 +229,7 @@ const authUrl =
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: GMAIL_SEND_SCOPE,
+    scope: OAUTH_SCOPES.join(' '),
     access_type: 'offline',
     prompt: 'consent',
     state,
