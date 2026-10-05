@@ -239,6 +239,11 @@ After this exit, Stage 7 reliability/security hardening runs before the full
 - Worker `836cc94e` raised the ceiling to 15 MiB with the review-queue fallback
   line; a generated 15.9 MB DOCX produced exactly that metadata-only mail and
   was then rejected with no derivatives.
+- Post-verification cleanup (2026-10-05): the seven labeled email/keyword
+  smoke submissions (3 accepted records included) and their 14 audit,
+  notification, and outbox rows each were deleted; remaining counts verified
+  zero and all 7 private R2 objects removed. Shared `keywords` concept rows
+  persist by append-only design. Stage 6 fixtures untouched.
 
 - Worker `6aac2080-f02e-4919-9f98-3962b7238dbb` enriched REO mail with authors
   and canonical school/course/file metadata and attached a generated 872-byte
