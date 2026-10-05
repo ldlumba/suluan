@@ -19,13 +19,27 @@ for that mailbox and updating secrets — no code change.
 
 These steps need the owner's Google account; they cannot be scripted.
 
-1. In GCP project `suluan-staging`, enable the Gmail API.
+1. In GCP project `suluan-staging`, enable the Gmail API (already done).
 2. Create an OAuth client (APIs & Services → Credentials → Create Credentials
    → OAuth client ID → **Desktop app**). Note the client ID and secret.
+   Branding: app name `SULUAN notifications (staging)`, support email the
+   sender UA address, home page `https://suluan-staging.firebaseapp.com`,
+   privacy link `https://suluan-staging.firebaseapp.com/privacy.html`
+   (deployed from `hosting/public/privacy.html` via
+   `firebase deploy --only hosting --project suluan-staging` after
+   `firebase login`; the page is a pilot notice, not the Stage 9 policy).
+   Keep publishing status **In production** (External): going back to Testing
+   would expire the refresh token every 7 days.
 3. Complete one consent flow for the UA sender mailbox with the
    `https://www.googleapis.com/auth/gmail.send` scope and capture the
-   **refresh token**. Any standard OAuth helper works; the token must be
-   offline/long-lived.
+   **refresh token**. Use the committed helper — it opens the consent page,
+   verifies the mailbox matches the sender, and pipes every secret straight
+   into `wrangler secret put` without printing or storing values:
+   `npm run authorize:gmail -w @suluan/worker`. It prompts for the OAuth
+   client ID/secret (hidden input), the sender address, and the REO
+   recipient, then stores `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`,
+   `GMAIL_REFRESH_TOKEN`, `GMAIL_SENDER`, and `REO_MAILBOX`. Re-run it to
+   rotate or to swap the sender mailbox later.
 4. Set the four Worker secrets (values never enter Git, chat, or logs):
    `wrangler secret put GMAIL_CLIENT_ID -c apps/worker/wrangler.staging.toml`
    (repeat for `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_SENDER`).
