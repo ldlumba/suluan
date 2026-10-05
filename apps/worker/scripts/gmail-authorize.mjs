@@ -13,7 +13,6 @@
  */
 import { execFile, spawn } from 'node:child_process'
 import { createServer } from 'node:http'
-import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -24,18 +23,24 @@ const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 const workerDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const repoRoot = path.dirname(path.dirname(workerDir))
 
-const rl = createInterface({ input: process.stdin, output: process.stdout })
-
+/**
+ * Single stdin reader for every prompt. An earlier version mixed Node's
+ * readline (visible prompts) with a manual raw-mode handler (hidden
+ * prompts); pausing stdin after a hidden prompt left readline's stream in a
+ * broken state, so the next visible prompt never resolved. One handler owns
+ * stdin now; visible input echoes, hidden input does not.
+ */
 async function prompt(label, { secret = false, def = '' } = {}) {
-  const suffix = def ? ` [${def}]` : ''
-  if (!secret) {
-    const answer = (await rl.question(`${label}${suffix}: `)).trim()
-    return answer || def
+  const stdin = process.stdin
+  if (!stdin.isTTY) {
+    throw new Error(
+      'interactive terminal required; run this script directly, not piped or redirected',
+    )
   }
-  process.stdout.write(`${label}: `)
+  const suffix = def ? ` [${def}]` : ''
+  process.stdout.write(`${label}${suffix}: `)
   return new Promise((resolve) => {
-    const stdin = process.stdin
-    const wasRaw = stdin.isRaw
+    const wasRaw = stdin.isRaw ?? false
     let value = ''
     const onData = (chunk) => {
       const s = chunk.toString('utf8')
@@ -45,7 +50,7 @@ async function prompt(label, { secret = false, def = '' } = {}) {
           stdin.setRawMode(wasRaw)
           stdin.pause()
           process.stdout.write('\n')
-          resolve(value.trim())
+          resolve(value.trim() || def)
           return
         }
         if (ch === '\u0003') {
@@ -53,10 +58,14 @@ async function prompt(label, { secret = false, def = '' } = {}) {
           process.exit(130)
         }
         if (ch === '\b' || ch === '\x7f') {
-          value = value.slice(0, -1)
+          if (value.length > 0) {
+            value = value.slice(0, -1)
+            if (!secret) process.stdout.write('\b \b')
+          }
           continue
         }
         value += ch
+        if (!secret) process.stdout.write(ch)
       }
     }
     stdin.setRawMode(true)
@@ -171,7 +180,6 @@ const sender = await prompt('Sender UA mailbox', { def: 'ld_lumba.student@ua.edu
 if (!sender || !sender.includes('@')) fail('a valid sender address is required')
 const reoMailbox = await prompt('REO recipient mailbox', { def: sender })
 if (!reoMailbox || !reoMailbox.includes('@')) fail('a valid recipient address is required')
-rl.close()
 
 const server = createServer()
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
