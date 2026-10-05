@@ -15,6 +15,10 @@ const neighborhoodSchema = z.object({
   id: z.string().uuid(),
   depth: z.coerce.number().int().min(1).max(2).default(2),
 })
+const countsSchema = z.object({
+  groupBy: z.enum(['keyword', 'course', 'year']).default('keyword'),
+})
+const AGGREGATE_LIMIT = 20
 
 type GraphNodeType =
   'paper' | 'author' | 'keyword' | 'course' | 'school' | 'year'
@@ -291,6 +295,162 @@ export function graphRoutes(optionalAuth: MiddlewareHandler<AppContext>) {
       if (!rows.some((row) => row.id === id))
         return c.json({ error: 'not_found' }, 404)
       return c.json({ centerId: id, depth, ...buildNeighborhood(rows, id) })
+    },
+  )
+
+  app.get(
+    '/counts',
+    optionalAuth,
+    zValidator('query', countsSchema),
+    async (c) => {
+      const { groupBy } = c.req.valid('query')
+      const viewer = viewerRoleFor(c.get('profile')?.role ?? null)
+      const attempted =
+        c.req.header('authorization')?.startsWith('Bearer ') ?? false
+      c.header('Cache-Control', cacheControlFor(viewer, attempted, 30))
+      c.header('Vary', 'Authorization')
+      const db = createDb(c.env.DATABASE_URL)
+
+      // Each aggregate starts from the same accepted + effective-visibility
+      // relation. Counts never inspect intake-only, pending, rejected, or
+      // viewer-hidden records, including the keyword-pair arithmetic.
+      if (groupBy === 'keyword') {
+        const result = await db.execute(sql`
+          with visible as (
+            select r.id
+            from research_records r
+            join submissions s on s.id = r.submission_id
+              and s.status = 'ACCEPTED'
+            where ${effectiveVisibility(viewer, 'r').rowVisible}
+          ), grouped as (
+            select k.id::text as id, k.display_name as label,
+              count(distinct v.id)::integer as count
+            from visible v
+            join research_keywords rk on rk.record_id = v.id
+            join keywords k on k.id = rk.keyword_id
+            group by k.id, k.display_name
+          ), paired as (
+            select k1.id::text as "firstId", k1.display_name as "firstLabel",
+              k2.id::text as "secondId", k2.display_name as "secondLabel",
+              count(distinct v.id)::integer as count
+            from visible v
+            join research_keywords rk1 on rk1.record_id = v.id
+            join research_keywords rk2 on rk2.record_id = v.id
+              and rk1.keyword_id < rk2.keyword_id
+            join keywords k1 on k1.id = rk1.keyword_id
+            join keywords k2 on k2.id = rk2.keyword_id
+            group by k1.id, k1.display_name, k2.id, k2.display_name
+          )
+          select
+            (select count(*)::integer from visible) as "totalPapers",
+            (select count(*)::integer from grouped) as "totalGroups",
+            (select count(*)::integer from paired) as "totalPairs",
+            coalesce((select jsonb_agg(to_jsonb(top_groups)) from (
+              select id, label, count from grouped
+              order by count desc, lower(label), id
+              limit ${AGGREGATE_LIMIT}
+            ) top_groups), '[]'::jsonb) as items,
+            coalesce((select jsonb_agg(to_jsonb(top_pairs)) from (
+              select "firstId", "firstLabel", "secondId", "secondLabel", count
+              from paired
+              order by count desc, lower("firstLabel"), lower("secondLabel"),
+                "firstId", "secondId"
+              limit ${AGGREGATE_LIMIT}
+            ) top_pairs), '[]'::jsonb) as pairs
+        `)
+        const row = result.rows[0] as {
+          totalPapers: number
+          totalGroups: number
+          totalPairs: number
+          items: unknown[]
+          pairs: unknown[]
+        }
+        return c.json({
+          groupBy,
+          totalPapers: row.totalPapers,
+          items: row.items,
+          pairs: row.pairs,
+          hasMore: row.totalGroups > AGGREGATE_LIMIT,
+          pairsHaveMore: row.totalPairs > AGGREGATE_LIMIT,
+          limit: AGGREGATE_LIMIT,
+        })
+      }
+
+      if (groupBy === 'course') {
+        const result = await db.execute(sql`
+          with visible as (
+            select r.id, s.course_id, course.name as course_name
+            from research_records r
+            join submissions s on s.id = r.submission_id
+              and s.status = 'ACCEPTED'
+            left join courses course on course.id = s.course_id
+            where ${effectiveVisibility(viewer, 'r').rowVisible}
+          ), grouped as (
+            select course_id::text as id, course_name as label,
+              count(*)::integer as count
+            from visible
+            where course_id is not null and course_name is not null
+            group by course_id, course_name
+          )
+          select
+            (select count(*)::integer from visible) as "totalPapers",
+            (select count(*)::integer from grouped) as "totalGroups",
+            coalesce((select jsonb_agg(to_jsonb(top_groups)) from (
+              select id, label, count from grouped
+              order by count desc, lower(label), id
+              limit ${AGGREGATE_LIMIT}
+            ) top_groups), '[]'::jsonb) as items
+        `)
+        const row = result.rows[0] as {
+          totalPapers: number
+          totalGroups: number
+          items: unknown[]
+        }
+        return c.json({
+          groupBy,
+          totalPapers: row.totalPapers,
+          items: row.items,
+          pairs: [],
+          hasMore: row.totalGroups > AGGREGATE_LIMIT,
+          pairsHaveMore: false,
+          limit: AGGREGATE_LIMIT,
+        })
+      }
+
+      const result = await db.execute(sql`
+        with visible as (
+          select r.id, r.year
+          from research_records r
+          join submissions s on s.id = r.submission_id
+            and s.status = 'ACCEPTED'
+          where ${effectiveVisibility(viewer, 'r').rowVisible}
+        ), grouped as (
+          select year::text as id, year::text as label,
+            count(*)::integer as count
+          from visible group by year
+        )
+        select
+          (select count(*)::integer from visible) as "totalPapers",
+          (select count(*)::integer from grouped) as "totalGroups",
+          coalesce((select jsonb_agg(to_jsonb(top_groups)) from (
+            select id, label, count from grouped
+            order by id desc limit ${AGGREGATE_LIMIT}
+          ) top_groups), '[]'::jsonb) as items
+      `)
+      const row = result.rows[0] as {
+        totalPapers: number
+        totalGroups: number
+        items: unknown[]
+      }
+      return c.json({
+        groupBy,
+        totalPapers: row.totalPapers,
+        items: row.items,
+        pairs: [],
+        hasMore: row.totalGroups > AGGREGATE_LIMIT,
+        pairsHaveMore: false,
+        limit: AGGREGATE_LIMIT,
+      })
     },
   )
 

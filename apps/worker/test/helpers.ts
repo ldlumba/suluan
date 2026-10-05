@@ -260,6 +260,10 @@ export async function deleteSubmissions(db: Db, ids: string[]) {
   await db
     .delete(submissionFiles)
     .where(inArray(submissionFiles.submissionId, ids))
+  // Full-suite files run concurrently. A queue-consumer test can complete an
+  // already-enqueued notification after the first delete above; close that
+  // test-only race immediately before removing the parent submissions.
+  await db.delete(notifications).where(inArray(notifications.submissionId, ids))
   await db.delete(submissions).where(inArray(submissions.id, ids))
 }
 

@@ -14,6 +14,11 @@ const graphPage = lazy(() =>
     default: module.GraphPage,
   })),
 )
+const graphAnalyticsPage = lazy(() =>
+  import('@/features/graph/GraphAnalyticsPage').then((module) => ({
+    default: module.GraphAnalyticsPage,
+  })),
+)
 
 /**
  * Route configuration, kept separate from the browser router instance so
@@ -32,6 +37,14 @@ export const routes = [
         element: (
           <Suspense fallback={<p role="status">Loading graph…</p>}>
             {createElement(graphPage)}
+          </Suspense>
+        ),
+      },
+      {
+        path: '/graph/analytics',
+        element: (
+          <Suspense fallback={<p role="status">Loading analytics…</p>}>
+            {createElement(graphAnalyticsPage)}
           </Suspense>
         ),
       },

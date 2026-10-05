@@ -316,4 +316,22 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   respective public/private cache policy, preventing an anonymous browser
   cache entry from masking a newly authenticated graph view.
 - No graph rows, snapshots, inferred aliases, citation edges, embeddings, or
-  other derivatives were written. REO aggregate counts remain later work.
+  other derivatives were written. The aggregate slice below was added later
+  the same day and preserves the same read-only rule.
+
+### Knowledge Graph aggregates — 2026-10-05
+
+- Worker `e79c8db9-224f-421a-9aa5-d1105af54eb4` added bounded
+  `/api/graph/counts?groupBy=keyword|course|year` reads. The local staging
+  `/graph/analytics` view rendered 15 course bars and search links without a
+  browser error.
+- Live per-viewer evidence: the manager saw 42 accepted records while an
+  anonymous request saw 35 from the same endpoint. Both returned the same 15
+  represented courses; hidden records changed only authorized totals.
+- The current staging accepted corpus has zero `research_keywords` links, so
+  the author-keyword view correctly displayed its empty state and no pair was
+  invented. Keyword and pair visibility arithmetic is pinned by the Neon-backed
+  integration fixture (two public papers versus three manager-visible papers
+  when the third is RESTRICTED).
+- Results are computed live with a top-20 cap. No aggregate, pair, graph, or
+  analytics rows were persisted.

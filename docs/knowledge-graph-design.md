@@ -9,8 +9,10 @@ the locked stack and is not proposed.
 
 Implementation status (2026-10-05): the discovery slice is implemented as a
 paper-centered, depth-1/2 neighborhood at `GET /api/graph/neighborhood` and the
-public `/graph` React Flow view. Search results link into the graph. The REO
-aggregate/counts slice remains later work.
+public `/graph` React Flow view. Search results link into the graph. The
+aggregate slice is implemented at `GET /api/graph/counts` and
+`/graph/analytics`, with bounded keyword/course/year counts plus top keyword
+pairs computed per viewer.
 
 ## 1. What the graph is and is not
 
@@ -83,9 +85,10 @@ No write paths. No mutation, no curation UI, no feedback loop in v1.
   topically similar. Serves every role, including REO reviewers checking
   related work during review. Bounded queries are the simplest to gate
   correctly.
-- **REO aggregates view (build second):** concentration charts + top
-  co-occurring keyword pairs, per the counts endpoint. Reuses the same API;
-  its only new work is presentation.
+- **REO aggregates view (implemented):** concentration charts + top
+  co-occurring keyword pairs, per the counts endpoint. The manager navigation
+  exposes this operational view; the read endpoint still applies per-viewer
+  policy for every caller so direct public/UA reads cannot leak hidden totals.
 
 Both render with React Flow. No custom canvas code.
 
@@ -148,3 +151,9 @@ literal under the documented trim/lowercase/whitespace normalization; v1 links
 graph → search rather than adding search-side graph filters; and no graph
 snapshot/export is created. These choices add no inferred identity, retained
 derivative, or write path.
+
+Aggregate implementation notes (2026-10-05): each response includes the top 20
+groups only and labels any omitted tail. Keyword pairs count distinct visible
+papers carrying both human-provided terms; they do not claim semantic
+similarity. `totalPapers` includes all visible accepted papers, including those
+without the selected metadata, so the UI does not imply complete tagging.

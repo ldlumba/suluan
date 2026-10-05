@@ -143,6 +143,7 @@ needsDb('viewer-safe graph route', () => {
     form.append('courseId', courseId)
     form.append('idempotencyKey', crypto.randomUUID())
     form.append('keywords[]', `Shared Topic ${tag}`)
+    form.append('keywords[]', `Second Topic ${tag}`)
     const submitted = await auth.app.request(
       '/api/submissions',
       {
@@ -223,5 +224,38 @@ needsDb('viewer-safe graph route', () => {
       null,
     )
     expect(hiddenCenter.status).toBe(404)
+
+    const anonymousCounts = await auth.authed(
+      '/api/graph/counts?groupBy=keyword',
+      null,
+    )
+    const managerCounts = await auth.authed(
+      '/api/graph/counts?groupBy=keyword',
+      managerToken,
+    )
+    expect(anonymousCounts.headers.get('cache-control')).toBe(
+      'public, max-age=30',
+    )
+    expect(managerCounts.headers.get('cache-control')).toBe('private, no-store')
+    const anonymousAggregate = (await anonymousCounts.json()) as {
+      items: { label: string; count: number }[]
+      pairs: { firstLabel: string; secondLabel: string; count: number }[]
+    }
+    const managerAggregate =
+      (await managerCounts.json()) as typeof anonymousAggregate
+    expect(
+      anonymousAggregate.items.find((item) =>
+        item.label.startsWith('Shared Topic'),
+      )?.count,
+    ).toBe(2)
+    expect(
+      managerAggregate.items.find((item) =>
+        item.label.startsWith('Shared Topic'),
+      )?.count,
+    ).toBe(3)
+    const isFixturePair = (pair: { firstLabel: string; secondLabel: string }) =>
+      pair.firstLabel.includes(tag) && pair.secondLabel.includes(tag)
+    expect(anonymousAggregate.pairs.find(isFixturePair)?.count).toBe(2)
+    expect(managerAggregate.pairs.find(isFixturePair)?.count).toBe(3)
   }, 60_000)
 })

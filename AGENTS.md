@@ -141,8 +141,10 @@ work from an earlier one.
   depth-capped at 2, and starts every hop from the shared effective-visibility
   predicate; unauthorized centers return 404 and cannot leak through related
   nodes or counts. Author aliases, exports/snapshots, citation edges, semantic
-  fusion, and the REO aggregate/counts view remain out of this slice. See
-  `docs/knowledge-graph-design.md`.
+  fusion remain out of scope. The second v1 slice is also implemented:
+  `/api/graph/counts` and `/graph/analytics` provide capped per-viewer
+  keyword/course/year concentrations and keyword-pair co-occurrences, with no
+  stored aggregates or graph writes. See `docs/knowledge-graph-design.md`.
 - **Stage 9 — Production/institutional readiness.** Resolve institutional cloud
   and billing ownership, two trusted admins, production first-admin process,
   identity/domain policy, real catalogs, retention/withdrawal/replacement/

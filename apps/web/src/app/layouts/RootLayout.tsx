@@ -47,12 +47,20 @@ export function RootLayout() {
               </Link>
             )}
             {profile && profile.role !== 'USER' && (
-              <Link
-                to="/review"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Review
-              </Link>
+              <>
+                <Link
+                  to="/graph/analytics"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Analytics
+                </Link>
+                <Link
+                  to="/review"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Review
+                </Link>
+              </>
             )}
             {loading ? null : user ? (
               <>
