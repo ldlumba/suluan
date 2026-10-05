@@ -30,13 +30,23 @@ function selectEmailAdapter(env: Env): EmailAdapter {
 /**
  * Queue consumer: claims one outbox row per message and dispatches it.
  * The claim is atomic, so redeliveries are safe. Failures retry with
- * backoff (max_retries in wrangler.toml); poison messages exhaust retries
- * and need operator attention — no silent drops.
+ * backoff (max_retries in wrangler.toml); messages that exhaust retries
+ * move to the `-dlq` queue instead of vanishing, and the DLQ branch below
+ * pokes REO about them.
  */
 async function handleQueue(
-  batch: { messages: QueueMessageLike<OutboxMessage>[] },
+  batch: { queue?: string; messages: QueueMessageLike<OutboxMessage>[] },
   env: Env,
 ) {
+  if (typeof batch.queue === 'string' && batch.queue.endsWith('-dlq')) {
+    await handleDeadLetters(
+      batch.messages,
+      selectEmailAdapter(env),
+      env.REO_MAILBOX,
+    )
+    return
+  }
+  if (batch.messages.length === 0) return
   const db = createDb(env.DATABASE_URL)
   const email = selectEmailAdapter(env)
   for (const msg of batch.messages) {
@@ -55,6 +65,41 @@ async function handleQueue(
       console.error('queue message failed', msg.body, err)
       msg.retry()
     }
+  }
+}
+
+/**
+ * Dead-letter alerts (Stage 7): each message here already failed delivery
+ * max_retries times and left FAILED rows behind — those rows are the source
+ * of truth, this email is just the poke. Best-effort by design: every
+ * message is acknowledged even when the alert itself fails, so the DLQ can
+ * never loop. Without the unconditional ack a broken alert path would
+ * redeliver forever. Exported for unit tests; the queue entrypoint owns it.
+ */
+export async function handleDeadLetters(
+  messages: QueueMessageLike<OutboxMessage>[],
+  email: EmailAdapter,
+  reoMailbox: string | undefined,
+) {
+  if (messages.length === 0) return
+  const ids = messages.map((msg) => {
+    msg.ack()
+    return msg.body.outboxId
+  })
+  console.error(`dead-letter notifications need operator attention`, ids)
+  if (!reoMailbox) return
+  try {
+    await email.send({
+      to: reoMailbox,
+      subject: 'SULUAN notification needs operator attention',
+      body: [
+        `The following notification(s) exhausted all delivery retries.`,
+        `Their FAILED rows are recorded; resend manually after fixing the cause.`,
+        ...ids.map((id) => `Outbox: ${id}`),
+      ].join('\n'),
+    })
+  } catch (err) {
+    console.error('dead-letter alert failed', err)
   }
 }
 

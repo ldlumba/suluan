@@ -24,7 +24,17 @@ bucket_name = "suluan-dev"
 binding = "NOTIFICATIONS"
 queue = "suluan-notifications-dev"
 
+# Dead-letter queue (Stage 7): messages that exhaust max_retries move here
+# instead of vanishing. Queues are created with `wrangler queues create`
+# (not declared here). The worker consumes the DLQ with an alert-only
+# handler that always acknowledges — see handleDeadLetters in src/index.ts.
 [[queues.consumers]]
 queue = "suluan-notifications-dev"
+max_batch_size = 5
+max_retries = 3
+dead_letter_queue = "suluan-notifications-dev-dlq"
+
+[[queues.consumers]]
+queue = "suluan-notifications-dev-dlq"
 max_batch_size = 5
 max_retries = 3

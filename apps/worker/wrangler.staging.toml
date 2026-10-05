@@ -3,8 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
 # Owner-approved 2026-10-05: 5-minute scheduled recovery sweep in staging.
-# Overlap is safe by atomic claim+lease; retry/dead-letter, alerting, and
-# recovery policy remain Stage 7 TBDs.
+# Overlap is safe by atomic claim+lease. Stage 7 policy (owner-approved
+# 2026-10-05): consumer max_retries 3, then the staging DLQ; the DLQ handler
+# alerts REO_MAILBOX and always acknowledges. Cloud Run scheduling stays
+# undeployed.
 [triggers]
 crons = ["*/5 * * * *"]
 
@@ -26,7 +28,17 @@ bucket_name = "suluan-staging"
 binding = "NOTIFICATIONS"
 queue = "suluan-notifications-staging"
 
+# Dead-letter queue (Stage 7): messages that exhaust max_retries move here
+# instead of vanishing. Queues are created with `wrangler queues create`
+# (not declared here). The worker consumes the DLQ with an alert-only
+# handler that always acknowledges — see handleDeadLetters in src/index.ts.
 [[queues.consumers]]
 queue = "suluan-notifications-staging"
+max_batch_size = 5
+max_retries = 3
+dead_letter_queue = "suluan-notifications-staging-dlq"
+
+[[queues.consumers]]
+queue = "suluan-notifications-staging-dlq"
 max_batch_size = 5
 max_retries = 3

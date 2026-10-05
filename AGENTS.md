@@ -107,17 +107,21 @@ work from an earlier one.
   production sender stay deferred. A single staging
   administrator is provisioned; owner decision 2026-10-04 is to proceed with no
   second staging account. Two trusted admins remain a Stage 9 item. See `docs/staging-environment.md`.
-- **Stage 7 — Reliability/security hardening: NEXT.** Verify pending/rejected
-  non-leakage; PUBLIC/UA_ONLY/RESTRICTED/embargo enforcement; denied restricted
-  downloads; idempotent submissions, decisions, results, and indexes; lease
-  reclaim/stale-token rejection; safe malformed/encrypted/oversize/image-only
-  failures; interruption recovery; notification isolation; and audit context.
-  Clarify that `ADMIN` and `REPOSITORY_MANAGER` are currently
-  enforcement-identical (`MANAGERS` in `apps/worker/src/app.ts`), so the role
-  hierarchy is documentation-only until an ADMIN-only operation exists.
-  Define Scheduler frequency, overlap, retries/dead-letter, alerting, recovery,
-  and log-retention/redaction before any automation. **Exit:** all critical
-  authorization, leakage, idempotency, and recovery checks pass.
+- **Stage 7 — Reliability/security hardening: DONE (2026-10-05).** Pending/
+  rejected non-leakage (including keyword filter/display), PUBLIC/UA_ONLY/
+  RESTRICTED + embargo enforcement, denied restricted downloads, idempotent
+  submissions/decisions/indexes/keyword bridging, outbox + processing lease
+  reclaim with stale-claim rejection, safe malformed/encrypted/oversize/
+  image-only handling, interruption recovery via queue backoff + 5-minute
+  sweep, notification isolation (failed email never reverses decisions), audit
+  context, and stale-token rejection all verified by tests or live evidence.
+  `ADMIN`/`REPOSITORY_MANAGER` documented as enforcement-identical
+  (`MANAGERS`). Owner-approved policy: consumer `max_retries` 3, then the
+  staging DLQ with a REO-mailed always-ack alert; logs carry IDs and routing
+  addresses only, never titles/remarks/bodies, on Cloudflare default
+  retention; Cloud Run scheduling stays undeployed. Gmail revocation drill
+  deferred to the Stage 9 sender rotation (unit behavior pinned by tests).
+  See `docs/staging-environment.md`.
 - **Stage 8 — Larger corpus pilot.** Process the approved corpus in bounded
   staging batches; measure duration, failures, recovery, indexing/search,
   visibility, and cost. Evaluate semantic retrieval with an independent/blinded

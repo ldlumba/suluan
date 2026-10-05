@@ -65,9 +65,13 @@ These steps need the owner's Google account; they cannot be scripted.
    `gmail` plus a Gmail message ID.
 2. Accept it with remarks → submitter receives the decision mail with the
    remarks included.
-3. Revocation drill: revoke the grant at Google Account → Third-party access,
+3. Revocation drill (deferred to the Stage 9 sender rotation, owner-approved
+   2026-10-05): revoke the grant at Google Account → Third-party access,
    trigger a send, and confirm the `notifications` row reads `FAILED` with a
    re-authorize error while the submission/decision itself is unaffected.
+   The `invalid_grant` path is pinned by unit tests; the live drill waits for
+   rotation, when re-authorization happens anyway. Do not revoke the working
+   grant merely to repeat successful-delivery verification.
 
 Live verification completed 2026-10-05 for the first two checks using generated
 fixture submission `b584a45a-c852-40bb-825d-7f60cf70a804`: the pilot mailbox

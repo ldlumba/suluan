@@ -28,8 +28,11 @@ export function logEmailAdapter(): EmailAdapter {
   return {
     name: 'log',
     supportsAttachments: false,
-    async send({ to, subject }) {
-      console.log(`[email:log] to=${to} subject=${subject}`)
+    // Stage 7 log policy: routing address only — never the subject (paper
+    // titles), remarks, or bodies. IDs and outcomes are logged at the
+    // call sites, which carry no content.
+    async send({ to }) {
+      console.log(`[email:log] to=${to}`)
       return { providerMessageId: `log-${crypto.randomUUID()}` }
     },
   }

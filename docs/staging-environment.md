@@ -259,3 +259,20 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   Stage 9 production/institutional readiness. Do not invent an identity, reuse
   a personal non-UA account, or treat the non-production promotion script as a
   production provisioning path.
+
+### Stage 7 hardening and policy — 2026-10-05
+
+- Keyword surfaces verified against the leakage rule: the exact-match filter
+  and keyword display return nothing for pending/rejected records and nothing
+  restricted-invisible to anonymous or non-manager viewers; managers see
+  terms. Idempotent resubmission creates exactly one term set.
+- Scheduler/queue policy (owner-approved): consumer `max_retries` 3, then
+  `suluan-notifications-staging-dlq`; the DLQ handler emails `REO_MAILBOX` and
+  always acknowledges so it can never loop. Worker `dd93d8ef` serves both
+  consumers. The 5-minute outbox sweep stands; Cloud Run scheduling stays
+  undeployed.
+- Log policy (owner-approved): IDs and routing addresses only — never paper
+  titles, remarks, or bodies — on Cloudflare default retention. The log
+  adapter no longer prints subjects.
+- The live Gmail revocation drill is deferred to the Stage 9 sender rotation;
+  `invalid_grant` handling is pinned by unit tests.
