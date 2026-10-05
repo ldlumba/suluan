@@ -36,7 +36,14 @@ export const submissionFormSchema = z.object({
   // Empty string = "no selection"; mapped to undefined before sending.
   schoolId: z.string().optional(),
   courseId: z.string().optional(),
+  // Author keywords v1: free text, up to 5. The chip input trims and
+  // dedupes client-side; the Worker re-validates authoritatively.
+  keywords: z
+    .array(z.string().trim().min(1).max(100))
+    .max(5, 'Use at most 5 keywords.')
+    .default([]),
   file: fileSchema,
 })
 
-export type SubmissionFormValues = z.infer<typeof submissionFormSchema>
+export type SubmissionFormValues = z.output<typeof submissionFormSchema>
+export type SubmissionFormInput = z.input<typeof submissionFormSchema>

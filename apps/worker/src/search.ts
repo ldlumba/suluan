@@ -20,6 +20,7 @@ import {
   isSemanticEnabled,
   toVectorLiteral,
 } from './embeddings'
+import { normalizeKeyword } from './keywords'
 import { consumeQuota, consumeQueryQuota, DEV_LIMITS } from './quota'
 
 const querySchema = z.object({
@@ -30,6 +31,8 @@ const keywordQuerySchema = querySchema.extend({
   sort: z
     .enum(['relevance', 'title', 'newest', 'oldest', 'course'])
     .default('relevance'),
+  /** Exact author-keyword filter (case-insensitive); ranking-neutral. */
+  keyword: z.string().trim().max(100).default(''),
 })
 const indexSchema = z.object({ recordId: z.string().uuid().optional() })
 const PAGE_SIZE = 10
@@ -65,10 +68,13 @@ export function searchRoutes(
     optionalAuth,
     zValidator('query', keywordQuerySchema),
     async (c) => {
-      const { q, page, sort } = c.req.valid('query')
+      const { q, page, sort, keyword } = c.req.valid('query')
       const db = createDb(c.env.DATABASE_URL)
       const profile = c.get('profile')
       const viewer = viewerRoleFor(profile?.role ?? null)
+      // Normalized through the single shared implementation, so the filter
+      // can never disagree with what intake stored.
+      const keywordFilter = keyword ? normalizeKeyword(keyword) : ''
       const rows = await db.execute(sql`
         with query as (select websearch_to_tsquery('simple', ${q}) as terms),
         eligible as (
@@ -76,6 +82,7 @@ export function searchRoutes(
             coalesce(authors.names, s.authors) as authors,
             school.name as school_name, course.name as course_name,
             r.year, r.created_at, i.id as index_id,
+            coalesce(kw.names, '{}'::text[]) as keywords,
             case when i.id is not null then 'READY'
               when j.status = 'FAILED' then 'FAILED' else 'PENDING' end as full_text_status,
             ${visibilityCase()} as visibility,
@@ -90,15 +97,27 @@ export function searchRoutes(
             select string_agg(a.name, ', ' order by a.position, a.id) as names
             from record_authors a where a.record_id = r.id
           ) authors on true
+          left join lateral (
+            select array_agg(k.display_name order by rk.position, k.id) as names
+            from research_keywords rk
+            join keywords k on k.id = rk.keyword_id
+            where rk.record_id = r.id
+          ) kw on true
           left join processing_jobs j on j.record_id = r.id
           left join keyword_indexes i on i.record_id = r.id
             and i.extraction_claim_token = j.claim_token
             and i.chunker_version = ${CHUNKER_VERSION} and j.status = 'EXTRACTED'
           where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
+            and (${keywordFilter} = '' or exists (
+              select 1 from research_keywords rk
+              join keywords k on k.id = rk.keyword_id
+              where rk.record_id = r.id
+                and k.normalized_name = ${keywordFilter}
+            ))
         )
         select e.id, e.title, e.submission_id as "submissionId", e.authors,
           e.school_name as "schoolName", e.course_name as "courseName",
-          e.year::text as year,
+          e.year::text as year, e.keywords,
           e.visibility, e.full_text_status as "fullTextStatus",
           case
             when ${q} = '' or best.content is null then null

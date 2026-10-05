@@ -1,6 +1,11 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { outboxEvents, submissionFiles, submissions } from '@suluan/db/schema'
+import {
+  outboxEvents,
+  submissionFiles,
+  submissionKeywords,
+  submissions,
+} from '@suluan/db/schema'
 import {
   deleteAuditEvents,
   deleteProfiles,
@@ -195,6 +200,81 @@ needsDb('submission intake', () => {
     })
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ error: 'unknown_school' })
+    expect(t.r2objects.size).toBe(objectsBefore)
+  })
+
+  it('stores keyword terms verbatim with normalized keys and positions', async () => {
+    const token = await userToken('uid-keywords', 'keywords@ua.edu.ph')
+    const form = new FormData()
+    form.append('file', pdfFile('paper.pdf', 64))
+    form.append('idempotencyKey', crypto.randomUUID())
+    form.append('title', 'Keyword intake')
+    form.append('keywords[]', 'Machine Learning')
+    form.append('keywords[]', 'machine  learning')
+    form.append('keywords[]', '  Vision  ')
+    const res = await t.app.request(
+      '/api/submissions',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: form,
+      },
+      t.testEnv(),
+    )
+    expect(res.status).toBe(201)
+    const created = (await res.json()) as { id: string }
+    submissionIds.push(created.id)
+    const rows = await testDb()
+      .select()
+      .from(submissionKeywords)
+      .where(eq(submissionKeywords.submissionId, created.id))
+    // Case/whitespace duplicates collapse, keeping the first occurrence.
+    expect(
+      rows
+        .sort((a, b) => a.position - b.position)
+        .map((r) => [r.term, r.normalizedName, r.position]),
+    ).toEqual([
+      ['Machine Learning', 'machine learning', 0],
+      ['Vision', 'vision', 1],
+    ])
+  })
+
+  it('stores no keyword rows when none are sent', async () => {
+    const token = await userToken('uid-nokeywords', 'nokeywords@ua.edu.ph')
+    const res = await submit(token, pdfFile('paper.pdf', 64), {
+      title: 'No keywords',
+    })
+    expect(res.status).toBe(201)
+    const created = (await res.json()) as { id: string }
+    submissionIds.push(created.id)
+    const rows = await testDb()
+      .select()
+      .from(submissionKeywords)
+      .where(eq(submissionKeywords.submissionId, created.id))
+    expect(rows).toHaveLength(0)
+  })
+
+  it('rejects more than five keywords without storing the file', async () => {
+    const token = await userToken('uid-manykw', 'manykw@ua.edu.ph')
+    const form = new FormData()
+    form.append('file', pdfFile('paper.pdf', 64))
+    form.append('idempotencyKey', crypto.randomUUID())
+    form.append('title', 'Too many keywords')
+    for (const term of ['a', 'b', 'c', 'd', 'e', 'f']) {
+      form.append('keywords[]', term)
+    }
+    const objectsBefore = t.r2objects.size
+    const res = await t.app.request(
+      '/api/submissions',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: form,
+      },
+      t.testEnv(),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid_keywords' })
     expect(t.r2objects.size).toBe(objectsBefore)
   })
 })

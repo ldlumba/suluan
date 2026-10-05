@@ -37,6 +37,7 @@ const decided = {
   title: 'ILAW - Test Paper',
   authors: 'Author',
   year: '2026',
+  keywords: ['Machine Learning'],
   status: 'ACCEPTED' as const,
   createdAt: '2026-10-01T00:00:00.000Z',
   updatedAt: '2026-10-01T00:00:00.000Z',
@@ -66,6 +67,9 @@ describe('MySubmissionsPage', () => {
     expect(screen.getByText(/Solid methodology/)).toBeInTheDocument()
     expect(
       screen.getByText(/access restrictions until 2027-01-01/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Keywords: Machine Learning'),
     ).toBeInTheDocument()
   })
 

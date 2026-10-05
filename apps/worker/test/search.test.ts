@@ -80,6 +80,7 @@ needsDb('restricted keyword discovery', () => {
     extracted = true,
     title = `Study ${tag}`,
     authors = `Author ${tag}`,
+    keywords: string[] = [],
   ) {
     const form = new FormData()
     form.append(
@@ -91,6 +92,7 @@ needsDb('restricted keyword discovery', () => {
     form.append('schoolId', schoolId)
     form.append('courseId', courseId)
     form.append('idempotencyKey', crypto.randomUUID())
+    for (const term of keywords) form.append('keywords[]', term)
     const res = await t.app.request(
       '/api/submissions',
       {
@@ -300,5 +302,48 @@ needsDb('restricted keyword discovery', () => {
       (await request(`/api/search/records?q=${'a'.repeat(201)}`, manager))
         .status,
     ).toBe(400)
+  })
+  dbIt('displays keywords and filters by exact normalized term', async () => {
+    const stamp = crypto.randomUUID().replaceAll('-', '')
+    const term = `Filter Kw ${stamp}`
+    const tagged = await fixture(
+      'ACCEPTED',
+      false,
+      `Tagged Study ${stamp}`,
+      `Author ${stamp}`,
+      [term, `Other Kw ${stamp}`],
+    )
+    const untagged = await fixture(
+      'ACCEPTED',
+      false,
+      `Untagged Study ${stamp}`,
+      `Author ${stamp}`,
+    )
+    // Display: accepted records carry their author terms in order.
+    const browse = (await (
+      await request(`/api/search/records?q=${stamp}&sort=title`, manager)
+    ).json()) as { items: { id: string; keywords: string[] }[] }
+    expect(
+      browse.items.find((x) => x.id === tagged.recordId)?.keywords,
+    ).toEqual([term, `Other Kw ${stamp}`])
+    expect(
+      browse.items.find((x) => x.id === untagged.recordId)?.keywords,
+    ).toEqual([])
+    // Exact filter: matches the tagged record only, case-insensitively.
+    const filtered = (await (
+      await request(
+        `/api/search/records?q=${stamp}&keyword=${encodeURIComponent(term.toUpperCase())}`,
+        manager,
+      )
+    ).json()) as { items: { id: string }[] }
+    expect(filtered.items.map((x) => x.id)).toEqual([tagged.recordId])
+    // The filter does not leak into text matching: the plain query still
+    // matches both records regardless of keywords.
+    const unfiltered = (await (
+      await request(`/api/search/records?q=${stamp}`, manager)
+    ).json()) as { items: { id: string }[] }
+    expect(unfiltered.items.map((x) => x.id).sort()).toEqual(
+      [tagged.recordId, untagged.recordId].sort(),
+    )
   })
 })

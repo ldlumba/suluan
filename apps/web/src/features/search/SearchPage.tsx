@@ -33,6 +33,7 @@ interface SearchItem {
   schoolName: string | null
   courseName: string | null
   year: string | null
+  keywords: string[]
   snippet: string | null
   fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
   visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
@@ -95,6 +96,12 @@ export function SearchPage() {
     : q
       ? 'relevance'
       : 'newest'
+  // Exact author-keyword filter (ranking-neutral). Threaded through every
+  // navigation so paging and sorting never silently drop it.
+  const keywordFilter = params.get('keyword') ?? ''
+  const keepKeyword: Record<string, string> = keywordFilter
+    ? { keyword: keywordFilter }
+    : {}
   const manager =
     profile?.role === 'ADMIN' || profile?.role === 'REPOSITORY_MANAGER'
   const form = useForm<z.infer<typeof formSchema>>({
@@ -121,14 +128,22 @@ export function SearchPage() {
     semantic.data !== undefined &&
     semantic.data.semanticStatus !== 'ready'
   const keyword = useQuery({
-    queryKey: ['keyword-search', profile?.id, profile?.role, q, page, sort],
+    queryKey: [
+      'keyword-search',
+      profile?.id,
+      profile?.role,
+      q,
+      page,
+      sort,
+      keywordFilter,
+    ],
     // Enabled in keyword mode, and also once semantic has reported a downgrade:
     // the fallback query can only start AFTER the semantic answer arrives.
     enabled: (mode === 'keyword' || semanticUnavailable) && q.length <= 200,
     retry: false,
     queryFn: async () =>
       apiFetch<KeywordResult>(
-        `/api/search/records?${new URLSearchParams({ q, page: String(page), sort })}`,
+        `/api/search/records?${new URLSearchParams({ q, page: String(page), sort, ...keepKeyword })}`,
         await getIdToken(),
       ),
   })
@@ -253,7 +268,7 @@ export function SearchPage() {
             setParams(
               mode === 'semantic'
                 ? { q: values.q, page: '1', mode: 'semantic' }
-                : { q: values.q, page: '1', sort },
+                : { q: values.q, page: '1', sort, ...keepKeyword },
             ),
           )}
         >
@@ -304,7 +319,7 @@ export function SearchPage() {
               type="button"
               size="sm"
               variant={mode === 'keyword' ? 'default' : 'outline'}
-              onClick={() => setParams({ q, page: '1', sort })}
+              onClick={() => setParams({ q, page: '1', sort, ...keepKeyword })}
             >
               Keyword
             </Button>
@@ -323,7 +338,12 @@ export function SearchPage() {
               <Select
                 value={sort}
                 onValueChange={(value) =>
-                  setParams({ q, page: '1', sort: value as SearchSort })
+                  setParams({
+                    q,
+                    page: '1',
+                    sort: value as SearchSort,
+                    ...keepKeyword,
+                  })
                 }
                 items={SORT_OPTIONS.map((option) => ({ ...option }))}
               >
@@ -339,6 +359,47 @@ export function SearchPage() {
                 </SelectContent>
               </Select>
             </div>
+          )}
+          {mode === 'keyword' && (
+            <form
+              className="max-w-56 space-y-2 pt-1"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const value = new FormData(e.currentTarget).get('kw')
+                const next = typeof value === 'string' ? value.trim() : ''
+                setParams(
+                  next
+                    ? { q, page: '1', sort, keyword: next }
+                    : { q, page: '1', sort },
+                )
+              }}
+            >
+              <Label htmlFor="search-keyword">
+                Filter by author keyword (exact match)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="search-keyword"
+                  name="kw"
+                  defaultValue={keywordFilter}
+                  key={keywordFilter}
+                  placeholder="e.g. machine learning"
+                />
+                <Button type="submit" size="sm">
+                  Apply
+                </Button>
+              </div>
+              {keywordFilter && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setParams({ q, page: '1', sort })}
+                >
+                  Clear keyword filter
+                </Button>
+              )}
+            </form>
           )}
         </form>
         {notice && (
@@ -394,6 +455,11 @@ export function SearchPage() {
                       {item.courseName || 'Course not listed'}
                     </p>
                   )}
+                  {(item.keywords ?? []).length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Keywords: {(item.keywords ?? []).join('; ')}
+                    </p>
+                  )}
                   {/* Extracted text is untrusted: React text rendering only, never HTML. */}
                   {item.fullTextStatus === 'READY' && item.snippet && (
                     <p className="whitespace-pre-wrap break-words text-sm">
@@ -411,7 +477,7 @@ export function SearchPage() {
                   setParams(
                     mode === 'semantic'
                       ? { q, page: String(page - 1), mode: 'semantic' }
-                      : { q, page: String(page - 1), sort },
+                      : { q, page: String(page - 1), sort, ...keepKeyword },
                   )
                 }
               >
@@ -425,7 +491,7 @@ export function SearchPage() {
                   setParams(
                     mode === 'semantic'
                       ? { q, page: String(page + 1), mode: 'semantic' }
-                      : { q, page: String(page + 1), sort },
+                      : { q, page: String(page + 1), sort, ...keepKeyword },
                   )
                 }
               >

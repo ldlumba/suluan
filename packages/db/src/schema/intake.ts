@@ -8,6 +8,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { courses, profiles, schools } from './identity'
+import { submissionKeywords } from './keywords'
 
 /**
  * LOCKED decision states (Architecture v1 §3). RETURNED_FOR_REVISION is
@@ -103,6 +104,7 @@ export const submissionsRelations = relations(submissions, ({ one, many }) => ({
     references: [profiles.id],
   }),
   files: many(submissionFiles),
+  submissionKeywords: many(submissionKeywords),
   decision: one(decisions, {
     fields: [submissions.id],
     references: [decisions.submissionId],

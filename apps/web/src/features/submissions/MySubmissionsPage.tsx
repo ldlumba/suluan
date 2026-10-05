@@ -14,6 +14,7 @@ interface MySubmission {
   title: string
   authors: string | null
   year: string | null
+  keywords: string[]
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
   createdAt: string
   updatedAt: string
@@ -109,6 +110,11 @@ export function MySubmissionsPage() {
               {' · '}
               Submitted {new Date(item.createdAt).toLocaleDateString()}
             </p>
+            {(item.keywords ?? []).length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Keywords: {(item.keywords ?? []).join('; ')}
+              </p>
+            )}
             {item.remarks && (
               <p className="whitespace-pre-wrap text-sm">
                 <span className="font-medium">Reviewer remarks: </span>

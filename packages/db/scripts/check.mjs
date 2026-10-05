@@ -12,11 +12,14 @@ const expectedTables = [
   // intake
   'submissions',
   'submission_files',
+  'submission_keywords',
   'decisions',
   // repository
   'research_records',
   'record_files',
   'record_authors',
+  'keywords',
+  'research_keywords',
   // operations
   'audit_events',
   'outbox_events',

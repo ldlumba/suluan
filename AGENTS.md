@@ -185,5 +185,15 @@ work from an earlier one.
   limit; both 9.9 MB mails then delivered as single copies with scanned
   attachments.
 
+- **Author keywords v1 (2026-10-05):** optional chip input on the Submit page
+  (free text, up to 5, one `keywords[]` part per chip — Hono drops repeated
+  bare keys). Stored verbatim in `submission_keywords`, bridged on acceptance
+  into shared `keywords` concept rows + `research_keywords` links (migration
+  0010; `db:check` covers the tables). Shown in the review queue, decision
+  dialog, REO mail, status view, and search results; search adds an exact-match
+  `keyword` filter with no ranking effect. No controlled vocabulary, no synonym
+  merging, no backfill, no semantic integration — all deferred past Stage 8.
+  System-derived topics will live in a separate table, never in keywords.
+
 - Add verified commands and non-obvious conventions here as the codebase gains them; delete anything stale.
 - Record approved changes to the architecture baseline with rationale and date in `SULUAN_ARCHITECTURE_V1_CONTEXT.md`.

@@ -101,6 +101,9 @@ async function dispatchNotification(
           ? `${details.fileName} (not attached: file exceeds the 15 MB email attachment limit; open it from the SULUAN review queue)`
           : `${details.fileName} (available in SULUAN; attachment unavailable for this sender)`
       : '(not available)'
+    const keywordLine = details?.keywords.length
+      ? details.keywords.join('; ')
+      : '(none provided)'
     draft = {
       kind: 'reo_new_submission',
       to: reoMailbox ?? null,
@@ -113,6 +116,7 @@ async function dispatchNotification(
         `Authors: ${details?.authors ?? '(not provided)'}`,
         `School: ${details?.school ?? '(not provided)'}`,
         `Course: ${details?.course ?? '(not provided)'}`,
+        `Keywords: ${keywordLine}`,
         `Document: ${documentLine}`,
       ].join('\n'),
       attachment,
@@ -196,6 +200,8 @@ interface SubmissionEmailDetails {
   fileName: string
   mimeType: string
   sizeBytes: number
+  /** Verbatim author terms, submission order. */
+  keywords: string[]
 }
 
 async function submissionEmailDetails(
@@ -206,23 +212,30 @@ async function submissionEmailDetails(
   const result = await db.execute(sql`
     select s.authors, sc.name as school, c.name as course,
       sf.r2_key as "r2Key", sf.file_name as "fileName",
-      sf.mime_type as "mimeType", sf.size_bytes::text as "sizeBytes"
+      sf.mime_type as "mimeType", sf.size_bytes::text as "sizeBytes",
+      coalesce(kw.terms, '{}'::text[]) as keywords
     from submissions s
     left join schools sc on sc.id = s.school_id
     left join courses c on c.id = s.course_id
     join submission_files sf on sf.submission_id = s.id
+    left join lateral (
+      select array_agg(k.term order by k.position, k.id) as terms
+      from submission_keywords k where k.submission_id = s.id
+    ) kw on true
     where s.id = ${submissionId}
     order by sf.uploaded_at asc
     limit 1
   `)
   if (result.rows.length === 0) return null
-  const row = result.rows[0] as Omit<SubmissionEmailDetails, 'sizeBytes'> & {
+  const row = result.rows[0] as Omit<SubmissionEmailDetails, 'sizeBytes' | 'keywords'> & {
     sizeBytes: string | null
+    keywords: string[] | null
   }
   return {
     ...row,
     mimeType: row.mimeType || 'application/octet-stream',
     sizeBytes: Number(row.sizeBytes ?? 0),
+    keywords: row.keywords ?? [],
   }
 }
 

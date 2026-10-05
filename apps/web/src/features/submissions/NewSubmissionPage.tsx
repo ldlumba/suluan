@@ -22,7 +22,8 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError, apiFetch } from '@/lib/api'
 import { useAuth } from '@/features/auth/useAuth'
-import { submissionFormSchema, type SubmissionFormValues } from './schema'
+import { KeywordInput } from './KeywordInput'
+import { submissionFormSchema, type SubmissionFormInput } from './schema'
 
 interface School {
   id: string
@@ -39,6 +40,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   empty_file: 'The selected file is empty.',
   missing_file: 'A PDF or DOCX document is required.',
   invalid_fields: 'Some fields need attention. Check the title and try again.',
+  invalid_keywords: 'Use at most 5 keywords, each under 100 characters.',
   invalid_form: 'The submission could not be read. Please try again.',
   storage_unavailable:
     'File storage is temporarily unavailable. Please try again in a moment.',
@@ -58,13 +60,14 @@ export function NewSubmissionPage() {
     crypto.randomUUID(),
   )
 
-  const form = useForm<SubmissionFormValues>({
+  const form = useForm<SubmissionFormInput>({
     resolver: zodResolver(submissionFormSchema),
     defaultValues: {
       title: '',
       authors: '',
       schoolId: '',
       courseId: '',
+      keywords: [],
     },
   })
   const selectedSchoolId = useWatch({ control: form.control, name: 'schoolId' })
@@ -138,7 +141,7 @@ export function NewSubmissionPage() {
     )
   }
 
-  async function onSubmit(values: SubmissionFormValues) {
+  async function onSubmit(values: SubmissionFormInput) {
     setSubmitError(null)
     setPhase('uploading')
     try {
@@ -156,6 +159,8 @@ export function NewSubmissionPage() {
       if (values.authors) form.append('authors', values.authors)
       if (values.schoolId) form.append('schoolId', values.schoolId)
       if (values.courseId) form.append('courseId', values.courseId)
+      for (const term of values.keywords ?? [])
+        form.append('keywords[]', term)
 
       const created = await apiFetch<{ id: string; status: string }>(
         '/api/submissions',
@@ -210,6 +215,21 @@ export function NewSubmissionPage() {
                 {...form.register('authors')}
               />
             </div>
+
+            <Controller
+              control={form.control}
+              name="keywords"
+              render={({ field }) => (
+                <KeywordInput
+                  id="keywords"
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  error={form.formState.errors.keywords?.message as
+                    | string
+                    | undefined}
+                />
+              )}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

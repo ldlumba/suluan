@@ -3,12 +3,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   decisions,
   auditEvents,
+  keywords,
   notifications,
   outboxEvents,
+  researchKeywords,
   researchRecords,
   recordAuthors,
   recordFiles,
   submissionFiles,
+  submissionKeywords,
   submissions,
   processingJobs,
   courses,
@@ -102,6 +105,7 @@ needsDb('review workflow', () => {
     title: string,
     authors?: string,
     catalog?: { schoolId: string; courseId: string },
+    keywords?: string[],
   ): Promise<{ id: string; key: string }> {
     const file = new File(['x'.repeat(777)], 'paper.pdf', {
       type: 'application/pdf',
@@ -115,6 +119,7 @@ needsDb('review workflow', () => {
       form.append('schoolId', catalog.schoolId)
       form.append('courseId', catalog.courseId)
     }
+    for (const term of keywords ?? []) form.append('keywords[]', term)
     const res = await t.app.request(
       '/api/submissions',
       {
@@ -705,8 +710,108 @@ needsDb('review workflow', () => {
     expect(notes).toHaveLength(2)
   })
 
-  it('keeps concurrent deliveries from dispatching an active claim twice', async () => {
-    const { id } = await submit('Concurrent notification')
+  it('bridges keywords to one shared concept row per normalized term', async () => {
+    const shared = `Kw Shared ${crypto.randomUUID().replaceAll('-', '')}`
+    const first = await submit('Keyword bridge one', undefined, undefined, [
+      shared,
+      'Kw Solo One',
+    ])
+    const second = await submit('Keyword bridge two', undefined, undefined, [
+      shared.toUpperCase(),
+      'Kw Solo Two',
+    ])
+    for (const { id } of [first, second]) {
+      expect(
+        (
+          await post('/api/decisions', managerToken, {
+            submissionId: id,
+            status: 'ACCEPTED',
+            remarks: 'Keyword bridge.',
+          })
+        ).status,
+      ).toBe(201)
+    }
+    const db = testDb()
+    // One concept row for the shared term, keeping first-seen display.
+    const sharedRows = await db
+      .select()
+      .from(keywords)
+      .where(eq(keywords.normalizedName, shared.toLowerCase()))
+    expect(sharedRows).toHaveLength(1)
+    expect(sharedRows[0].displayName).toBe(shared)
+    // Each record links its own terms in author order.
+    for (const [sub, terms] of [
+      [first, [shared, 'Kw Solo One']],
+      [second, [shared, 'Kw Solo Two']],
+    ] as const) {
+      const [record] = await db
+        .select()
+        .from(researchRecords)
+        .where(eq(researchRecords.submissionId, sub.id))
+      const links = await db
+        .select({
+          term: keywords.displayName,
+          position: researchKeywords.position,
+        })
+        .from(researchKeywords)
+        .innerJoin(keywords, eq(keywords.id, researchKeywords.keywordId))
+        .where(eq(researchKeywords.recordId, record.id))
+        .orderBy(researchKeywords.position)
+      expect(links.map((l) => l.term)).toEqual(terms)
+      expect(links.map((l) => l.position)).toEqual([0, 1])
+    }
+  })
+
+  it('keeps rejected submission keywords in intake with no record links', async () => {
+    const term = `Kw Rejected ${crypto.randomUUID().replaceAll('-', '')}`
+    const { id } = await submit('Keyword rejection', undefined, undefined, [
+      term,
+    ])
+    expect(
+      (
+        await post('/api/decisions', managerToken, {
+          submissionId: id,
+          status: 'REJECTED',
+          remarks: 'Not this time.',
+        })
+      ).status,
+    ).toBe(201)
+    const db = testDb()
+    // Intake terms survive rejection in the REO-only archive.
+    const intake = await db
+      .select()
+      .from(submissionKeywords)
+      .where(eq(submissionKeywords.submissionId, id))
+    expect(intake.map((r) => r.term)).toEqual([term])
+    // No repository concept row and no links were created.
+    expect(
+      await db
+        .select()
+        .from(keywords)
+        .where(eq(keywords.normalizedName, term.toLowerCase())),
+    ).toHaveLength(0)
+    expect(
+      await db
+        .select()
+        .from(researchRecords)
+        .where(eq(researchRecords.submissionId, id)),
+    ).toHaveLength(0)
+  })
+
+  it('shows submitted keywords in the review queue', async () => {
+    const { id } = await submit('Keyword queue display', undefined, undefined, [
+      'Queue Alpha',
+      'Queue Beta',
+    ])
+    const queue = (await (
+      await get('/api/review/queue', managerToken)
+    ).json()) as { id: string; keywords: string[] }[]
+    expect(
+      queue.find((item) => item.id === id)?.keywords,
+    ).toEqual(['Queue Alpha', 'Queue Beta'])
+  })
+
+  it('keeps concurrent deliveries from dispatching an active claim twice', async () => {    const { id } = await submit('Concurrent notification')
     const db = testDb()
     const [event] = await db
       .select()

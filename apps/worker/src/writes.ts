@@ -22,6 +22,8 @@ export interface NewSubmissionInput {
   mimeType: string
   sizeBytes: number
   submitterEmail: string | null
+  /** Prepared author keywords (validated + normalized app-side). */
+  keywords: { term: string; normalized: string }[]
 }
 
 export async function createSubmissionAtomic(
@@ -33,6 +35,12 @@ export async function createSubmissionAtomic(
     title: input.title,
     submitterEmail: input.submitterEmail,
   })
+  // Keywords travel as JSON (proven jsonb_to_recordset pattern, same as
+  // chunk indexing): an empty array yields zero rows, so keyword-less
+  // submissions need no special case. Positions are assigned app-side.
+  const kwJson = JSON.stringify(
+    input.keywords.map((k, position) => ({ ...k, position })),
+  )
   const result = await db.execute(sql`
     WITH new_submission AS (
       INSERT INTO submissions
@@ -55,6 +63,14 @@ export async function createSubmissionAtomic(
       SELECT ${input.submitterId}, 'submission.created', 'submission',
         id::text
       FROM new_submission
+    ),
+    new_keywords AS (
+      INSERT INTO submission_keywords
+        (submission_id, term, normalized_name, position)
+      SELECT ns.id, kw.term, kw.normalized, kw.position
+      FROM new_submission ns
+      CROSS JOIN LATERAL jsonb_to_recordset(${kwJson}::jsonb)
+        AS kw(term text, normalized text, position integer)
     ),
     new_outbox AS (
       INSERT INTO outbox_events
@@ -131,7 +147,7 @@ export async function recordDecisionAtomic(
         ${visibility}, ${embargo}
       FROM upd
       ${accepted ? sql`` : sql`WHERE false`}
-      RETURNING id
+      RETURNING id, submission_id
     ),
     new_record_authors AS (
       INSERT INTO record_authors (record_id, name, position)
@@ -146,6 +162,32 @@ export async function recordDecisionAtomic(
       INSERT INTO record_files (record_id, r2_key, file_name, mime_type)
       SELECT nr.id, ${input.r2Key}, ${input.fileName}, ${input.mimeType}
       FROM new_record nr
+    ),
+    new_keywords AS (
+      INSERT INTO keywords (normalized_name, display_name)
+      SELECT sk.normalized_name,
+        (array_agg(sk.term ORDER BY sk.position))[1]
+      FROM upd u
+      JOIN submission_keywords sk ON sk.submission_id = u.id
+      ${accepted ? sql`` : sql`WHERE false`}
+      GROUP BY sk.normalized_name
+      ORDER BY sk.normalized_name
+      -- No-op DO UPDATE (not DO NOTHING): concurrent accepts for different
+      -- submissions sharing a brand-new term would otherwise lose the link —
+      -- DO NOTHING returns zero rows on conflict, while the update returns
+      -- every id. Same pattern as the semantic snapshot upsert. Ordered
+      -- insertion keeps concurrent upserts deadlock-free.
+      ON CONFLICT (normalized_name) DO UPDATE
+        SET display_name = keywords.display_name
+      RETURNING id, normalized_name
+    ),
+    new_research_keywords AS (
+      INSERT INTO research_keywords (record_id, keyword_id, position)
+      SELECT nr.id, nk.id, MIN(sk.position)
+      FROM new_record nr
+      JOIN submission_keywords sk ON sk.submission_id = nr.submission_id
+      JOIN new_keywords nk ON nk.normalized_name = sk.normalized_name
+      GROUP BY nr.id, nk.id
     ),
     new_processing_job AS (
       INSERT INTO processing_jobs (record_id)

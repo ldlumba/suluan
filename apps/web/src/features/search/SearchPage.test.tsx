@@ -41,6 +41,7 @@ const semanticItem = {
   schoolName: 'School of Technological Studies',
   courseName: 'BS Information Technology',
   year: '2026',
+  keywords: [] as string[],
   snippet: 'Measured output under high humidity.',
   fullTextStatus: 'READY' as const,
   visibility: 'PUBLIC' as const,
@@ -65,6 +66,7 @@ describe('keyword search', () => {
           title: 'Study',
           authors: null,
           year: null,
+          keywords: [],
           snippet,
           fullTextStatus: 'READY',
           visibility: 'PUBLIC',
@@ -117,6 +119,28 @@ describe('keyword search', () => {
       ),
     ).toBeInTheDocument()
   })
+  it('renders author keywords and applies the exact-match filter', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [{ ...semanticItem, keywords: ['Machine Learning', 'Vision'] }],
+      page: 1,
+      hasMore: false,
+    })
+    renderPage('USER')
+    expect(
+      await screen.findByText('Keywords: Machine Learning; Vision'),
+    ).toBeInTheDocument()
+    fireEvent.change(
+      screen.getByLabelText('Filter by author keyword (exact match)'),
+      { target: { value: 'machine learning' } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringContaining('keyword=machine+learning'),
+        'test-token',
+      ),
+    )
+  })
   it('shows API permission errors instead of an empty-results success state', async () => {
     vi.mocked(apiFetch).mockRejectedValue(
       new ApiError(403, 'Permission denied.'),
@@ -137,6 +161,7 @@ describe('keyword search', () => {
           title: 'Pending study',
           year: '2026',
           authors: 'Author',
+          keywords: [],
           fullTextStatus: 'PENDING',
           visibility: 'PUBLIC',
           snippet: 'Stale pending text',
@@ -146,6 +171,7 @@ describe('keyword search', () => {
           title: 'Failed study',
           year: '2026',
           authors: 'Author',
+          keywords: [],
           fullTextStatus: 'FAILED',
           visibility: 'PUBLIC',
           snippet: 'Stale failed text',

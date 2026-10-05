@@ -21,6 +21,7 @@ import {
   validateUploadFile,
 } from './uploads'
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
+import { prepareSubmissionKeywords } from './keywords'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { searchRoutes } from './search'
 import {
@@ -231,10 +232,15 @@ export function createApp(
         s.status, s.created_at as "createdAt", s.updated_at as "updatedAt",
         d.remarks, d.decided_at as "decidedAt",
         r.id as "recordId", r.visibility, r.embargo_until as "embargoUntil",
-        ${effectiveVisibilityLevel('r')} as "effectiveVisibility"
+        ${effectiveVisibilityLevel('r')} as "effectiveVisibility",
+        coalesce(kw.terms, '{}'::text[]) as keywords
       from submissions s
       left join decisions d on d.submission_id = s.id
       left join research_records r on r.submission_id = s.id
+      left join lateral (
+        select array_agg(k.term order by k.position, k.id) as terms
+        from submission_keywords k where k.submission_id = s.id
+      ) kw on true
       where s.submitter_id = ${me.id}
       order by s.created_at desc limit 100
     `)
@@ -335,6 +341,16 @@ export function createApp(
     }
     const meta = fields.data
 
+    // Author keywords arrive as repeated `keywords[]` parts (one term per
+    // part, matching the chip UI). The `[]` suffix matters: Hono's default
+    // multipart parsing overwrites repeated bare keys, keeping only the
+    // last value. Untrusted like every other field: validated, collapsed,
+    // and normalized before storage.
+    const preparedKeywords = prepareSubmissionKeywords(form['keywords[]'])
+    if ('error' in preparedKeywords) {
+      return c.json({ error: 'invalid_keywords' }, 400)
+    }
+
     const db = createDb(c.env.DATABASE_URL)
     const profile = c.get('profile')
 
@@ -388,6 +404,7 @@ export function createApp(
           mimeType: validated.mimeType,
           sizeBytes: validated.sizeBytes,
           submitterEmail: profile.email,
+          keywords: preparedKeywords.keywords,
         })
       } catch (err) {
         // Lost a concurrent finalize race: the winner's row is the truth.
@@ -438,6 +455,9 @@ export function createApp(
           files: {
             columns: { fileName: true, mimeType: true, sizeBytes: true },
           },
+          submissionKeywords: {
+            columns: { term: true, position: true },
+          },
         },
         orderBy: (s, { asc }) => [asc(s.createdAt)],
         limit: 50,
@@ -450,6 +470,9 @@ export function createApp(
           createdAt: s.createdAt,
           submitterEmail: s.submitter.email,
           files: s.files,
+          keywords: s.submissionKeywords
+            .sort((a, b) => a.position - b.position)
+            .map((k) => k.term),
         })),
       )
     },

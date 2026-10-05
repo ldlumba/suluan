@@ -34,6 +34,7 @@ interface QueueItem {
   authors: string | null
   createdAt: string
   submitterEmail: string | null
+  keywords: string[]
   files: {
     fileName: string
     mimeType: string | null
@@ -202,6 +203,11 @@ export function ReviewQueuePage() {
                 {item.authors ?? 'Authors not listed'} ·{' '}
                 {item.submitterEmail ?? 'Submitter unknown'}
               </div>
+              {item.keywords.length > 0 && (
+                <div className="text-sm text-muted-foreground">
+                  Keywords: {item.keywords.join('; ')}
+                </div>
+              )}
               <div className="text-sm text-muted-foreground">
                 {item.files
                   .map((f) => `${f.fileName} (${formatBytes(f.sizeBytes)})`)
@@ -241,6 +247,9 @@ export function ReviewQueuePage() {
             <DialogTitle>Decide: {deciding?.title}</DialogTitle>
             <DialogDescription>
               Remarks are required and will be recorded with your decision.
+              {deciding && deciding.keywords.length > 0 && (
+                <> Submitted keywords: {deciding.keywords.join('; ')}.</>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

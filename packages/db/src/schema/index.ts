@@ -1,6 +1,7 @@
 export * from './identity'
 export * from './intake'
 export * from './repository'
+export * from './keywords'
 export * from './operations'
 export * from './processing'
 export * from './search'

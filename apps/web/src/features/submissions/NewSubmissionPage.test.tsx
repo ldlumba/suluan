@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
 import { NewSubmissionPage } from './NewSubmissionPage'
@@ -33,11 +33,14 @@ function renderPage() {
   } as never)
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(catalog), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    // Fresh Response per call: bodies are single-use, and the page fetches
+    // the catalog first, then POSTs the submission through the same stub.
+    vi.fn().mockImplementation(
+      async () =>
+        new Response(JSON.stringify(catalog), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     ),
   )
   const client = new QueryClient({
@@ -66,5 +69,58 @@ describe('NewSubmissionPage catalog UX', () => {
     expect(nursing).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(nursing)
     expect(nursing).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('collects keyword chips and sends one part per keyword', async () => {
+    renderPage()
+    fireEvent.change(screen.getByLabelText('Title'), {
+      target: { value: 'Keyword UI Study' },
+    })
+    fireEvent.change(screen.getByLabelText(/Document/), {
+      target: {
+        files: [
+          new File(['x'.repeat(10)], 'paper.pdf', {
+            type: 'application/pdf',
+          }),
+        ],
+      },
+    })
+    const input = screen.getByLabelText(/Keywords/)
+    // Comma commits immediately; Enter commits the draft.
+    fireEvent.change(input, { target: { value: 'Alpha,' } })
+    fireEvent.change(input, { target: { value: 'alpha' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.change(input, { target: { value: 'Beta' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    // Case-insensitive duplicates collapse to the first chip.
+    expect(
+      await screen.findByRole('button', { name: 'Remove keyword Alpha' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Remove keyword Beta' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Remove keyword alpha' }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Submit for review' }),
+    )
+    await waitFor(() => {
+      const posts = vi
+        .mocked(fetch)
+        .mock.calls.filter(([, init]) => init?.method === 'POST')
+      expect(posts.length).toBeGreaterThan(0)
+    })
+    expect(await screen.findByText('Submission received')).toBeInTheDocument()
+    const post = vi
+      .mocked(fetch)
+      .mock.calls.map(([, init]) => init)
+      .find(
+        (init) =>
+          init?.method === 'POST' && init.body instanceof FormData,
+      )
+    const parts = (post?.body as FormData).getAll('keywords[]')
+    expect(parts).toEqual(['Alpha', 'Beta'])
   })
 })
