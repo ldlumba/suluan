@@ -185,6 +185,34 @@ export async function semanticSearchByVector(
   }
 }
 
+/** Evaluation-only raw distances. Returns IDs and numbers, never chunk text. */
+export async function semanticChunkDistancesByVector(
+  db: Db,
+  viewer: ViewerRole,
+  vector: number[],
+) {
+  const queryVector = toVectorLiteral(vector)
+  const rows = await db.execute(sql`
+    select k.record_id as "recordId",
+      e.embedding <=> cast(${queryVector} as vector) as distance
+    from document_embeddings e
+    join document_chunks d on d.id = e.chunk_id
+    join semantic_indexes si on si.id = e.semantic_index_id
+    join keyword_indexes k on k.id = si.keyword_index_id
+    join research_records r on r.id = k.record_id
+    join submissions s on s.id = r.submission_id
+    where si.model = ${EMBEDDING_MODEL} and si.dimensions = ${EMBEDDING_DIMS}
+      and si.chunker_version = ${CHUNKER_VERSION}
+      and s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
+    order by k.record_id, distance asc
+  `)
+  const distances: Record<string, number[]> = {}
+  for (const row of rows.rows as { recordId: string; distance: number }[]) {
+    ;(distances[row.recordId] ??= []).push(Number(row.distance))
+  }
+  return distances
+}
+
 /**
  * Keyword discovery. Public by default (owner-approved 2026-10-01): accepted
  * PUBLIC records are readable without an account, UA_ONLY requires a signed-in

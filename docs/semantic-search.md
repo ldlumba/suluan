@@ -159,6 +159,23 @@ five clean negatives also all returned nearest papers, at distances
 `0.405–0.458`, so the current retrieval path has no safe abstention behavior.
 Semantic mode remains unapproved and disabled.
 
+## Scoring workbench — 2026-10-06
+
+The Worker now exposes an internal, service-authenticated evaluation option for
+the pinned-region query claim: `includeDiagnostics: true` returns only record
+IDs and per-chunk cosine distances. It never returns chunk text and is not part
+of the public semantic response. `embed_runner.py --query-vectors-output` can
+persist those distances and the query vectors together with the frozen
+query-file SHA-256, so scoring experiments do not pay to re-embed the same
+queries.
+
+`services/processing/semantic_scoring.py` provides pure candidate aggregators
+(`MIN`, fixed top-k mean, proportional top-k mean, and a length-penalized
+control) plus explicit score-floor and margin abstention diagnostics. These are
+evaluation primitives, not a production policy. The public Worker still uses
+the existing defensive `MIN` path and remains disabled until a fresh labeled
+holdout selects and verifies a scoring/abstention policy.
+
 ## Known limits
 
 - Semantic results only cover papers that have been extracted, keyword-prepared,

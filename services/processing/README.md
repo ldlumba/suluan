@@ -143,3 +143,12 @@ started automatically every 15 minutes by Cloud Scheduler; development remains
 manual. The `workers.dev` edge requires the runner's browser-compatible
 `User-Agent`; bare non-browser clients fail with Cloudflare 1010 before
 reaching the Worker.
+
+For an explicitly approved evaluation, `embed_runner.py` also accepts
+`--query-vectors-output PATH` together with `--query-file`. It writes the frozen
+query-file SHA-256, model/task metadata, and query vectors without document
+text, allowing offline scoring experiments to reuse paid query embeddings. The
+artifact is not a routine log and must not be committed. The pure
+`semantic_scoring.py` module contains candidate aggregators and abstention
+diagnostics only; no threshold is production-approved until a fresh labeled
+holdout selects and verifies it.

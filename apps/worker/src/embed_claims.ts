@@ -10,7 +10,10 @@ import { CHUNKER_VERSION } from './chunking'
 import { normalizeVector, toVectorLiteral } from './embeddings'
 import { consumeQuota, embeddingLimits } from './quota'
 import { EMBED_INPUT_BATCH, EMBED_PAPER_BATCH } from './search'
-import { semanticSearchByVector } from './search'
+import {
+  semanticChunkDistancesByVector,
+  semanticSearchByVector,
+} from './search'
 import type { ViewerRole } from './visibility'
 
 const claimSchema = z
@@ -31,6 +34,7 @@ const queryClaimSchema = z
     query: z.string().trim().min(1).max(200),
     viewer: z.enum(['PUBLIC', 'UA_USER', 'MANAGER']).default('MANAGER'),
     page: z.number().int().min(1).max(1000).default(1),
+    includeDiagnostics: z.boolean().default(false),
   })
   .strict()
 const queryResultSchema = z
@@ -98,7 +102,12 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       insert into embedding_claims
         (claim_token, kind, inputs, payload, expires_at)
       values (${claimToken}, 'query', 1,
-        ${JSON.stringify({ query: body.query, viewer: body.viewer, page: body.page })}::jsonb,
+        ${JSON.stringify({
+          query: body.query,
+          viewer: body.viewer,
+          page: body.page,
+          includeDiagnostics: body.includeDiagnostics,
+        })}::jsonb,
         now() + interval '10 minutes')
       returning id as "claimId"
     `)
@@ -128,7 +137,11 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       )
         return c.json({ error: 'stale_claim' }, 409)
       const claim = claims.rows[0] as {
-        payload: { viewer: ViewerRole; page: number }
+        payload: {
+          viewer: ViewerRole
+          page: number
+          includeDiagnostics?: boolean
+        }
       }
       let vector: number[]
       try {
@@ -145,13 +158,23 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       update embedding_claims set used_at = now()
       where claim_token = ${body.claimToken} and used_at is null
     `)
+      const result = await semanticSearchByVector(
+        db,
+        claim.payload.viewer,
+        vector,
+        claim.payload.page,
+      )
       return c.json({
-        ...(await semanticSearchByVector(
-          db,
-          claim.payload.viewer,
-          vector,
-          claim.payload.page,
-        )),
+        ...result,
+        ...(claim.payload.includeDiagnostics
+          ? {
+              chunkDistances: await semanticChunkDistancesByVector(
+                db,
+                claim.payload.viewer,
+                vector,
+              ),
+            }
+          : {}),
         semanticStatus: 'ready' as const,
       })
     },

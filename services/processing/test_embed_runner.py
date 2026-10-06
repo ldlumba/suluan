@@ -168,6 +168,43 @@ class EmbedRunnerTests(unittest.TestCase):
         self.assertEqual((completed, embedded), (0, 0))
         self.assertTrue(any("quota" in message for message in messages))
 
+    def test_process_query_can_capture_diagnostics_without_document_text(self):
+        class QueryClient:
+            def __init__(self):
+                self.calls = []
+
+            def json(self, path, body=None):
+                self.calls.append((path, body))
+                if path.endswith("/query/claim"):
+                    return {
+                        "claimToken": "00000000-0000-4000-8000-000000000001",
+                        "query": "query",
+                    }
+                return {
+                    "semanticStatus": "ready",
+                    "items": [],
+                    "chunkDistances": {"record-1": [0.2, 0.3]},
+                }
+
+        client = QueryClient()
+        original = embed_runner.embed_texts
+        embed_runner.embed_texts = lambda texts, key, task_type="RETRIEVAL_DOCUMENT": [
+            [0.2] * 768
+        ]
+        try:
+            result, vector = embed_runner.process_query(
+                client,
+                "test-key",
+                "query",
+                include_vector=True,
+                include_diagnostics=True,
+            )
+        finally:
+            embed_runner.embed_texts = original
+        self.assertEqual(result["chunkDistances"], {"record-1": [0.2, 0.3]})
+        self.assertEqual(len(vector), 768)
+        self.assertTrue(client.calls[0][1]["includeDiagnostics"])
+
 
 if __name__ == "__main__":
     unittest.main()

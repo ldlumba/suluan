@@ -12,6 +12,7 @@ failures stop the run without any automatic retry.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -117,19 +118,32 @@ def process_claim(client, api_key, claim):
     return result.get("embedded", 0)
 
 
-def process_query(client, api_key, query):
-    """Embed one query and return visibility-filtered Worker ranking."""
+def process_query(
+    client, api_key, query, *, include_vector=False, include_diagnostics=False
+):
+    """Embed one query and return visibility-filtered Worker ranking.
+
+    ``include_vector`` is an explicit evaluation-only escape hatch. It lets
+    offline scoring experiments reuse a paid query embedding without sending
+    the vector to the Worker or including it in normal result logs.
+    """
     claim = client.json(
         "/api/internal/embeddings/query/claim",
-        {"query": query, "viewer": "MANAGER", "page": 1},
+        {
+            "query": query,
+            "viewer": "MANAGER",
+            "page": 1,
+            "includeDiagnostics": include_diagnostics,
+        },
     )
     vector = embed_texts(
         [claim["query"]], api_key, task_type="RETRIEVAL_QUERY"
     )[0]
-    return client.json(
+    result = client.json(
         "/api/internal/embeddings/query/result",
         {"claimToken": claim["claimToken"], "values": vector},
     )
+    return (result, vector) if include_vector else result
 
 
 def safe_query_result(probe_id, result):
@@ -190,6 +204,13 @@ def main():
         help="Run a frozen JSON probe list in the pinned region.",
     )
     parser.add_argument(
+        "--query-vectors-output",
+        help=(
+            "Explicit evaluation-only JSON artifact for query vectors; requires "
+            "--query-file and never includes document text"
+        ),
+    )
+    parser.add_argument(
         "--query-interval",
         type=float,
         default=float(os.environ.get("SULUAN_QUERY_INTERVAL", "3")),
@@ -206,6 +227,8 @@ def main():
         parser.error("--max-claims must be between 1 and 10")
     if args.query_file and args.query:
         parser.error("use --query or --query-file, not both")
+    if args.query_vectors_output and not args.query_file:
+        parser.error("--query-vectors-output requires --query-file")
     if args.query_interval < 1:
         parser.error("--query-interval must be at least 1 second")
     # Secret Manager values are expected to be newline-free, but strip at the
@@ -231,8 +254,23 @@ def main():
         if args.query_file:
             with open(args.query_file, encoding="utf-8") as handle:
                 probes = json.load(handle)
+            with open(args.query_file, "rb") as handle:
+                query_file_sha256 = hashlib.sha256(handle.read()).hexdigest()
+            vector_artifact = {
+                "sourceSha256": query_file_sha256,
+                "model": "gemini-embedding-001",
+                "taskType": "RETRIEVAL_QUERY",
+                "dimensions": EMBED_DIMS,
+                "vectors": [],
+            }
             for number, probe in enumerate(probes, 1):
-                result = process_query(client, api_key, probe["query"])
+                result, vector = process_query(
+                    client,
+                    api_key,
+                    probe["query"],
+                    include_vector=True,
+                    include_diagnostics=bool(args.query_vectors_output),
+                )
                 if result.get("semanticStatus") != "ready":
                     raise RuntimeError(
                         f"query {probe['id']} returned "
@@ -242,8 +280,24 @@ def main():
                     safe_query_result(probe["id"], result),
                     separators=(",", ":"),
                 ))
+                if args.query_vectors_output:
+                    vector_artifact["vectors"].append(
+                        {
+                            "id": probe["id"],
+                            "vector": vector,
+                            "chunkDistances": result.get("chunkDistances", {}),
+                            "rankedItems": safe_query_result(
+                                probe["id"], result
+                            )["items"],
+                        }
+                    )
                 if number < len(probes):
                     time.sleep(args.query_interval)
+            if args.query_vectors_output:
+                output = os.path.abspath(args.query_vectors_output)
+                os.makedirs(os.path.dirname(output), exist_ok=True)
+                with open(output, "w", encoding="utf-8") as handle:
+                    json.dump(vector_artifact, handle, indent=2)
         elif args.query:
             result = process_query(client, api_key, args.query)
             print(json.dumps(result, separators=(",", ":")))
