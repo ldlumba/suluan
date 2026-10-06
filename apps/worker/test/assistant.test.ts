@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ASSISTANT_EVIDENCE_VIEWER,
+  ASSISTANT_LIMITS,
+  ASSISTANT_MODEL,
   ASSISTANT_SYSTEM_RULES,
   buildEvidenceContext,
   canUseAssistant,
@@ -10,6 +13,19 @@ describe('assistant foundation', () => {
     expect(canUseAssistant('PUBLIC')).toBe(false)
     expect(canUseAssistant('UA_USER')).toBe(true)
     expect(canUseAssistant('MANAGER')).toBe(true)
+  })
+
+  it('uses the approved free-tier model and bounded server policy', () => {
+    expect(ASSISTANT_MODEL).toBe('gemini-3-flash-preview')
+    expect(ASSISTANT_EVIDENCE_VIEWER).toBe('PUBLIC')
+    expect(ASSISTANT_LIMITS).toEqual({
+      messagesPerUserPerDay: 10,
+      messagesPerDay: 300,
+      promptChars: 1000,
+      turnsPerConversation: 5,
+      maxOutputTokens: 800,
+      evidenceChunks: 5,
+    })
   })
 
   it('delimits retrieved text as untrusted data', () => {

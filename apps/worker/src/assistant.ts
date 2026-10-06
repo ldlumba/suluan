@@ -9,6 +9,30 @@ import {
   type ViewerRole,
 } from './visibility'
 
+/**
+ * Free-tier Gemini policy approved 2026-10-06. Assistant access and evidence
+ * scope are separate: authenticated users may ask, but only PUBLIC evidence is
+ * sent to a free-tier provider because its terms may permit submitted content
+ * to improve Google's products. This is intentionally narrower than search.
+ */
+export const ASSISTANT_EVIDENCE_VIEWER: ViewerRole = 'PUBLIC'
+
+/**
+ * Owner-approved product limits, replacing the frontend handoff's illustrative
+ * figures. These values are server-side policy, not frontend configuration.
+ */
+export const ASSISTANT_LIMITS = {
+  messagesPerUserPerDay: 10,
+  messagesPerDay: 300,
+  promptChars: 1000,
+  turnsPerConversation: 5,
+  maxOutputTokens: 800,
+  evidenceChunks: 5,
+} as const
+
+/** Selected generation model; generation remains disabled until transport exists. */
+export const ASSISTANT_MODEL = 'gemini-3-flash-preview'
+
 /** The assistant is never available to anonymous viewers. */
 export function canUseAssistant(viewer: ViewerRole): boolean {
   return viewer === 'UA_USER' || viewer === 'MANAGER'
@@ -36,8 +60,10 @@ export type AssistantEvidenceOptions = {
  * a query vector supplied by the validated semantic-search path, then applies
  * the same accepted-record and effective-visibility predicates used by search.
  * Restricted, pending, rejected, and unindexed content therefore cannot enter
- * the assistant context. Chunk content is untrusted data and must only be
- * passed through `buildEvidenceContext` before a model is introduced.
+ * the assistant context. The PUBLIC evidence viewer is deliberate even when
+ * the requester is a UA user or manager. Chunk content is untrusted data and
+ * must only be passed through `buildEvidenceContext` before a model is
+ * introduced.
  */
 export async function retrieveAssistantEvidence(
   db: Db,
@@ -65,7 +91,7 @@ export async function retrieveAssistantEvidence(
       and si.dimensions = ${EMBEDDING_DIMS}
       and si.chunker_version = ${CHUNKER_VERSION}
       and s.status = 'ACCEPTED'
-      and ${effectiveVisibility(viewer, 'r').rowVisible}
+      and ${effectiveVisibility(ASSISTANT_EVIDENCE_VIEWER, 'r').rowVisible}
     order by distance asc, r.id, d.ordinal
     limit ${options.limit}
   `)
