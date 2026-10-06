@@ -211,6 +211,14 @@ def main():
         ),
     )
     parser.add_argument(
+        "--query-vectors-stdout",
+        action="store_true",
+        help=(
+            "Explicit evaluation-only NDJSON export to stdout; requires "
+            "--query-file and emits one probe per line"
+        ),
+    )
+    parser.add_argument(
         "--query-interval",
         type=float,
         default=float(os.environ.get("SULUAN_QUERY_INTERVAL", "3")),
@@ -229,6 +237,8 @@ def main():
         parser.error("use --query or --query-file, not both")
     if args.query_vectors_output and not args.query_file:
         parser.error("--query-vectors-output requires --query-file")
+    if args.query_vectors_stdout and not args.query_file:
+        parser.error("--query-vectors-stdout requires --query-file")
     if args.query_interval < 1:
         parser.error("--query-interval must be at least 1 second")
     # Secret Manager values are expected to be newline-free, but strip at the
@@ -269,27 +279,36 @@ def main():
                     api_key,
                     probe["query"],
                     include_vector=True,
-                    include_diagnostics=bool(args.query_vectors_output),
+                    include_diagnostics=bool(
+                        args.query_vectors_output or args.query_vectors_stdout
+                    ),
                 )
                 if result.get("semanticStatus") != "ready":
                     raise RuntimeError(
                         f"query {probe['id']} returned "
                         f"semanticStatus={result.get('semanticStatus')}"
                     )
-                print(json.dumps(
-                    safe_query_result(probe["id"], result),
-                    separators=(",", ":"),
-                ))
+                safe_result = safe_query_result(probe["id"], result)
+                print(json.dumps(safe_result, separators=(",", ":")))
                 if args.query_vectors_output:
-                    vector_artifact["vectors"].append(
-                        {
-                            "id": probe["id"],
-                            "vector": vector,
-                            "chunkDistances": result.get("chunkDistances", {}),
-                            "rankedItems": safe_query_result(
-                                probe["id"], result
-                            )["items"],
-                        }
+                    vector_artifact["vectors"].append({
+                        "id": probe["id"],
+                        "vector": vector,
+                        "chunkDistances": result.get("chunkDistances", {}),
+                        "rankedItems": safe_result["items"],
+                    })
+                if args.query_vectors_stdout:
+                    print(
+                        "SULUAN_EVAL_PROBE "
+                        + json.dumps(
+                            {
+                                "id": probe["id"],
+                                "vector": vector,
+                                "chunkDistances": result.get("chunkDistances", {}),
+                                "rankedItems": safe_result["items"],
+                            },
+                            separators=(",", ":"),
+                        )
                     )
                 if number < len(probes):
                     time.sleep(args.query_interval)

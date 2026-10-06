@@ -152,3 +152,8 @@ artifact is not a routine log and must not be committed. The pure
 `semantic_scoring.py` module contains candidate aggregators and abstention
 diagnostics only; no threshold is production-approved until a fresh labeled
 holdout selects and verifies it.
+
+Cloud Run Jobs have ephemeral filesystems. For an explicitly approved remote
+evaluation, `--query-vectors-stdout` emits one `SULUAN_EVAL_PROBE` NDJSON line
+per probe so the evaluation artifact can be reconstructed from that execution's
+logs; it is not a routine logging mode.
