@@ -66,6 +66,38 @@ class SemanticRelevanceTests(unittest.TestCase):
             )
         self.assertEqual(client.calls, 1)
 
+    def test_multi_result_probe_requires_all_expected_papers(self):
+        class Client:
+            def json(self, path):
+                if "/semantic?" in path:
+                    return {
+                        "semanticStatus": "ready",
+                        "items": [
+                            {"id": "a", "title": "Farming", "distance": 0.2},
+                            {"id": "b", "title": "Soil", "distance": 0.3},
+                        ],
+                    }
+                return {"items": []}
+
+        report = run_evaluation(
+            Client(),
+            [
+                {
+                    "id": "multi",
+                    "kind": "multi_positive",
+                    "query": "AI assisted farming",
+                    "expectedTitles": ["Farming", "Soil"],
+                }
+            ],
+            interval=3,
+            sleep=lambda _: None,
+            emit=lambda _: None,
+        )
+        row = report["results"][0]
+        self.assertEqual(row["expectedRanks"], [1, 2])
+        self.assertTrue(row["expectedAllFound"])
+        self.assertEqual(report["summary"]["multiResult"]["completeRate"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,6 +29,19 @@ def rank_of(items, title):
     return None
 
 
+def expected_titles(probe):
+    """Support one expected paper and adviser-approved multi-paper cases."""
+    titles = probe.get("expectedTitles")
+    if titles is not None:
+        if not isinstance(titles, list) or not titles or any(
+            not isinstance(title, str) or not title for title in titles
+        ):
+            raise EvaluationError(f"probe {probe.get('id')} has invalid expectedTitles")
+        return titles
+    title = probe.get("expectedTitle")
+    return [title] if title else []
+
+
 def safe_items(items):
     """Discard snippets so extracted text is never written to the result file."""
     return [
@@ -127,6 +140,7 @@ def summarize(results):
         if row.get("expectedTitle") and row.get("expectedChunks"):
             chunks[row["expectedTitle"]] = row["expectedChunks"]
     labeled_titles = sorted(chunks)
+    multi_results = [row for row in results if len(row.get("expectedTitles", [])) > 1]
     return {
         "semantic": ranking_metrics(positives, "semanticRank"),
         "keyword": ranking_metrics(positives, "keywordRank"),
@@ -160,6 +174,18 @@ def summarize(results):
             if row["kind"] == "hard_positive"
         ),
         "hardContrastQueries": sum(row["kind"] == "hard_positive" for row in positives),
+        "multiResult": {
+            "queries": len(multi_results),
+            "allExpectedFound": sum(
+                row.get("expectedAllFound", False) for row in multi_results
+            ),
+            "completeRate": (
+                sum(row.get("expectedAllFound", False) for row in multi_results)
+                / len(multi_results)
+                if multi_results
+                else None
+            ),
+        },
     }
 
 
@@ -195,9 +221,12 @@ def run_evaluation(
         semantic = safe_items(semantic_response.get("items", []))
         keyword = safe_items(client.json(f"/api/search/records?{query}").get("items", []))
         hybrid = rrf_titles(semantic, keyword)
-        expected = probe.get("expectedTitle")
-        semantic_rank = rank_of(semantic, expected) if expected else None
-        keyword_rank = rank_of(keyword, expected) if expected else None
+        titles = expected_titles(probe)
+        expected = titles[0] if titles else None
+        semantic_ranks = [rank_of(semantic, title) for title in titles]
+        keyword_ranks = [rank_of(keyword, title) for title in titles]
+        semantic_rank = semantic_ranks[0] if semantic_ranks else None
+        keyword_rank = keyword_ranks[0] if keyword_ranks else None
         hybrid_rank = hybrid.index(expected) + 1 if expected in hybrid else None
         contrast = probe.get("contrastTitle")
         expected_distance = (
@@ -205,6 +234,12 @@ def run_evaluation(
         )
         row = {
             **probe,
+            "expectedTitles": titles,
+            "expectedRanks": semantic_ranks,
+            "keywordRanks": keyword_ranks,
+            "expectedAllFound": bool(titles) and all(
+                rank is not None for rank in semantic_ranks
+            ),
             "semanticRank": semantic_rank,
             "keywordRank": keyword_rank,
             "hybridRank": hybrid_rank,
@@ -225,7 +260,7 @@ def run_evaluation(
             checkpoint(report_for(probes, results))
         label = (
             f"rank={semantic_rank}"
-            if expected
+            if titles
             else f"top={semantic[0]['title'] if semantic else 'none'}"
         )
         emit(f"{number:02d}/{len(probes)} {probe['id']}: {label}")
