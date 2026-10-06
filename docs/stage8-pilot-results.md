@@ -91,6 +91,23 @@ text, private file paths, tokens, credentials, or raw provider secrets.
   was removed, Worker `2c011e64-c464-47ea-b118-423ddd493e74` was redeployed,
   and the public semantic endpoint was verified `unconfigured`.
 
+## Region-stable retry — 2026-10-06
+
+- The pinned `asia-southeast1` embedding Job completed the pilot backfill:
+  1,224/1,224 expected chunks were embedded, and a follow-up claim reported no
+  remaining chunks. The frozen holdout file was committed with SHA-256
+  `a93702be25a253edfc679bb754977db994840df1e858776ea0b21e3842f6cccb` so the
+  exact evaluation input is reproducible.
+- All 25 holdout queries returned `semanticStatus: ready`. The 15 positive and
+  five hard-positive targets ranked first (15/15 and 5/5).
+- All five clean negatives nevertheless returned a nearest paper. Their top
+  distances were `0.405`, `0.447`, `0.448`, `0.449`, and `0.458`; the defensive
+  `0.7` bound rejected none. This validates provider availability and curated
+  ranking, but fails the abstention/relevance gate. Semantic remains disabled.
+- A temporary bounded staging quota window was removed and the Worker was
+  redeployed without overrides after the run. The embedding Job was restored to
+  its normal preparation configuration.
+
 ## Exit
 
 Stage 8 exits with dependable keyword search and all corpus security,

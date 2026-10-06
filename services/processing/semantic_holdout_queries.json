@@ -1,0 +1,172 @@
+[
+  {
+    "id": "holdout-p02",
+    "kind": "positive",
+    "query": "how does financial knowledge affect the performance of public market vendors in Apalit",
+    "expectedTitle": "Beyond the Bargain: Assessing the Role of Financial Literacy on Business Performance among Apalit Public Market Vendors",
+    "expectedChunks": 15
+  },
+  {
+    "id": "holdout-p04",
+    "kind": "positive",
+    "query": "using business data to improve the accuracy and quality of company financial reports",
+    "expectedTitle": "Data Driven Decision Making: Optimizing the Quality of Financial Reporting",
+    "expectedChunks": 20
+  },
+  {
+    "id": "holdout-p07",
+    "kind": "positive",
+    "query": "effects of artificial intelligence tools on the grades and learning of hospitality and tourism students",
+    "expectedTitle": "THE ASSESSMENT OF ARTIFICIAL INTELLIGENCE ON THE ACADEMIC PERFORMANCE OF HOSPITALITY AND TOURISM MANAGEMENT STUDENTS AT THE UNIVERSITY OF THE ASSUMPTION",
+    "expectedChunks": 31
+  },
+  {
+    "id": "holdout-p10",
+    "kind": "positive",
+    "query": "travel patterns and destination preferences of university tourism students",
+    "expectedTitle": "TRAVEL BEHAVIOR AMONG TOURISM STUDENTS AT THE UNIVERSITY OF THE ASSUMPTION",
+    "expectedChunks": 27
+  },
+  {
+    "id": "holdout-p11",
+    "kind": "positive",
+    "query": "how a TikTok personality affects customers intention to buy a local perfume brand",
+    "expectedTitle": "Asheng’s Influence on Customers' Purchase Intentions for Ashscents Perfume on TikTok",
+    "expectedChunks": 48
+  },
+  {
+    "id": "holdout-p14",
+    "kind": "positive",
+    "query": "experiences of Filipino family breadwinners dealing with debt of gratitude in family movies",
+    "expectedTitle": "Ma, Pa, Ako Na: INSIGHTS OF FILIPINO BREADWINNERS ON “UTANG NA LOOB” IN FAMILY-THEMED FILIPINO FILMS",
+    "expectedChunks": 31
+  },
+  {
+    "id": "holdout-p15",
+    "kind": "positive",
+    "query": "barriers faced by Filipino single mothers when accessing government health services",
+    "expectedTitle": "Filipino Single Mothers’ Access To Government Healthcare: A Qualitative Inquiry",
+    "expectedChunks": 17
+  },
+  {
+    "id": "holdout-p18",
+    "kind": "positive",
+    "query": "antibacterial effectiveness of water spinach extract against common gram positive and gram negative bacteria",
+    "expectedTitle": "In Vitro Antibacterial Activity of Ipomoea aquatica Extract against Staphylococcus aureus and Escherichia coli",
+    "expectedChunks": 37
+  },
+  {
+    "id": "holdout-p19",
+    "kind": "positive",
+    "query": "relationship between connection to nature and environmentally responsible behavior among student leaders",
+    "expectedTitle": "Nature’s Voice, Leader’s Choice: Nature Connectedness and Pro-Environmental Behavior Among College Student Leaders",
+    "expectedChunks": 37
+  },
+  {
+    "id": "holdout-p20",
+    "kind": "positive",
+    "query": "challenges and coping strategies of college student single fathers in shared parenting arrangements",
+    "expectedTitle": "Challenges, Coping, and Realizations of Single Father College Students in Co-Parenting Arrangements: A Hermeneutic Phenomenological Study",
+    "expectedChunks": 22
+  },
+  {
+    "id": "holdout-p25",
+    "kind": "positive",
+    "query": "architectural space for preserving and teaching regional culinary heritage",
+    "expectedTitle": "Pamánam: A Culinary Museum and Food heritage institute",
+    "expectedChunks": 10
+  },
+  {
+    "id": "holdout-p30",
+    "kind": "positive",
+    "query": "eco friendly hybrid engineering methods for controlling riverbank erosion in Candaba",
+    "expectedTitle": "Bantay-ilog: A Sustainable Hybrid Eco-Structural Design for Riverbank Erosion Control in Candaba, Pampanga",
+    "expectedChunks": 23
+  },
+  {
+    "id": "holdout-p32",
+    "kind": "positive",
+    "query": "computer vision assistant for finding visibly damaged electronic parts in smartphones",
+    "expectedTitle": "The Tech Medic AI: A Smart Diagnostic Assistant for Automated Detection of Visible Faulty Electronic Components in Smartphone",
+    "expectedChunks": 30
+  },
+  {
+    "id": "holdout-p33",
+    "kind": "positive",
+    "query": "sustainable non toxic writing pencil designed to be safe for children",
+    "expectedTitle": "ACL SafeWrite: A Sustainable Child-safe Pencil",
+    "expectedChunks": 17
+  },
+  {
+    "id": "holdout-p34",
+    "kind": "positive",
+    "query": "localized climate responsive farming decision support for Pampanga agricultural communities",
+    "expectedTitle": "AgriKlima: Empowering District 3 Farmers in Pampanga using Localized Farming Solutions",
+    "expectedChunks": 13
+  },
+  {
+    "id": "holdout-contrast-financial-reporting",
+    "kind": "hard_positive",
+    "query": "how analytics can strengthen reliable financial statement preparation",
+    "expectedTitle": "Data Driven Decision Making: Optimizing the Quality of Financial Reporting",
+    "expectedChunks": 20,
+    "contrastTitle": "Beyond the Bargain: Assessing the Role of Financial Literacy on Business Performance among Apalit Public Market Vendors"
+  },
+  {
+    "id": "holdout-contrast-student-ai-learning",
+    "kind": "hard_positive",
+    "query": "academic outcomes from students using AI in hospitality education",
+    "expectedTitle": "THE ASSESSMENT OF ARTIFICIAL INTELLIGENCE ON THE ACADEMIC PERFORMANCE OF HOSPITALITY AND TOURISM MANAGEMENT STUDENTS AT THE UNIVERSITY OF THE ASSUMPTION",
+    "expectedChunks": 31,
+    "contrastTitle": "The Tech Medic AI: A Smart Diagnostic Assistant for Automated Detection of Visible Faulty Electronic Components in Smartphone"
+  },
+  {
+    "id": "holdout-contrast-tourism-travel-patterns",
+    "kind": "hard_positive",
+    "query": "where tourism majors travel and what shapes their travel choices",
+    "expectedTitle": "TRAVEL BEHAVIOR AMONG TOURISM STUDENTS AT THE UNIVERSITY OF THE ASSUMPTION",
+    "expectedChunks": 27,
+    "contrastTitle": "THE ASSESSMENT OF ARTIFICIAL INTELLIGENCE ON THE ACADEMIC PERFORMANCE OF HOSPITALITY AND TOURISM MANAGEMENT STUDENTS AT THE UNIVERSITY OF THE ASSUMPTION"
+  },
+  {
+    "id": "holdout-contrast-student-environmental-action",
+    "kind": "hard_positive",
+    "query": "whether feeling emotionally connected to nature predicts ecological actions by campus leaders",
+    "expectedTitle": "Nature’s Voice, Leader’s Choice: Nature Connectedness and Pro-Environmental Behavior Among College Student Leaders",
+    "expectedChunks": 37,
+    "contrastTitle": "Bantay-ilog: A Sustainable Hybrid Eco-Structural Design for Riverbank Erosion Control in Candaba, Pampanga"
+  },
+  {
+    "id": "holdout-contrast-safe-sustainable-pencil",
+    "kind": "hard_positive",
+    "query": "designing an environmentally responsible pencil that reduces hazards for young users",
+    "expectedTitle": "ACL SafeWrite: A Sustainable Child-safe Pencil",
+    "expectedChunks": 17,
+    "contrastTitle": "Pamánam: A Culinary Museum and Food heritage institute"
+  },
+  {
+    "id": "holdout-negative-marine-genomics",
+    "kind": "clean_negative",
+    "query": "genomic adaptation of deep sea organisms around hydrothermal vents"
+  },
+  {
+    "id": "holdout-negative-medieval-linguistics",
+    "kind": "clean_negative",
+    "query": "meter and allegory in medieval European court poetry"
+  },
+  {
+    "id": "holdout-negative-particle-physics",
+    "kind": "clean_negative",
+    "query": "quantum chromodynamics measurements from high energy particle colliders"
+  },
+  {
+    "id": "holdout-negative-exoplanet-chemistry",
+    "kind": "clean_negative",
+    "query": "spectroscopic evidence of atmospheric molecules on distant exoplanets"
+  },
+  {
+    "id": "holdout-negative-arctic-glaciology",
+    "kind": "clean_negative",
+    "query": "satellite measurement of glacier mass loss in the Greenland ice sheet"
+  }
+]

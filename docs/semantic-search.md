@@ -151,13 +151,13 @@ bucket had already been consumed; both overrides were removed and the Worker
 was redeployed immediately afterward. The default code-owned cap remains
 20/2,000.
 
-The frozen 25-query holdout returned `semanticStatus: ready` for all 25 queries
-through the pinned region, proving provider availability. It did **not** produce
-valid relevance evidence: the frozen expected `[CORPUS]` records were absent
-from the staging dataset, so none of the 15 positive targets could be scored,
-while all five clean negatives still returned nearest papers. Semantic mode
-remains unapproved and must stay disabled until the holdout is rerun against
-the intended corpus (or an equivalently governed replacement).
+The correct frozen 25-query staging holdout is now versioned as
+`services/processing/semantic_holdout_queries.json` with the registered SHA-256
+above. Through the pinned region, all 25 queries returned `semanticStatus:
+ready`; the 15 positive and five hard-positive targets all ranked first. The
+five clean negatives also all returned nearest papers, at distances
+`0.405–0.458`, so the current retrieval path has no safe abstention behavior.
+Semantic mode remains unapproved and disabled.
 
 ## Known limits
 
