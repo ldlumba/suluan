@@ -1,12 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { ClipboardCheck, Download, FileText, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -167,17 +163,56 @@ export function ReviewQueuePage() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Review queue
-          </h1>
-          <CardDescription>
-            Pending submissions. Remarks are required before accepting or
-            rejecting.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="space-y-8">
+        <header className="flex flex-col gap-5 border-b border-[var(--border)] pb-7 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="eyebrow text-[var(--impact)]">
+              Research and Extension Office
+            </p>
+            <div className="mt-3 flex items-center gap-3">
+              <ClipboardCheck
+                className="size-7 text-[var(--primary)]"
+                aria-hidden="true"
+              />
+              <h1 className="display-heading text-4xl font-semibold">
+                Review queue
+              </h1>
+            </div>
+            <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-muted)]">
+              Make a decision on each submission. Remarks are required and
+              become part of the record.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() =>
+              void queryClient.invalidateQueries({ queryKey: ['review-queue'] })
+            }
+            disabled={queueQuery.isFetching}
+          >
+            <RefreshCw
+              className={`size-4 ${queueQuery.isFetching ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            Refresh queue
+          </Button>
+        </header>
+
+        <section
+          aria-labelledby="pending-submissions-heading"
+          className="space-y-4"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <h2
+              id="pending-submissions-heading"
+              className="text-sm font-bold uppercase tracking-[0.14em] text-[var(--ink-muted)]"
+            >
+              Pending submissions
+            </h2>
+            <span className="rounded-full bg-[var(--secondary)] px-3 py-1 text-sm font-semibold">
+              {items.length} {items.length === 1 ? 'paper' : 'papers'}
+            </span>
+          </div>
           {queueQuery.isLoading && (
             <p className="text-sm text-muted-foreground">Loading queue…</p>
           )}
@@ -192,49 +227,75 @@ export function ReviewQueuePage() {
             </p>
           )}
           {!queueQuery.isLoading && items.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No pending submissions.
-            </p>
+            <div className="border-t-2 border-[var(--primary)] bg-white px-5 py-8">
+              <FileText
+                className="size-6 text-[var(--primary)]"
+                aria-hidden="true"
+              />
+              <p className="mt-4 font-semibold">The queue is clear.</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+                New submissions will appear here when authors send their work
+                for review.
+              </p>
+            </div>
           )}
           {items.map((item) => (
-            <div key={item.id} className="space-y-2 rounded-lg border p-4">
-              <div className="font-medium">{item.title}</div>
-              <div className="text-sm text-muted-foreground">
-                {item.authors ?? 'Authors not listed'} ·{' '}
-                {item.submitterEmail ?? 'Submitter unknown'}
-              </div>
-              {item.keywords.length > 0 && (
-                <div className="text-sm text-muted-foreground">
-                  Keywords: {item.keywords.join('; ')}
+            <article
+              key={item.id}
+              className="border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6"
+            >
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 space-y-3">
+                  <h3 className="display-heading text-2xl font-semibold leading-tight">
+                    {item.title}
+                  </h3>
+                  <div className="text-sm text-[var(--ink-muted)]">
+                    {item.authors ?? 'Authors not listed'} ·{' '}
+                    {item.submitterEmail ?? 'Submitter unknown'}
+                  </div>
+                  {item.keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {item.keywords.map((keyword) => (
+                        <span
+                          key={keyword}
+                          className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-sm text-[var(--ink-muted)]">
+                    <FileText className="size-4" aria-hidden="true" />
+                    {item.files
+                      .map((f) => `${f.fileName} (${formatBytes(f.sizeBytes)})`)
+                      .join(', ')}
+                  </div>
                 </div>
-              )}
-              <div className="text-sm text-muted-foreground">
-                {item.files
-                  .map((f) => `${f.fileName} (${formatBytes(f.sizeBytes)})`)
-                  .join(', ')}
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void download(item)}
+                  >
+                    <Download className="size-4" aria-hidden="true" />
+                    Download
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setDeciding(item)
+                      resetDecisionFields()
+                    }}
+                  >
+                    Review
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void download(item)}
-                >
-                  Download paper
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setDeciding(item)
-                    resetDecisionFields()
-                  }}
-                >
-                  Review
-                </Button>
-              </div>
-            </div>
+            </article>
           ))}
-        </CardContent>
-      </Card>
+        </section>
+      </div>
 
       <Dialog
         open={deciding !== null}
