@@ -73,7 +73,7 @@ there is no SDK that might reject it.
 
 ## Limits and behavior
 
-- **Daily development cap: 20 requests and 2,000 embedding inputs per UTC day.**
+- **Default development cap: 20 requests and 2,000 embedding inputs per UTC day.**
   The temporary 40-request relevance-evaluation window was completed and reverted
   on 2026-10-02. Document chunks and search queries are both inputs. When either
   limit is reached, semantic search falls back to keyword results and says so —
@@ -140,6 +140,24 @@ sanitized results remain local in the Git-ignored `logs/semantic-relevance.json`
   writes only the missing ones; it never needs to delete and re-embed a paper.
 - **Restricted papers are embedded too**, but stay hidden in results. Access is
   a read-time decision, so lifting an embargo needs no re-embedding.
+
+## Region-stable retry — 2026-10-06
+
+The pinned `asia-southeast1` Cloud Run embedding Job completed the remaining
+staging backfill: 1,224/1,224 expected pilot chunks became embedded, and a
+follow-up claim reported no remaining chunks. A temporary, hard-bounded staging
+window (`200` requests / `4,000` inputs) was used because the reset-day staging
+bucket had already been consumed; both overrides were removed and the Worker
+was redeployed immediately afterward. The default code-owned cap remains
+20/2,000.
+
+The frozen 25-query holdout returned `semanticStatus: ready` for all 25 queries
+through the pinned region, proving provider availability. It did **not** produce
+valid relevance evidence: the frozen expected `[CORPUS]` records were absent
+from the staging dataset, so none of the 15 positive targets could be scored,
+while all five clean negatives still returned nearest papers. Semantic mode
+remains unapproved and must stay disabled until the holdout is rerun against
+the intended corpus (or an equivalently governed replacement).
 
 ## Known limits
 

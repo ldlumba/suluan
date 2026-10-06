@@ -6,10 +6,10 @@ describe('embeddingLimits', () => {
     expect(embeddingLimits(undefined)).toEqual(DEV_LIMITS)
   })
 
-  it('accepts a bounded environment-specific request limit', () => {
-    expect(embeddingLimits('100')).toEqual({
+  it('accepts bounded environment-specific limits', () => {
+    expect(embeddingLimits('100', '3000')).toEqual({
       maxRequests: 100,
-      maxInputs: 2000,
+      maxInputs: 3000,
     })
   })
 
@@ -17,9 +17,9 @@ describe('embeddingLimits', () => {
     expect(embeddingLimits('0')).toEqual(DEV_LIMITS)
     expect(embeddingLimits('20.5')).toEqual(DEV_LIMITS)
     expect(embeddingLimits('not-a-number')).toEqual(DEV_LIMITS)
-    expect(embeddingLimits('1000')).toEqual({
-      maxRequests: 100,
-      maxInputs: 2000,
+    expect(embeddingLimits('1000', '9000')).toEqual({
+      maxRequests: 200,
+      maxInputs: 4000,
     })
   })
 })

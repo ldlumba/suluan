@@ -42,22 +42,42 @@ export interface QuotaLimits {
 export const DEV_LIMITS: QuotaLimits = { maxRequests: 20, maxInputs: 2000 }
 
 /**
- * Resolve a temporary environment override without making the cost-bearing
- * input cap configurable. Invalid values fail safe to the normal 20-request
- * limit, and even an approved override cannot exceed 100 requests/day.
+ * Resolve temporary environment overrides for a controlled evaluation window.
+ * Invalid values fail safe to the normal development limits. The hard ceilings
+ * remain code-owned so a deployment cannot accidentally create an unbounded
+ * paid-work budget.
  */
-export function embeddingLimits(raw: string | undefined): QuotaLimits {
-  if (!raw || !/^\d+$/.test(raw)) return DEV_LIMITS
-  const maxRequests = Number(raw)
-  if (!Number.isSafeInteger(maxRequests) || maxRequests < 1) return DEV_LIMITS
-  return { maxRequests: Math.min(maxRequests, 100), maxInputs: DEV_LIMITS.maxInputs }
+export function embeddingLimits(
+  rawRequests: string | undefined,
+  rawInputs?: string,
+): QuotaLimits {
+  const maxRequests =
+    rawRequests && /^\d+$/.test(rawRequests)
+      ? Number(rawRequests)
+      : DEV_LIMITS.maxRequests
+  const maxInputs =
+    rawInputs && /^\d+$/.test(rawInputs)
+      ? Number(rawInputs)
+      : DEV_LIMITS.maxInputs
+  if (
+    !Number.isSafeInteger(maxRequests) ||
+    maxRequests < 1 ||
+    !Number.isSafeInteger(maxInputs) ||
+    maxInputs < 1
+  )
+    return DEV_LIMITS
+  return {
+    maxRequests: Math.min(maxRequests, 200),
+    maxInputs: Math.min(maxInputs, 4000),
+  }
 }
 
 /** Approved production query-side limits, applied to search calls only. */
-export const QUERY_LIMITS: Record<'anonymous' | 'authenticated', QuotaLimits> = {
-  anonymous: { maxRequests: 20, maxInputs: 20 },
-  authenticated: { maxRequests: 50, maxInputs: 50 },
-}
+export const QUERY_LIMITS: Record<'anonymous' | 'authenticated', QuotaLimits> =
+  {
+    anonymous: { maxRequests: 20, maxInputs: 20 },
+    authenticated: { maxRequests: 50, maxInputs: 50 },
+  }
 
 export interface QuotaResult {
   allowed: boolean
@@ -109,7 +129,10 @@ export async function consumeQuota(
     }
   }
   const row = result.rows[0] as { requests: number; inputs: number }
-  return { allowed: true, used: { requests: Number(row.requests), inputs: Number(row.inputs) } }
+  return {
+    allowed: true,
+    used: { requests: Number(row.requests), inputs: Number(row.inputs) },
+  }
 }
 
 async function readUsage(
@@ -148,14 +171,7 @@ export async function consumeQueryQuota(
   if (!dev.allowed) return dev
 
   if (request.viewer === 'PUBLIC') {
-    return consumeQuota(
-      db,
-      'anon_global',
-      'all',
-      1,
-      1,
-      QUERY_LIMITS.anonymous,
-    )
+    return consumeQuota(db, 'anon_global', 'all', 1, 1, QUERY_LIMITS.anonymous)
   }
   if (request.viewer === 'UA_USER' && request.profileId) {
     return consumeQuota(

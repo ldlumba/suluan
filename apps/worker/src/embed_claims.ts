@@ -86,9 +86,13 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       'all',
       1,
       1,
-      embeddingLimits(c.env.EMBEDDING_DAILY_REQUEST_LIMIT),
+      embeddingLimits(
+        c.env.EMBEDDING_DAILY_REQUEST_LIMIT,
+        c.env.EMBEDDING_DAILY_INPUT_LIMIT,
+      ),
     )
-    if (!quota.allowed) return c.json({ error: 'quota_exhausted', reason: quota.reason }, 429)
+    if (!quota.allowed)
+      return c.json({ error: 'quota_exhausted', reason: quota.reason }, 429)
     const claimToken = crypto.randomUUID()
     const inserted = await db.execute(sql`
       insert into embedding_claims
@@ -105,38 +109,53 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
     })
   })
 
-  app.post('/query/result', zValidator('json', queryResultSchema), async (c) => {
-    const db = createDb(c.env.DATABASE_URL)
-    const body = c.req.valid('json')
-    const claims = await db.execute(sql`
+  app.post(
+    '/query/result',
+    zValidator('json', queryResultSchema),
+    async (c) => {
+      const db = createDb(c.env.DATABASE_URL)
+      const body = c.req.valid('json')
+      const claims = await db.execute(sql`
       select payload, used_at as "usedAt"
       from embedding_claims
       where claim_token = ${body.claimToken}
         and kind = 'query' and expires_at > now()
       limit 1
     `)
-    if (!claims.rows.length || (claims.rows[0] as { usedAt: string | null }).usedAt)
-      return c.json({ error: 'stale_claim' }, 409)
-    const claim = claims.rows[0] as {
-      payload: { viewer: ViewerRole; page: number }
-    }
-    let vector: number[]
-    try {
-      vector = normalizeVector(body.values)
-      if (vector.length !== 768 || vector.some((value) => !Number.isFinite(value)))
-        throw new Error('invalid vector')
-    } catch {
-      return c.json({ error: 'invalid_vector' }, 422)
-    }
-    await db.execute(sql`
+      if (
+        !claims.rows.length ||
+        (claims.rows[0] as { usedAt: string | null }).usedAt
+      )
+        return c.json({ error: 'stale_claim' }, 409)
+      const claim = claims.rows[0] as {
+        payload: { viewer: ViewerRole; page: number }
+      }
+      let vector: number[]
+      try {
+        vector = normalizeVector(body.values)
+        if (
+          vector.length !== 768 ||
+          vector.some((value) => !Number.isFinite(value))
+        )
+          throw new Error('invalid vector')
+      } catch {
+        return c.json({ error: 'invalid_vector' }, 422)
+      }
+      await db.execute(sql`
       update embedding_claims set used_at = now()
       where claim_token = ${body.claimToken} and used_at is null
     `)
-    return c.json({
-      ...(await semanticSearchByVector(db, claim.payload.viewer, vector, claim.payload.page)),
-      semanticStatus: 'ready' as const,
-    })
-  })
+      return c.json({
+        ...(await semanticSearchByVector(
+          db,
+          claim.payload.viewer,
+          vector,
+          claim.payload.page,
+        )),
+        semanticStatus: 'ready' as const,
+      })
+    },
+  )
 
   app.post('/claim', zValidator('json', claimSchema), async (c) => {
     const db = createDb(c.env.DATABASE_URL)
@@ -172,7 +191,10 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       .filter((r) => allowed.has(r.record_id))
       .slice(0, EMBED_INPUT_BATCH)
 
-    const limits = embeddingLimits(c.env.EMBEDDING_DAILY_REQUEST_LIMIT)
+    const limits = embeddingLimits(
+      c.env.EMBEDDING_DAILY_REQUEST_LIMIT,
+      c.env.EMBEDDING_DAILY_INPUT_LIMIT,
+    )
     const quota = await consumeQuota(
       db,
       'dev_global',
@@ -182,10 +204,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       limits,
     )
     if (!quota.allowed) {
-      return c.json(
-        { error: 'quota_exhausted', reason: quota.reason },
-        429,
-      )
+      return c.json({ error: 'quota_exhausted', reason: quota.reason }, 429)
     }
 
     const claimToken = crypto.randomUUID()
@@ -236,8 +255,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
           and kind = 'prep' and expires_at > now()
         limit 1
       `)
-      if (claims.rows.length === 0)
-        return c.json({ error: 'stale_claim' }, 409)
+      if (claims.rows.length === 0) return c.json({ error: 'stale_claim' }, 409)
       const claim = claims.rows[0] as {
         claimId: string
         payload: { chunkId: string }[]
@@ -262,12 +280,12 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       } catch {
         return c.json({ error: 'invalid_vector' }, 422)
       }
-      const fullPayload = (claim.payload as unknown as Omit<ClaimItem, 'content'>[]).map(
-        (item) => {
-          const literal = literals.find((l) => l.chunkId === item.chunkId)
-          return { ...item, embedding: literal?.literal ?? '' }
-        },
-      )
+      const fullPayload = (
+        claim.payload as unknown as Omit<ClaimItem, 'content'>[]
+      ).map((item) => {
+        const literal = literals.find((l) => l.chunkId === item.chunkId)
+        return { ...item, embedding: literal?.literal ?? '' }
+      })
       const inserted = await db.execute(sql`
         with input as (
           select * from jsonb_to_recordset(${JSON.stringify(fullPayload)}::jsonb)
