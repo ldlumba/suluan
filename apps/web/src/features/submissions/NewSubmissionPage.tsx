@@ -3,13 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Link } from 'react-router'
+import { CheckCircle2, FileText, UploadCloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -100,30 +95,33 @@ export function NewSubmissionPage() {
     return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
   if (!user) {
     return (
-      <Card>
-        <CardContent className="pt-6 text-sm">
+      <div className="border-t-2 border-[var(--primary)] bg-white p-6 text-sm">
+        <p className="font-semibold">Sign in to submit research.</p>
+        <p className="mt-2 leading-6 text-[var(--ink-muted)]">
           <Link to="/signin" className="underline underline-offset-4">
             Sign in
           </Link>{' '}
           with your UA Google account to submit research.
-        </CardContent>
-      </Card>
+        </p>
+      </div>
     )
   }
 
   if (phase === 'success') {
     return (
-      <Card>
-        <CardHeader>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Submission received
-          </h1>
-          <CardDescription>
-            Your paper is pending REO review. You will be notified of the
-            decision by email.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="border-t-2 border-[var(--signal-blue)] bg-white p-6 sm:p-8">
+        <CheckCircle2
+          className="size-9 text-[var(--signal-blue)]"
+          aria-hidden="true"
+        />
+        <h1 className="display-heading mt-5 text-4xl font-semibold">
+          Submission received
+        </h1>
+        <p className="mt-3 max-w-xl leading-7 text-[var(--ink-muted)]">
+          Your paper is pending REO review. You will be notified of the decision
+          by email.
+        </p>
+        <div className="mt-7">
           <Button
             variant="outline"
             onClick={() => {
@@ -136,8 +134,8 @@ export function NewSubmissionPage() {
           >
             Submit another paper
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
@@ -159,8 +157,7 @@ export function NewSubmissionPage() {
       if (values.authors) form.append('authors', values.authors)
       if (values.schoolId) form.append('schoolId', values.schoolId)
       if (values.courseId) form.append('courseId', values.courseId)
-      for (const term of values.keywords ?? [])
-        form.append('keywords[]', term)
+      for (const term of values.keywords ?? []) form.append('keywords[]', term)
 
       const created = await apiFetch<{ id: string; status: string }>(
         '/api/submissions',
@@ -185,167 +182,178 @@ export function NewSubmissionPage() {
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-      <Card>
-        <CardHeader>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Submit research
-          </h1>
-          <CardDescription>
-            Your paper goes to REO review first. Nothing is published until it
-            is accepted.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input id="title" {...form.register('title')} />
-              {form.formState.errors.title && (
-                <p role="alert" className="text-sm text-destructive">
-                  {form.formState.errors.title.message}
-                </p>
-              )}
-            </div>
+      <section className="border-t-2 border-[var(--primary)] bg-white p-5 sm:p-7">
+        <div className="mb-7 flex items-start gap-3 border-b border-[var(--border)] pb-6">
+          <UploadCloud
+            className="mt-1 size-7 shrink-0 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <div>
+            <p className="eyebrow text-[var(--impact)]">Research intake</p>
+            <h1 className="display-heading mt-2 text-4xl font-semibold">
+              Submit research
+            </h1>
+            <p className="mt-3 max-w-xl leading-7 text-[var(--ink-muted)]">
+              Your paper goes to REO review first. Nothing is published until it
+              is accepted.
+            </p>
+          </div>
+        </div>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="title">Title</Label>
+            <Input id="title" {...form.register('title')} />
+            {form.formState.errors.title && (
+              <p role="alert" className="text-sm text-destructive">
+                {form.formState.errors.title.message}
+              </p>
+            )}
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="authors">Authors</Label>
-              <Textarea
-                id="authors"
-                placeholder="One author per line"
-                {...form.register('authors')}
-              />
-            </div>
-
-            <Controller
-              control={form.control}
-              name="keywords"
-              render={({ field }) => (
-                <KeywordInput
-                  id="keywords"
-                  value={field.value ?? []}
-                  onChange={field.onChange}
-                  error={form.formState.errors.keywords?.message as
-                    | string
-                    | undefined}
-                />
-              )}
+          <div className="space-y-2">
+            <Label htmlFor="authors">Authors</Label>
+            <Textarea
+              id="authors"
+              placeholder="One author per line"
+              {...form.register('authors')}
             />
+          </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>School</Label>
-                <Controller
-                  control={form.control}
-                  name="schoolId"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value)
-                        form.setValue('courseId', '')
-                      }}
-                      items={schools.map((s) => ({
-                        value: s.id,
-                        label: s.name,
-                      }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a school" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {schools.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Course</Label>
-                <Controller
-                  control={form.control}
-                  name="courseId"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={courses.length === 0}
-                      items={courses.map((c) => ({
-                        value: c.id,
-                        label: c.name,
-                      }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            courses.length === 0
-                              ? 'Select a school first'
-                              : 'Select a course'
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {courses.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="file">Document (PDF or DOCX, up to 30 MB)</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={(e) =>
-                  form.setValue('file', e.target.files?.[0] as File, {
-                    shouldValidate: true,
-                  })
+          <Controller
+            control={form.control}
+            name="keywords"
+            render={({ field }) => (
+              <KeywordInput
+                id="keywords"
+                value={field.value ?? []}
+                onChange={field.onChange}
+                error={
+                  form.formState.errors.keywords?.message as string | undefined
                 }
               />
-              {form.formState.errors.file && (
-                <p role="alert" className="text-sm text-destructive">
-                  {form.formState.errors.file.message as string}
-                </p>
-              )}
+            )}
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>School</Label>
+              <Controller
+                control={form.control}
+                name="schoolId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      field.onChange(value)
+                      form.setValue('courseId', '')
+                    }}
+                    items={schools.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                    }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a school" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schools.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
+            <div className="space-y-2">
+              <Label>Course</Label>
+              <Controller
+                control={form.control}
+                name="courseId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={courses.length === 0}
+                    items={courses.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          courses.length === 0
+                            ? 'Select a school first'
+                            : 'Select a course'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courses.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </div>
 
-            {submitError && (
+          <div className="space-y-2">
+            <Label htmlFor="file">Document (PDF or DOCX, up to 30 MB)</Label>
+            <Input
+              id="file"
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(e) =>
+                form.setValue('file', e.target.files?.[0] as File, {
+                  shouldValidate: true,
+                })
+              }
+            />
+            {form.formState.errors.file && (
               <p role="alert" className="text-sm text-destructive">
-                {submitError}
+                {form.formState.errors.file.message as string}
               </p>
             )}
+          </div>
 
-            <Button type="submit" disabled={phase === 'uploading'}>
-              {phase === 'uploading' ? 'Uploading…' : 'Submit for review'}
-            </Button>
-            {submissionId && (
-              <p className="text-xs text-muted-foreground">
-                Reference: {submissionId}
-              </p>
-            )}
-          </form>
-        </CardContent>
-      </Card>
+          {submitError && (
+            <p role="alert" className="text-sm text-destructive">
+              {submitError}
+            </p>
+          )}
 
-      <Card className="lg:sticky lg:top-6">
-        <CardHeader>
-          <h2 className="text-base font-semibold">Schools and courses</h2>
-          <CardDescription>
-            Select a course here to fill both catalog fields. The paper year is
-            assigned automatically when REO accepts it.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <Button type="submit" disabled={phase === 'uploading'}>
+            {phase === 'uploading' ? 'Uploading…' : 'Submit for review'}
+          </Button>
+          {submissionId && (
+            <p className="text-xs text-muted-foreground">
+              Reference: {submissionId}
+            </p>
+          )}
+        </form>
+      </section>
+
+      <aside className="border-t-2 border-[var(--archive-gold)] bg-white p-5 lg:sticky lg:top-6 sm:p-6">
+        <div className="flex items-start gap-3 border-b border-[var(--border)] pb-4">
+          <FileText
+            className="mt-0.5 size-5 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <div>
+            <h2 className="font-semibold">Schools and courses</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+              Select a course here to fill both catalog fields. The paper year
+              is assigned automatically when REO accepts it.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 space-y-4">
           {schoolsQuery.isLoading && (
             <p className="text-sm text-muted-foreground">Loading catalog…</p>
           )}
@@ -389,8 +397,8 @@ export function NewSubmissionPage() {
               </div>
             </section>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </aside>
     </div>
   )
 }

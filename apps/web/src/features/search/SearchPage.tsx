@@ -3,15 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useSearchParams } from 'react-router'
-import { Network, Search, X } from 'lucide-react'
+import { BookOpen, Network, Search, SlidersHorizontal, X } from 'lucide-react'
 import { z } from 'zod'
 import { Button, buttonVariants } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -226,21 +220,45 @@ export function SearchPage() {
   if (loading) return <p>Checking permissions…</p>
 
   return (
-    <Card>
-      <CardHeader>
-        <h1 className="text-2xl font-semibold">
-          {mode === 'semantic' ? 'Semantic search' : 'Keyword search'}
-        </h1>
-        <CardDescription>
-          {mode === 'semantic'
-            ? 'Search accepted, embedded papers by meaning. Availability and limits are reported after a query runs.'
-            : 'Accepted papers, searchable by title, author, year, and full text.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="space-y-8">
+      <header className="border-b border-[var(--border)] pb-7">
+        <p className="eyebrow text-[var(--impact)]">UA research repository</p>
+        <div className="mt-3 flex items-start gap-3">
+          <BookOpen
+            className="mt-1 size-7 shrink-0 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <div>
+            <h1 className="display-heading text-4xl font-semibold">
+              {mode === 'semantic'
+                ? 'Semantic search'
+                : 'Find accepted research'}
+            </h1>
+            <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-muted)]">
+              {mode === 'semantic'
+                ? 'Search accepted, embedded papers by meaning. Availability and limits are reported after a query runs.'
+                : 'Search accepted papers by title, author, year, course, keywords, and prepared full text.'}
+            </p>
+          </div>
+        </div>
+      </header>
+      <div className="space-y-6">
         {manager && (
-          <div className="space-y-2">
-            <div className="border-t pt-4">
+          <div className="border-t-2 border-[var(--archive-gold)] bg-white p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <SlidersHorizontal
+                className="mt-0.5 size-5 text-[var(--primary)]"
+                aria-hidden="true"
+              />
+              <div>
+                <h2 className="font-semibold">Semantic index maintenance</h2>
+                <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
+                  Prepare a bounded batch of accepted papers for semantic
+                  search.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4">
               <Button
                 variant="outline"
                 disabled={embed.isPending}
@@ -250,7 +268,7 @@ export function SearchPage() {
                   ? 'Embedding…'
                   : 'Embed papers for semantic search'}
               </Button>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
                 Sends one bounded batch of up to 2 papers (20 chunks) to Gemini.
                 Wait at least 30 seconds between batches. Counts against the
                 daily embedding limit. Papers are embedded once per extraction.
@@ -282,7 +300,9 @@ export function SearchPage() {
             ),
           )}
         >
-          <Label htmlFor="search-query">Keywords, study title, or author</Label>
+          <Label className="text-base font-semibold" htmlFor="search-query">
+            Keywords, study title, or author
+          </Label>
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Input
@@ -320,7 +340,7 @@ export function SearchPage() {
               The URL query is too long. Enter at most 200 characters.
             </p>
           )}
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm leading-6 text-[var(--ink-muted)]">
             {mode === 'semantic'
               ? 'Describe the research you are looking for in your own words.'
               : 'Try a topic, study title, or author. Leave blank to browse accepted papers; quoted phrases are supported.'}
@@ -344,7 +364,7 @@ export function SearchPage() {
             </Button>
           </div>
           {mode === 'keyword' && (
-            <div className="flex flex-wrap items-end gap-4 border-t border-[var(--border)] pt-4">
+            <div className="flex flex-wrap items-end gap-4 border-t border-[var(--border)] pt-5">
               <div className="space-y-2">
                 <Label htmlFor="search-sort">Sort papers</Label>
                 <Select
@@ -385,11 +405,18 @@ export function SearchPage() {
           )}
         </form>
         {notice && (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p
+            role="status"
+            className="border-l-2 border-[var(--archive-gold)] bg-white px-4 py-3 text-sm leading-6 text-[var(--ink-muted)]"
+          >
             {notice}
           </p>
         )}
-        {results.isFetching && <p role="status">Searching…</p>}
+        {results.isFetching && (
+          <p role="status" className="text-sm text-[var(--ink-muted)]">
+            Searching…
+          </p>
+        )}
         {results.isError && (
           <p role="alert">
             {results.error instanceof ApiError
@@ -400,7 +427,7 @@ export function SearchPage() {
         {!results.isError && q.length <= 200 && results.data && (
           <>
             {items.length === 0 && (
-              <p>
+              <p className="border-t border-[var(--border)] pt-5 text-[var(--ink-muted)]">
                 {mode === 'semantic'
                   ? 'No close match. Try fewer or more general words, or switch to Keyword search for exact terms.'
                   : 'No matching accepted papers. Full-text matches become available after extraction and search preparation.'}
@@ -408,11 +435,14 @@ export function SearchPage() {
             )}
             <ul className="space-y-4">
               {items.map((item) => (
-                <li key={item.id} className="space-y-2 rounded-lg border p-4">
-                  <h2 className="font-semibold">
+                <li
+                  key={item.id}
+                  className="space-y-3 border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6"
+                >
+                  <h2 className="display-heading text-2xl font-semibold leading-tight">
                     {manager || item.visibility !== 'RESTRICTED' ? (
                       <Link
-                        className="hover:text-primary hover:underline"
+                        className="transition-colors hover:text-[var(--signal-blue)] hover:underline underline-offset-4"
                         to={`/records/${encodeURIComponent(item.id)}`}
                       >
                         {item.title}
@@ -421,7 +451,7 @@ export function SearchPage() {
                       item.title
                     )}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-[var(--ink-muted)]">
                     {mode === 'keyword' && (
                       <>
                         {item.fullTextStatus === 'READY'
@@ -438,24 +468,39 @@ export function SearchPage() {
                         ? 'University access only'
                         : 'Repository managers only'}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-[var(--ink-muted)]">
                     {item.authors || 'Authors not listed'} ·{' '}
                     {item.year || 'Year not listed'}
                   </p>
                   {(item.schoolName || item.courseName) && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-[var(--ink-muted)]">
                       {item.schoolName || 'School not listed'} ·{' '}
                       {item.courseName || 'Course not listed'}
                     </p>
                   )}
                   {(item.keywords ?? []).length > 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      Keywords: {(item.keywords ?? []).join('; ')}
-                    </p>
+                    <>
+                      <span className="sr-only">
+                        Keywords: {(item.keywords ?? []).join('; ')}
+                      </span>
+                      <div
+                        className="flex flex-wrap gap-2"
+                        aria-label={`Keywords: ${(item.keywords ?? []).join('; ')}`}
+                      >
+                        {(item.keywords ?? []).map((keyword) => (
+                          <span
+                            key={keyword}
+                            className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium"
+                          >
+                            {keyword}
+                          </span>
+                        ))}
+                      </div>
+                    </>
                   )}
                   {/* Extracted text is untrusted: React text rendering only, never HTML. */}
                   {item.fullTextStatus === 'READY' && item.snippet && (
-                    <p className="whitespace-pre-wrap break-words text-sm">
+                    <p className="whitespace-pre-wrap break-words border-l-2 border-[var(--border)] pl-4 text-sm leading-6 text-[var(--ink-muted)]">
                       {item.snippet}
                     </p>
                   )}
@@ -470,7 +515,7 @@ export function SearchPage() {
                       Read paper details
                     </Link>
                   ) : (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-[var(--ink-muted)]">
                       Details unavailable for your access level
                     </span>
                   )}
@@ -487,7 +532,7 @@ export function SearchPage() {
                 </li>
               ))}
             </ul>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 border-t border-[var(--border)] pt-5">
               <Button
                 variant="outline"
                 disabled={page <= 1}
@@ -518,7 +563,7 @@ export function SearchPage() {
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

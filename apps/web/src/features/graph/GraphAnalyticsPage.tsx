@@ -10,12 +10,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -81,18 +75,27 @@ export function GraphAnalyticsPage() {
   })
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <BarChart3 className="size-5" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold">Research concentration</h1>
+    <div className="space-y-8">
+      <header className="border-b border-[var(--border)] pb-7">
+        <p className="eyebrow text-[var(--impact)]">Knowledge graph</p>
+        <div className="mt-3 flex items-start gap-3">
+          <BarChart3
+            className="mt-1 size-7 shrink-0 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <div>
+            <h1 className="display-heading text-4xl font-semibold">
+              Research concentration
+            </h1>
+            <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-muted)]">
+              Bounded summaries of accepted papers you are authorized to
+              discover. Restricted work contributes only to repository-manager
+              totals.
+            </p>
+          </div>
         </div>
-        <CardDescription>
-          Bounded summaries of accepted papers you are authorized to discover.
-          Restricted work contributes only to repository-manager totals.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      </header>
+      <div className="space-y-6">
         <div className="max-w-64 space-y-2">
           <Label htmlFor="graph-group">Group visible papers by</Label>
           <Select
@@ -135,7 +138,7 @@ export function GraphAnalyticsPage() {
             ) : (
               <>
                 <div
-                  className="w-full overflow-x-auto rounded-lg border p-3"
+                  className="w-full overflow-x-auto border-t-2 border-[var(--primary)] bg-white p-3"
                   aria-label={`Visible papers grouped by ${groupBy}`}
                 >
                   <div
@@ -219,7 +222,7 @@ export function GraphAnalyticsPage() {
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -1,11 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '@/components/ui/card'
+import { ClipboardList, Clock3, CircleCheck, CircleX } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 
@@ -51,58 +46,93 @@ export function MySubmissionsPage() {
     return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
   if (!user) {
     return (
-      <Card>
-        <CardContent className="pt-6 text-sm">
+      <div className="border-t-2 border-[var(--primary)] bg-white p-6 text-sm">
+        <p className="font-semibold">Sign in to track your research.</p>
+        <p className="mt-2 leading-6 text-[var(--ink-muted)]">
           <Link to="/signin" className="underline underline-offset-4">
             Sign in
           </Link>{' '}
           with your UA Google account to track your submissions.
-        </CardContent>
-      </Card>
+        </p>
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          My submissions
-        </h1>
-        <CardDescription>
-          Status and reviewer remarks for papers you submitted. You will also be
-          emailed when a decision is recorded.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-8">
+      <header className="border-b border-[var(--border)] pb-7">
+        <p className="eyebrow text-[var(--impact)]">Workspace</p>
+        <div className="mt-3 flex items-start gap-3">
+          <ClipboardList
+            className="mt-1 size-7 shrink-0 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <div>
+            <h1 className="display-heading text-4xl font-semibold">
+              My submissions
+            </h1>
+            <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-muted)]">
+              Track review status and reviewer remarks. You will also be emailed
+              when a decision is recorded.
+            </p>
+          </div>
+        </div>
+      </header>
+      <section aria-label="Submission status" className="space-y-4">
         {mine.isLoading && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[var(--ink-muted)]">
             Loading your submissions…
           </p>
         )}
         {mine.isError && (
-          <p role="alert" className="text-sm text-destructive">
+          <p
+            role="alert"
+            className="border-l-2 border-[var(--impact-red)] bg-white px-4 py-3 text-sm text-[var(--impact-red)]"
+          >
             {mine.error instanceof ApiError
               ? mine.error.message
               : 'Your submissions could not be loaded.'}
           </p>
         )}
         {mine.data?.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            You have not submitted any papers yet.{' '}
-            <Link to="/submit" className="underline underline-offset-4">
-              Submit research
-            </Link>
-          </p>
+          <div className="border-t-2 border-[var(--primary)] bg-white p-6">
+            <p className="font-semibold">No submissions yet.</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+              Start your repository record by{' '}
+              <Link to="/submit" className="underline underline-offset-4">
+                Submit research
+              </Link>
+              .
+            </p>
+          </div>
         )}
         {mine.data?.map((item) => (
-          <div key={item.id} className="space-y-2 rounded-lg border p-4">
+          <article
+            key={item.id}
+            className="space-y-4 border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6"
+          >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{item.title}</span>
-              <span className="rounded border px-2 py-0.5 text-xs">
+              <h2 className="display-heading mr-auto text-2xl font-semibold leading-tight">
+                {item.title}
+              </h2>
+              <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1 text-xs font-semibold">
+                {item.status === 'PENDING' ? (
+                  <Clock3 className="size-3.5" aria-hidden="true" />
+                ) : item.status === 'ACCEPTED' ? (
+                  <CircleCheck
+                    className="size-3.5 text-[var(--signal-blue)]"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <CircleX
+                    className="size-3.5 text-[var(--impact-red)]"
+                    aria-hidden="true"
+                  />
+                )}
                 {STATUS_LABEL[item.status]}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[var(--ink-muted)]">
               {item.authors || 'Authors not listed'}
               {item.status === 'ACCEPTED' && item.year
                 ? ` · Accepted ${item.year}`
@@ -111,18 +141,33 @@ export function MySubmissionsPage() {
               Submitted {new Date(item.createdAt).toLocaleDateString()}
             </p>
             {(item.keywords ?? []).length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Keywords: {(item.keywords ?? []).join('; ')}
-              </p>
+              <>
+                <span className="sr-only">
+                  Keywords: {(item.keywords ?? []).join('; ')}
+                </span>
+                <div
+                  className="flex flex-wrap gap-2"
+                  aria-label={`Keywords: ${(item.keywords ?? []).join('; ')}`}
+                >
+                  {(item.keywords ?? []).map((keyword) => (
+                    <span
+                      key={keyword}
+                      className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium"
+                    >
+                      {keyword}
+                    </span>
+                  ))}
+                </div>
+              </>
             )}
             {item.remarks && (
-              <p className="whitespace-pre-wrap text-sm">
+              <p className="whitespace-pre-wrap border-l-2 border-[var(--archive-gold)] pl-4 text-sm leading-6">
                 <span className="font-medium">Reviewer remarks: </span>
                 {item.remarks}
               </p>
             )}
             {item.status === 'ACCEPTED' && item.recordId && (
-              <p className="text-sm text-muted-foreground">
+              <p className="border-t border-[var(--border)] pt-4 text-sm text-[var(--ink-muted)]">
                 Published to the repository
                 {item.embargoUntil
                   ? ` with access restrictions until ${item.embargoUntil}`
@@ -130,9 +175,9 @@ export function MySubmissionsPage() {
                 .
               </p>
             )}
-          </div>
+          </article>
         ))}
-      </CardContent>
-    </Card>
+      </section>
+    </div>
   )
 }
