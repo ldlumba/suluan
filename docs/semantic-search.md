@@ -176,6 +176,23 @@ evaluation primitives, not a production policy. The public Worker still uses
 the existing defensive `MIN` path and remains disabled until a fresh labeled
 holdout selects and verifies a scoring/abstention policy.
 
+### Development distance artifact — 2026-10-06
+
+The pinned staging Job execution `suluan-processing-staging-xgrvx` captured the
+same frozen 25-query file after a bounded temporary quota window. The artifact
+was verified with SHA-256
+`a93702be25a253edfc679bb754977db994840df1e858776ea0b21e3842f6cccb`, contained
+25/25 query vectors, and included 39 per-paper distance lists per query. The
+temporary Worker limits were reverted immediately; the public semantic route
+returned `semanticStatus: unconfigured` afterward, and the Job was restored to
+the normal extraction image/command without a Gemini secret attachment.
+
+Offline comparison on this development set found 20/20 positive Hit@1 and 5/5
+negative abstention at conservative candidate floors, including the current
+`MIN` control and top-k variants. This is directional only: the same set is now
+development data, not a calibration or production gate. No scoring policy or
+threshold was promoted.
+
 ## Known limits
 
 - Semantic results only cover papers that have been extracted, keyword-prepared,
