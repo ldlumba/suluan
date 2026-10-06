@@ -1,23 +1,27 @@
 # SULUAN Semantic Search Test Cases
 
-## Draft for adviser review
+## Adviser-approved query set
 
-This is a short proposed set of search queries for reviewing SULUAN's Semantic
-AI Search. Specific Objective 2 says that these behaviors should be assessed
-using adviser-approved test cases.
+This document records the query set reviewed by the adviser for SULUAN's
+Semantic AI Search. Specific Objective 2 says that these behaviors should be
+assessed using adviser-approved test cases.
 
-The proposed expected papers are only initial suggestions. Please correct or
-replace them where necessary. The full legacy corpus has not yet been loaded,
-so the no-match cases should be checked again after import.
+The adviser indicated that the listed queries were acceptable and requested an
+additional query about AI-assisted farming that may return projects related to
+farming or helpful to farmers. That request is represented as a multi-result
+case in `services/processing/semantic_adviser_approved_queries.json`.
 
-This review does not require localhost access. Please just reply with:
+**Frozen file SHA-256:** `c459cbc52eaa77155efa2a9700818f4b53a6086e0d843158a2e2d8964dc7e5ca`
 
-- any query or expected paper you would change;
-- any query you would reject as ambiguous or unrealistic; and
-- two or three search queries you think a UA student or researcher would use.
+The adviser review did not require localhost access. The approval reply was:
 
-The final corrected list will be frozen before the system is evaluated. It will
-be run against the complete repository, not only the current staging records.
+> Maglagay siguro kayo sa proposed query yung for example "AI assisted farming"
+> tapos magrereturn ng projects related sa farming or helpful sa farmers. Yung
+> queries na binigay niyo na nasa docs okay naman.
+
+The JSON file is the frozen approved set for evaluation. Its SHA-256 must be
+recorded before the evaluation run. It should be run against the complete
+repository, not only the current staging records.
 
 ## A. Direct topic searches
 

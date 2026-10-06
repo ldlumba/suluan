@@ -1,0 +1,100 @@
+[
+  {
+    "id": "adviser-a1",
+    "kind": "positive",
+    "query": "antibacterial activity of water spinach extract",
+    "expectedTitle": "In Vitro Antibacterial Activity of Ipomoea aquatica Extract against Staphylococcus aureus and Escherichia coli"
+  },
+  {
+    "id": "adviser-a2",
+    "kind": "positive",
+    "query": "financial literacy of public market vendors in Apalit",
+    "expectedTitle": "Beyond the Bargain: Assessing the Role of Financial Literacy on Business Performance among Apalit Public Market Vendors"
+  },
+  {
+    "id": "adviser-a3",
+    "kind": "positive",
+    "query": "travel behavior of tourism students",
+    "expectedTitle": "TRAVEL BEHAVIOR AMONG TOURISM STUDENTS AT THE UNIVERSITY OF THE ASSUMPTION"
+  },
+  {
+    "id": "adviser-a4",
+    "kind": "positive",
+    "query": "single mothers accessing government health services",
+    "expectedTitle": "Filipino Single Mothers’ Access To Government Healthcare: A Qualitative Inquiry"
+  },
+  {
+    "id": "adviser-b1",
+    "kind": "positive",
+    "query": "does feeling connected to nature affect how students treat the environment",
+    "expectedTitle": "Nature’s Voice, Leader’s Choice: Nature Connectedness and Pro-Environmental Behavior Among College Student Leaders"
+  },
+  {
+    "id": "adviser-b2",
+    "kind": "positive",
+    "query": "can a short-video creator persuade people to buy a local product",
+    "expectedTitle": "Asheng’s Influence on Customers' Purchase Intentions for Ashscents Perfume on TikTok"
+  },
+  {
+    "id": "adviser-b3",
+    "kind": "positive",
+    "query": "how can traditional cooking knowledge be preserved for future generations",
+    "expectedTitle": "Pamánam: A Culinary Museum and Food Heritage Institute"
+  },
+  {
+    "id": "adviser-c1",
+    "kind": "hard_positive",
+    "query": "does using AI improve students' grades",
+    "expectedTitle": "THE ASSESSMENT OF ARTIFICIAL INTELLIGENCE ON THE ACADEMIC PERFORMANCE OF HOSPITALITY AND TOURISM MANAGEMENT STUDENTS AT THE UNIVERSITY OF THE ASSUMPTION",
+    "contrastTitle": "SoilScope: An AI-Powered Mobile Application for Soil Analysis and Disease Detection"
+  },
+  {
+    "id": "adviser-c2",
+    "kind": "hard_positive",
+    "query": "affordable farming technology for local farmers",
+    "expectedTitle": "AgriKlima: Empowering District 3 Farmers in Pampanga using Localized Farming Solutions",
+    "contrastTitle": "SoilScope: An AI-Powered Mobile Application for Soil Analysis and Disease Detection"
+  },
+  {
+    "id": "adviser-c3",
+    "kind": "hard_positive",
+    "query": "how can businesses produce better financial statements",
+    "expectedTitle": "Data Driven Decision Making: Optimizing the Quality of Financial Reporting",
+    "contrastTitle": "Beyond the Bargain: Assessing the Role of Financial Literacy on Business Performance among Apalit Public Market Vendors"
+  },
+  {
+    "id": "adviser-c4",
+    "kind": "hard_positive",
+    "query": "a place for preserving regional food traditions",
+    "expectedTitle": "Pamánam: A Culinary Museum and Food Heritage Institute"
+  },
+  {
+    "id": "adviser-d1",
+    "kind": "clean_negative",
+    "query": "quantum chromodynamics lattice simulation"
+  },
+  {
+    "id": "adviser-d2",
+    "kind": "clean_negative",
+    "query": "how do I install Linux on a laptop"
+  },
+  {
+    "id": "adviser-d3",
+    "kind": "clean_negative",
+    "query": "salary negotiation advice for fresh graduates"
+  },
+  {
+    "id": "adviser-d4",
+    "kind": "clean_negative",
+    "query": "comparative analysis of Nordic and Philippine tax systems"
+  },
+  {
+    "id": "adviser-e1",
+    "kind": "multi_positive",
+    "query": "AI-assisted farming projects that could help local farmers",
+    "expectedTitles": [
+      "AgriKlima: Empowering District 3 Farmers in Pampanga using Localized Farming Solutions",
+      "SoilScope: An AI-Powered Mobile Application for Soil Analysis and Disease Detection"
+    ]
+  }
+]
