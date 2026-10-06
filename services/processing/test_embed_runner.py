@@ -86,6 +86,10 @@ class EmbedRunnerTests(unittest.TestCase):
             self.assertEqual(request["taskType"], "RETRIEVAL_DOCUMENT")
             self.assertEqual(request["outputDimensionality"], 768)
 
+    def test_gemini_body_supports_query_task_for_evaluation(self):
+        body = gemini_body(["hello"], "RETRIEVAL_QUERY")
+        self.assertEqual(body["requests"][0]["taskType"], "RETRIEVAL_QUERY")
+
     def test_parse_accepts_matching_vectors(self):
         vectors = parse_gemini_vectors(vector_payload(2), 2)
         self.assertEqual(len(vectors), 2)

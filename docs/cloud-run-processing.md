@@ -5,8 +5,9 @@
 Development activation is verified as of 2026-10-03. The bounded pull
 contract and container entry point are implemented, remotely built, deployed
 as a manual Cloud Run Job, and smoke-tested end to end against the deployed
-Worker and remote R2. The PHP 250 monthly budget alert is set. Scheduler
-remains intentionally undeployed; execution stays manual.
+Worker and remote R2. The PHP 250 monthly budget alert is set. Staging now
+uses a bounded Cloud Scheduler trigger; development remains manual until its
+own scheduling decision is made.
 
 ## Development smoke test (2026-10-03)
 
@@ -30,8 +31,10 @@ remains intentionally undeployed; execution stays manual.
   never tokens, document bytes, or secrets.
 
 Deployment stays bounded: one task, parallelism 1, max retries 0, 15-minute
-timeout, `SULUAN_MAX_JOBS=5`. Do not enable Scheduler without a separately
-approved frequency, retry/dead-letter, monitoring, and overlap policy.
+timeout, `SULUAN_MAX_JOBS=5`. Staging Scheduler runs every 15 minutes in UTC;
+the database claim lease and the next scheduled run provide recovery for an
+interrupted Job. Production scheduling still requires its own billing,
+monitoring, alerting, and recovery approval.
 
 ## Locked delivery and identity design
 
@@ -129,9 +132,11 @@ Do not execute deployment commands until each gate is confirmed:
 8. Execute one manually queued development fixture. Verify claim audit, private
    download, extraction result, replay behavior, and abandoned-lease recovery.
    Done 2026-10-03 (`suluan-processing-lssfx` → `Full text searchable`).
-9. Only after that check, choose a bounded schedule. Scheduler frequency,
-   retry/dead-letter policy, region, and observability thresholds remain TBD.
-   Manual execution remains the approved development trigger.
+9. Only after that check, choose a bounded schedule. Staging's approved
+   development schedule is 15 minutes, with one task, no Cloud Run task retry,
+   and database lease recovery. Production frequency, alerting thresholds,
+   and institutional ownership remain TBD. Development manual execution
+   remains the approved trigger.
 
 Official references checked 2026-10-03: Cloud Run service identity documents the
 metadata-server audience-bound ID-token flow; Cloud Run Jobs supports a dedicated

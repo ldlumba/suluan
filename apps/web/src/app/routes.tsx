@@ -8,6 +8,7 @@ import { NewSubmissionPage } from '@/features/submissions/NewSubmissionPage'
 import { ReviewQueuePage } from '@/features/review/ReviewQueuePage'
 import { SearchPage } from '@/features/search/SearchPage'
 import { MySubmissionsPage } from '@/features/submissions/MySubmissionsPage'
+import { PaperPage } from '@/features/search/PaperPage'
 
 const graphPage = lazy(() =>
   import('@/features/graph/GraphPage').then((module) => ({
@@ -32,6 +33,7 @@ export const routes = [
       { path: '/signin', element: <SignInPage /> },
       // Search is public discovery: no ProtectedRoute wrapper.
       { path: '/search', element: <SearchPage /> },
+      { path: '/records/:id', element: <PaperPage /> },
       {
         path: '/graph',
         element: (

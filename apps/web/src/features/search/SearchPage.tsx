@@ -99,11 +99,11 @@ function KeywordFilter({
 }) {
   const [draft, setDraft] = useState(initial)
   return (
-    <div className="max-w-56 space-y-2 pt-1">
-      <Label htmlFor="search-keyword">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+      <Label className="sm:whitespace-nowrap" htmlFor="search-keyword">
         Filter by author keyword (exact match)
       </Label>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 flex-1 gap-2 sm:min-w-56">
         <Input
           id="search-keyword"
           value={draft}
@@ -118,7 +118,12 @@ function KeywordFilter({
         </Button>
       </div>
       {initial && (
-        <Button type="button" size="sm" variant="ghost" onClick={() => onApply('')}>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => onApply('')}
+        >
           Clear keyword filter
         </Button>
       )}
@@ -191,21 +196,6 @@ export function SearchPage() {
         await getIdToken(),
       ),
   })
-  const prepare = useMutation({
-    mutationFn: async () =>
-      apiFetch<{ indexed: number; hasMore: boolean }>(
-        '/api/search/index',
-        await getIdToken(),
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{}',
-        },
-      ),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['keyword-search'] })
-    },
-  })
   const embed = useMutation({
     mutationFn: async () =>
       apiFetch<{ embedded: number; papers: number; hasMore: boolean }>(
@@ -222,7 +212,11 @@ export function SearchPage() {
     },
   })
 
-  const results = semanticUnavailable ? keyword : mode === 'semantic' ? semantic : keyword
+  const results = semanticUnavailable
+    ? keyword
+    : mode === 'semantic'
+      ? semantic
+      : keyword
   const items = results.data?.items ?? []
   const notice =
     mode === 'semantic' && semantic.data
@@ -246,64 +240,36 @@ export function SearchPage() {
       <CardContent className="space-y-6">
         {manager && (
           <div className="space-y-2">
-          <Button
-            variant="outline"
-            disabled={prepare.isPending}
-            onClick={() => prepare.mutate()}
-          >
-            {prepare.isPending
-              ? 'Preparing…'
-              : 'Prepare extracted papers for search'}
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Prepares up to 10 papers per batch. Queued extraction jobs are left
-            alone.
-          </p>
-          {prepare.isSuccess && (
-            <p role="status">
-              Prepared {prepare.data.indexed} papers.
-              {prepare.data.hasMore
-                ? ' More remain; run another batch.'
-                : ' Batch complete.'}
-            </p>
-          )}
-          {prepare.isError && (
-            <p role="alert">
-              {prepare.error instanceof ApiError
-                ? prepare.error.message
-                : 'Could not prepare papers.'}
-            </p>
-          )}
-          <div className="border-t pt-4">
-            <Button
-              variant="outline"
-              disabled={embed.isPending}
-              onClick={() => embed.mutate()}
-            >
-              {embed.isPending
-                ? 'Embedding…'
-                : 'Embed papers for semantic search'}
-            </Button>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Sends one bounded batch of up to 2 papers (20 chunks) to Gemini.
-              Wait at least 30 seconds between batches. Counts against the daily
-              embedding limit. Papers are embedded once per extraction.
-            </p>
-            {embed.isSuccess && (
-              <p role="status">
-                Embedded {embed.data.embedded} chunks from {embed.data.papers}{' '}
-                papers.
-                {embed.data.hasMore ? ' More remain; run another batch.' : ''}
+            <div className="border-t pt-4">
+              <Button
+                variant="outline"
+                disabled={embed.isPending}
+                onClick={() => embed.mutate()}
+              >
+                {embed.isPending
+                  ? 'Embedding…'
+                  : 'Embed papers for semantic search'}
+              </Button>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Sends one bounded batch of up to 2 papers (20 chunks) to Gemini.
+                Wait at least 30 seconds between batches. Counts against the
+                daily embedding limit. Papers are embedded once per extraction.
               </p>
-            )}
-            {embed.isError && (
-              <p role="alert">
-                {embed.error instanceof ApiError
-                  ? embed.error.message
-                  : 'Could not embed papers.'}
-              </p>
-            )}
-          </div>
+              {embed.isSuccess && (
+                <p role="status">
+                  Embedded {embed.data.embedded} chunks from {embed.data.papers}{' '}
+                  papers.
+                  {embed.data.hasMore ? ' More remain; run another batch.' : ''}
+                </p>
+              )}
+              {embed.isError && (
+                <p role="alert">
+                  {embed.error instanceof ApiError
+                    ? embed.error.message
+                    : 'Could not embed papers.'}
+                </p>
+              )}
+            </div>
           </div>
         )}
         <form
@@ -317,11 +283,12 @@ export function SearchPage() {
           )}
         >
           <Label htmlFor="search-query">Keywords, study title, or author</Label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Input
                 id="search-query"
-                className="pr-10"
+                className="h-12 pr-10 text-base"
+                placeholder="e.g. reading comprehension, climate change, or public health"
                 {...form.register('q')}
               />
               {formQuery && (
@@ -340,7 +307,7 @@ export function SearchPage() {
                 </Button>
               )}
             </div>
-            <Button type="submit">
+            <Button type="submit" size="lg" className="h-12 px-6">
               <Search className="size-4" aria-hidden="true" />
               Search
             </Button>
@@ -356,7 +323,7 @@ export function SearchPage() {
           <p className="text-sm text-muted-foreground">
             {mode === 'semantic'
               ? 'Describe the research you are looking for in your own words.'
-              : 'Leave blank to browse accepted papers. Quoted phrases are supported; matching is word-based.'}
+              : 'Try a topic, study title, or author. Leave blank to browse accepted papers; quoted phrases are supported.'}
           </p>
           <div className="flex gap-2 pt-1">
             <Button
@@ -377,42 +344,44 @@ export function SearchPage() {
             </Button>
           </div>
           {mode === 'keyword' && (
-            <div className="max-w-56 space-y-2 pt-2">
-              <Label htmlFor="search-sort">Sort papers</Label>
-              <Select
-                value={sort}
-                onValueChange={(value) =>
-                  setParams({
-                    q,
-                    page: '1',
-                    sort: value as SearchSort,
-                    ...keepKeyword,
-                  })
+            <div className="flex flex-wrap items-end gap-4 border-t border-[var(--border)] pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="search-sort">Sort papers</Label>
+                <Select
+                  value={sort}
+                  onValueChange={(value) =>
+                    setParams({
+                      q,
+                      page: '1',
+                      sort: value as SearchSort,
+                      ...keepKeyword,
+                    })
+                  }
+                  items={SORT_OPTIONS.map((option) => ({ ...option }))}
+                >
+                  <SelectTrigger id="search-sort">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <KeywordFilter
+                initial={keywordFilter}
+                onApply={(next) =>
+                  setParams(
+                    next
+                      ? { q, page: '1', sort, keyword: next }
+                      : { q, page: '1', sort },
+                  )
                 }
-                items={SORT_OPTIONS.map((option) => ({ ...option }))}
-              >
-                <SelectTrigger id="search-sort">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
-          )}
-          {mode === 'keyword' && (
-            <KeywordFilter
-              initial={keywordFilter}
-              onApply={(next) =>
-                setParams(
-                  next ? { q, page: '1', sort, keyword: next } : { q, page: '1', sort },
-                )
-              }
-            />
           )}
         </form>
         {notice && (
@@ -440,7 +409,18 @@ export function SearchPage() {
             <ul className="space-y-4">
               {items.map((item) => (
                 <li key={item.id} className="space-y-2 rounded-lg border p-4">
-                  <h2 className="font-semibold">{item.title}</h2>
+                  <h2 className="font-semibold">
+                    {manager || item.visibility !== 'RESTRICTED' ? (
+                      <Link
+                        className="hover:text-primary hover:underline"
+                        to={`/records/${encodeURIComponent(item.id)}`}
+                      >
+                        {item.title}
+                      </Link>
+                    ) : (
+                      item.title
+                    )}
+                  </h2>
                   <p className="text-sm text-muted-foreground">
                     {mode === 'keyword' && (
                       <>
@@ -479,8 +459,26 @@ export function SearchPage() {
                       {item.snippet}
                     </p>
                   )}
+                  {manager || item.visibility !== 'RESTRICTED' ? (
+                    <Link
+                      className={buttonVariants({
+                        variant: 'outline',
+                        size: 'sm',
+                      })}
+                      to={`/records/${encodeURIComponent(item.id)}`}
+                    >
+                      Read paper details
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      Details unavailable for your access level
+                    </span>
+                  )}
                   <Link
-                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                    className={buttonVariants({
+                      variant: 'outline',
+                      size: 'sm',
+                    })}
                     to={`/graph?record=${encodeURIComponent(item.id)}`}
                   >
                     <Network className="size-4" aria-hidden="true" />

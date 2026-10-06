@@ -14,8 +14,9 @@ option on the same `/search` page.
 
 1. **Extraction** — a manager-accepted PDF/DOCX is turned into text by
    `services/processing` (`EXTRACTED`).
-2. **Keyword preparation** — "Prepare extracted papers for search" splits the
-   text into 2,000-character chunks and stores them with a full-text index.
+2. **Keyword preparation** — the Worker's five-minute scheduled sweep splits
+   extracted text into 2,000-character chunks and stores it with a full-text
+   index. `POST /api/search/index` remains a manager-only recovery escape hatch.
 3. **Embedding** — "Embed papers for semantic search" sends each chunk to Gemini
    `gemini-embedding-001`, which returns a 768-dimension vector. The vector is
    normalized and stored in `document_embeddings`, one row per chunk.
@@ -26,8 +27,9 @@ option on the same `/search` page.
    not calibrated as a relevance boundary and currently filters no observed
    development results.
 
-Step 3 is **manager-only** and is an operator action, like step 2. Step 4 is
-public and open to signed-out visitors.
+Step 3 is **manager-only** and remains an operator action while semantic search
+is gated. Step 4 is public and open to signed-out visitors when semantic search
+is configured and approved.
 
 ## What you need
 
@@ -47,8 +49,8 @@ there is no SDK that might reject it.
 ## Manual checks
 
 1. Start `npm run dev:worker` and `npm run dev`, then sign in as a manager.
-2. On `/search`, run **Prepare extracted papers for search** until the batch
-   reports complete. This creates the chunks.
+2. Wait for the scheduled keyword-index sweep, or use the manager-only recovery
+   endpoint if an incident requires immediate preparation.
 3. Run **Embed papers for semantic search**. It reports how many chunks were
    embedded from how many papers. Each action makes one Gemini request for at
    most 20 chunks from at most two papers. Wait at least 30 seconds between

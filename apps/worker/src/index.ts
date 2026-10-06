@@ -13,6 +13,7 @@ import {
   type OutboxMessage,
 } from './notifications'
 import type { Env, QueueMessageLike } from './config'
+import { indexExtractedRecords, KEYWORD_SWEEP_BATCH } from './search'
 
 const app = createApp(productionVerifier)
 
@@ -107,6 +108,15 @@ export default {
   fetch: app.fetch,
   queue: handleQueue,
   async scheduled(_event: unknown, env: Env) {
-    await sweepOutbox(createDb(env.DATABASE_URL), env.NOTIFICATIONS)
+    const db = createDb(env.DATABASE_URL)
+    await sweepOutbox(db, env.NOTIFICATIONS)
+    const result = await indexExtractedRecords(db, {
+      actorId: null,
+      context: { trigger: 'scheduled_sweep' },
+      limit: KEYWORD_SWEEP_BATCH,
+    })
+    if (result.indexed > 0) {
+      console.log(`keyword index sweep indexed=${result.indexed} hasMore=${result.hasMore}`)
+    }
   },
 }

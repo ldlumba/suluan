@@ -4,10 +4,7 @@
 
 1. Restart `npm run dev:worker` and keep `npm run dev` running.
 2. Sign in as an ADMIN or REPOSITORY_MANAGER; click **Search** or open `/search`.
-3. Click **Prepare extracted papers for search**. This prepares up to 10
-   ACCEPTED + EXTRACTED records per batch. If more remain, click again.
-   The two intentionally unprocessed extraction jobs remain QUEUED.
-4. Search for a word from an extracted paper, its title, or an author.
+3. Search for a word from an extracted paper, its title, or an author.
    Leave the query blank to browse accepted papers. Use Previous/Next
    for pages of 10 papers. Quotes support phrase matching within a chunk.
    Accepted papers whose full text is not yet searchable still appear by
@@ -16,8 +13,9 @@
 
 No token-copying or Python rerun is required for papers already EXTRACTED.
 New papers still need the local Python extraction step before preparation.
-Index preparation is explicit in this development slice; it is not automatically
-triggered when a paper is accepted or extracted.
+Keyword indexing runs automatically from the deployed Worker's five-minute
+scheduled sweep. The manager-only `POST /api/search/index` endpoint remains an
+incident/recovery escape hatch, but is not needed for normal operation.
 
 ## Scope
 

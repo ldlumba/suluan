@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { EMBEDDING_DIMS, EMBEDDING_MODEL } from '@suluan/db/schema'
 import type { AppContext } from './app'
-import { createDb } from './db'
+import { createDb, type Db } from './db'
 import { CHUNKER_VERSION, chunkText } from './chunking'
 import {
   cacheControlFor,
@@ -53,6 +53,141 @@ const INDEX_BATCH = 10
 /** Semantic preparation is operator-triggered, so it is bounded hard. */
 export const EMBED_PAPER_BATCH = 2
 export const EMBED_INPUT_BATCH = EMBED_BATCH_SIZE
+export const KEYWORD_SWEEP_BATCH = 50
+
+type IndexActor = {
+  actorId: string | null
+  context?: Record<string, unknown>
+  limit: number
+  recordId?: string
+}
+
+/**
+ * Index extracted records that do not yet have a current keyword snapshot.
+ * The derived candidate query makes this safe to run from both the manager
+ * escape hatch and the scheduled recovery sweep: a replay simply finds no
+ * candidate after the idempotent snapshot/chunk write.
+ */
+export async function indexExtractedRecords(
+  db: Db,
+  { actorId, context, limit, recordId }: IndexActor,
+) {
+  const candidates = await db.execute(sql`
+    select r.id, j.claim_token as "claimToken", j.result
+    from research_records r join submissions s on s.id = r.submission_id
+    join processing_jobs j on j.record_id = r.id
+    where s.status = 'ACCEPTED' and j.status = 'EXTRACTED'
+      and (${recordId ?? null}::uuid is null or r.id = ${recordId ?? null}::uuid)
+      and j.claim_token is not null and not exists (
+        select 1 from keyword_indexes i where i.record_id = r.id
+          and i.extraction_claim_token = j.claim_token
+          and i.chunker_version = ${CHUNKER_VERSION}
+      )
+    order by r.id limit ${limit + 1}
+  `)
+  let indexed = 0
+  for (const row of candidates.rows.slice(0, limit)) {
+    const source = row.result as { text: string; sha256: string }
+    const chunks = chunkText(source.text)
+    if (!chunks.length) continue
+    const result = await db.execute(sql`
+      with snapshot as (
+        insert into keyword_indexes
+          (record_id, extraction_claim_token, chunker_version, source_sha256)
+        select r.id, j.claim_token, ${CHUNKER_VERSION}, ${source.sha256}
+        from research_records r join submissions s on s.id = r.submission_id
+        join processing_jobs j on j.record_id = r.id
+        where r.id = ${row.id} and s.status = 'ACCEPTED' and j.status = 'EXTRACTED'
+          and j.claim_token = ${row.claimToken}
+          and j.result = ${JSON.stringify(row.result)}::jsonb
+        on conflict (record_id, extraction_claim_token, chunker_version) do nothing
+        returning id
+      ), chunks as (
+        insert into document_chunks
+          (index_id, ordinal, start_offset, end_offset, content)
+        select snapshot.id, x.ordinal, x."startOffset", x."endOffset", x.content
+        from snapshot, jsonb_to_recordset(${JSON.stringify(chunks)}::jsonb)
+          as x(ordinal integer, "startOffset" integer, "endOffset" integer, content text)
+      ), audit as (
+        insert into audit_events (actor_id, action, entity_type, entity_id, context)
+        select ${actorId}::uuid, 'keyword_index.created', 'research_record',
+          ${row.id}::text, ${context ? JSON.stringify(context) : null}::jsonb
+        from snapshot
+      ) select id from snapshot
+    `)
+    indexed += result.rows.length
+  }
+  return { indexed, hasMore: candidates.rows.length > limit }
+}
+
+/** Execute vector ranking for a caller that already obtained a query vector.
+ *
+ * Kept separate from Gemini transport so the pinned Cloud Run evaluation path
+ * can use exactly the same visibility and ranking SQL without re-embedding in
+ * the Worker.
+ */
+export async function semanticSearchByVector(
+  db: Db,
+  viewer: ViewerRole,
+  vector: number[],
+  page: number,
+) {
+  const queryVector = toVectorLiteral(vector)
+  const rows = await db.execute(sql`
+    with best as (
+      select e.semantic_index_id, k.record_id,
+        min(e.embedding <=> cast(${queryVector} as vector)) as distance,
+        regexp_replace(btrim((array_agg(
+          d.content order by e.embedding <=> cast(${queryVector} as vector)
+        ))[1]), '[[:space:]]+', ' ', 'g') as snippet
+      from document_embeddings e
+      join document_chunks d on d.id = e.chunk_id
+      join semantic_indexes si on si.id = e.semantic_index_id
+      join keyword_indexes k on k.id = si.keyword_index_id
+      where si.model = ${EMBEDDING_MODEL} and si.dimensions = ${EMBEDDING_DIMS}
+        and si.chunker_version = ${CHUNKER_VERSION}
+      group by e.semantic_index_id, k.record_id
+    ), ranked as (
+      select distinct on (b.record_id) b.record_id, b.distance, b.snippet
+      from best b
+      join research_records r on r.id = b.record_id
+      join submissions s on s.id = r.submission_id
+      where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
+      order by b.record_id, b.distance asc
+    )
+    select r.id, r.title, r.submission_id as "submissionId",
+      coalesce(authors.names, s.authors) as authors,
+      school.name as "schoolName", course.name as "courseName",
+      r.year::text as year,
+      ${effectiveVisibilityLevel('r')} as visibility,
+      'READY' as "fullTextStatus",
+      case
+        when ranked.snippet is null then null
+        when char_length(ranked.snippet) <= 400 then ranked.snippet
+        else rtrim(regexp_replace(
+          left(ranked.snippet, 400), '[[:space:]]+[^[:space:]]*$', ''
+        )) || '…'
+      end as snippet,
+      ranked.distance
+    from ranked
+    join research_records r on r.id = ranked.record_id
+    join submissions s on s.id = r.submission_id
+    left join schools school on school.id = s.school_id
+    left join courses course on course.id = s.course_id
+    left join lateral (
+      select string_agg(a.name, ', ' order by a.position, a.id) as names
+      from record_authors a where a.record_id = r.id
+    ) authors on true
+    where ranked.distance <= ${MAX_SEMANTIC_DISTANCE}
+    order by ranked.distance asc, r.id
+    limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
+  `)
+  return {
+    items: rows.rows.slice(0, PAGE_SIZE),
+    page,
+    hasMore: rows.rows.length > PAGE_SIZE,
+  }
+}
 
 /**
  * Keyword discovery. Public by default (owner-approved 2026-10-01): accepted
@@ -179,52 +314,13 @@ export function searchRoutes(
     async (c) => {
       const { recordId } = c.req.valid('json')
       const db = createDb(c.env.DATABASE_URL)
-      const candidates = await db.execute(sql`
-      select r.id, j.claim_token as "claimToken", j.result
-      from research_records r join submissions s on s.id = r.submission_id
-      join processing_jobs j on j.record_id = r.id
-      where s.status = 'ACCEPTED' and j.status = 'EXTRACTED'
-        and (${recordId ?? null}::uuid is null or r.id = ${recordId ?? null}::uuid)
-        and j.claim_token is not null and not exists (
-          select 1 from keyword_indexes i where i.record_id = r.id
-            and i.extraction_claim_token = j.claim_token
-            and i.chunker_version = ${CHUNKER_VERSION}
-        ) order by r.id limit ${INDEX_BATCH + 1}
-    `)
-      let indexed = 0
-      for (const row of candidates.rows.slice(0, INDEX_BATCH)) {
-        const source = row.result as { text: string; sha256: string }
-        const chunks = chunkText(source.text)
-        if (!chunks.length) continue
-        const result = await db.execute(sql`
-        with snapshot as (
-          insert into keyword_indexes
-            (record_id, extraction_claim_token, chunker_version, source_sha256)
-          select r.id, j.claim_token, ${CHUNKER_VERSION}, ${source.sha256}
-          from research_records r join submissions s on s.id = r.submission_id
-          join processing_jobs j on j.record_id = r.id
-          where r.id = ${row.id} and s.status = 'ACCEPTED' and j.status = 'EXTRACTED'
-            and j.claim_token = ${row.claimToken}
-            and j.result = ${JSON.stringify(row.result)}::jsonb
-          on conflict (record_id, extraction_claim_token, chunker_version) do nothing
-          returning id
-        ), chunks as (
-          insert into document_chunks
-            (index_id, ordinal, start_offset, end_offset, content)
-          select snapshot.id, x.ordinal, x."startOffset", x."endOffset", x.content
-          from snapshot, jsonb_to_recordset(${JSON.stringify(chunks)}::jsonb)
-            as x(ordinal integer, "startOffset" integer, "endOffset" integer, content text)
-        ), audit as (
-          insert into audit_events (actor_id, action, entity_type, entity_id)
-          select ${c.get('profile').id}, 'keyword_index.created', 'research_record',
-            ${row.id}::text
-          from snapshot
-        ) select id from snapshot
-      `)
-        indexed += result.rows.length
-      }
+      const result = await indexExtractedRecords(db, {
+        actorId: c.get('profile').id,
+        limit: recordId ? 1 : INDEX_BATCH,
+        recordId,
+      })
       c.header('Cache-Control', 'private, no-store')
-      return c.json({ indexed, hasMore: candidates.rows.length > INDEX_BATCH })
+      return c.json(result)
     },
   )
 
@@ -319,60 +415,9 @@ export function searchRoutes(
       // yet a calibrated relevance method: longer papers get more chances for
       // one spuriously close chunk, so corpus evaluation must compare it with
       // margin/relative scoring and hybrid keyword + vector retrieval.
-      const queryVector = toVectorLiteral(vector)
-      const rows = await db.execute(sql`
-        with best as (
-          select e.semantic_index_id, k.record_id,
-            min(e.embedding <=> cast(${queryVector} as vector)) as distance,
-            regexp_replace(btrim((array_agg(
-              d.content order by e.embedding <=> cast(${queryVector} as vector)
-            ))[1]), '[[:space:]]+', ' ', 'g') as snippet
-          from document_embeddings e
-          join document_chunks d on d.id = e.chunk_id
-          join semantic_indexes si on si.id = e.semantic_index_id
-          join keyword_indexes k on k.id = si.keyword_index_id
-          where si.model = ${EMBEDDING_MODEL} and si.dimensions = ${EMBEDDING_DIMS}
-            and si.chunker_version = ${CHUNKER_VERSION}
-          group by e.semantic_index_id, k.record_id
-        ), ranked as (
-          select distinct on (b.record_id) b.record_id, b.distance, b.snippet
-          from best b
-          join research_records r on r.id = b.record_id
-          join submissions s on s.id = r.submission_id
-          where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
-          order by b.record_id, b.distance asc
-        )
-        select r.id, r.title, r.submission_id as "submissionId",
-          coalesce(authors.names, s.authors) as authors,
-          school.name as "schoolName", course.name as "courseName",
-          r.year::text as year,
-          ${visibilityCase()} as visibility,
-          'READY' as "fullTextStatus",
-          case
-            when ranked.snippet is null then null
-            when char_length(ranked.snippet) <= 400 then ranked.snippet
-            else rtrim(regexp_replace(
-              left(ranked.snippet, 400), '[[:space:]]+[^[:space:]]*$', ''
-            )) || '…'
-          end as snippet,
-          ranked.distance
-        from ranked
-        join research_records r on r.id = ranked.record_id
-        join submissions s on s.id = r.submission_id
-        left join schools school on school.id = s.school_id
-        left join courses course on course.id = s.course_id
-        left join lateral (
-          select string_agg(a.name, ', ' order by a.position, a.id) as names
-          from record_authors a where a.record_id = r.id
-        ) authors on true
-        where ranked.distance <= ${MAX_SEMANTIC_DISTANCE}
-        order by ranked.distance asc, r.id
-        limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
-      `)
+      const result = await semanticSearchByVector(db, viewer, vector, page)
       return c.json({
-        items: rows.rows.slice(0, PAGE_SIZE),
-        page,
-        hasMore: rows.rows.length > PAGE_SIZE,
+        ...result,
         semanticStatus: 'ready' as const,
       })
     },

@@ -2,6 +2,7 @@ import { eq, sql } from 'drizzle-orm'
 import { Hono, type MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
 import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
 import { courses, profiles, schools, submissions } from '@suluan/db/schema'
 import {
   productionServiceVerifier,
@@ -25,6 +26,7 @@ import { prepareSubmissionKeywords } from './keywords'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { serviceEmbedRoutes } from './embed_claims'
 import { searchRoutes } from './search'
+import { CHUNKER_VERSION } from './chunking'
 import { graphRoutes } from './graph'
 import {
   cacheControlFor,
@@ -231,6 +233,64 @@ export function createApp(
   )
   // Live metadata graph. Every response is viewer-specific and read-only.
   app.route('/api/graph', graphRoutes(optionalAuth))
+
+  /**
+   * Public metadata detail for one accepted record. The visibility predicate
+   * intentionally matches search and download; an invisible or non-accepted
+   * record is always returned as the same 404 to prevent ID probing.
+   */
+  app.get(
+    '/api/records/:id',
+    optionalAuth,
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    async (c) => {
+      const db = createDb(c.env.DATABASE_URL)
+      const profile = c.get('profile')
+      const viewer = viewerRoleFor(profile?.role ?? null)
+      const authAttempted = Boolean(c.req.header('authorization'))
+      const rows = await db.execute(sql`
+      select r.id, r.title, r.year::text as year,
+        coalesce(authors.names, s.authors) as authors,
+        school.name as "schoolName", course.name as "courseName",
+        ${effectiveVisibilityLevel('r')} as visibility,
+        case
+          when j.status = 'EXTRACTED' and exists (
+            select 1 from keyword_indexes i
+            where i.record_id = r.id
+              and i.extraction_claim_token = j.claim_token
+              and i.chunker_version = ${CHUNKER_VERSION}
+          ) then 'READY'
+          when j.status = 'FAILED' then 'FAILED'
+          else 'PENDING'
+        end as "fullTextStatus",
+        coalesce(kw.terms, '{}'::text[]) as keywords
+      from research_records r
+      join submissions s on s.id = r.submission_id
+      left join processing_jobs j on j.record_id = r.id
+      left join schools school on school.id = s.school_id
+      left join courses course on course.id = s.course_id
+      left join lateral (
+        select string_agg(a.name, ', ' order by a.position, a.id) as names
+        from record_authors a where a.record_id = r.id
+      ) authors on true
+      left join lateral (
+        select array_agg(k.display_name order by rk.position, k.id) as terms
+        from research_keywords rk join keywords k on k.id = rk.keyword_id
+        where rk.record_id = r.id
+      ) kw on true
+      where r.id = ${c.req.valid('param').id}
+        and s.status = 'ACCEPTED'
+        and ${effectiveVisibility(viewer, 'r').rowVisible}
+      limit 1
+    `)
+      if (!rows.rows.length) {
+        c.header('Cache-Control', 'private, no-store')
+        return c.json({ error: 'record_not_found' }, 404)
+      }
+      c.header('Cache-Control', cacheControlFor(viewer, authAttempted, 30))
+      return c.json(rows.rows[0])
+    },
+  )
 
   /**
    * Submitter status view (owner-approved 2026-10-01): a signed-in submitter

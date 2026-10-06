@@ -8,7 +8,7 @@ import {
   type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Network } from 'lucide-react'
+import { ArrowUpRight, Network, Search } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import {
   Card,
@@ -16,6 +16,7 @@ import {
   CardDescription,
   CardHeader,
 } from '@/components/ui/card'
+import { buttonVariants } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 
@@ -45,6 +46,21 @@ interface Neighborhood {
   nodes: GraphNode[]
   edges: GraphEdge[]
   truncated: boolean
+}
+
+interface RecentPaper {
+  id: string
+  title: string
+  authors: string | null
+  schoolName: string | null
+  courseName: string | null
+  year: string | null
+}
+
+interface RecentPapersResult {
+  items: RecentPaper[]
+  page: number
+  hasMore: boolean
 }
 
 const COLORS: Record<GraphNodeType, string> = {
@@ -103,7 +119,7 @@ function flowNodes(nodes: GraphNode[]): Node[] {
           border: `${node.center ? 3 : 1}px solid ${COLORS[type]}`,
           borderRadius: 10,
           background: 'white',
-          color: '#0f172a',
+          color: 'var(--foreground)',
           fontSize: 12,
           fontWeight: node.center ? 700 : 500,
           padding: 10,
@@ -144,6 +160,16 @@ export function GraphPage() {
         await getIdToken(),
       ),
   })
+  const recent = useQuery({
+    queryKey: ['graph-entry-papers'],
+    enabled: !recordId,
+    retry: false,
+    queryFn: async () =>
+      apiFetch<RecentPapersResult>(
+        '/api/search/records?q=&page=1&sort=newest',
+        await getIdToken(),
+      ),
+  })
   const papers = graph.data?.nodes.filter((node) => node.type === 'paper') ?? []
 
   return (
@@ -161,13 +187,107 @@ export function GraphPage() {
       </CardHeader>
       <CardContent className="space-y-4">
         {!recordId && (
-          <p>
-            Choose <strong>View relationships</strong> on a paper in{' '}
-            <Link className="underline" to="/search">
-              search
-            </Link>
-            .
-          </p>
+          <section className="space-y-8" aria-labelledby="graph-start-heading">
+            <div className="rounded-[25px] bg-[var(--primary)] p-6 text-white sm:p-8">
+              <p className="eyebrow">Explore the collection differently</p>
+              <h2
+                id="graph-start-heading"
+                className="display-heading mt-3 max-w-2xl text-3xl font-semibold sm:text-4xl"
+              >
+                Start with a paper, then follow its connections.
+              </h2>
+              <p className="mt-4 max-w-2xl leading-7 text-white/75">
+                See how accepted research connects through authors, keywords,
+                courses, schools, and years. Choose a recent paper below or
+                search the full repository.
+              </p>
+              <Link
+                className={`${buttonVariants({ variant: 'secondary' })} mt-6 bg-white text-[var(--primary)] hover:bg-[var(--highlight)] hover:text-[var(--foreground)]`}
+                to="/search"
+              >
+                <Search className="size-4" aria-hidden="true" />
+                Search the repository
+                <ArrowUpRight className="size-4" aria-hidden="true" />
+              </Link>
+            </div>
+
+            <div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="eyebrow text-[var(--impact)]">
+                    Recent research
+                  </p>
+                  <h2 className="display-heading mt-2 text-2xl font-semibold">
+                    Choose a starting point
+                  </h2>
+                </div>
+                <Link
+                  className="text-sm font-semibold text-[var(--primary)] hover:text-[var(--accent)] hover:underline"
+                  to="/search?sort=newest"
+                >
+                  View all papers <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+
+              {recent.isPending && (
+                <p role="status" className="mt-6 text-sm text-muted-foreground">
+                  Loading recent papers…
+                </p>
+              )}
+              {recent.isError && (
+                <p role="alert" className="mt-6 text-sm text-muted-foreground">
+                  Recent papers could not be loaded. Use search to find a paper
+                  to explore.
+                </p>
+              )}
+              {recent.data && recent.data.items.length === 0 && (
+                <div className="mt-6 border-t border-[var(--border)] pt-6">
+                  <p className="font-medium">
+                    No published papers are available yet.
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Once accepted research is published, it will appear here as
+                    a graph entry point.
+                  </p>
+                </div>
+              )}
+              {recent.data && recent.data.items.length > 0 && (
+                <ul className="mt-6 grid gap-3 md:grid-cols-2">
+                  {recent.data.items.slice(0, 6).map((paper) => (
+                    <li key={paper.id}>
+                      <Link
+                        className="group flex h-full flex-col justify-between border-t-2 border-[var(--border)] bg-white p-5 transition-colors hover:border-[var(--accent)] hover:bg-[var(--secondary)]"
+                        to={`/graph?record=${encodeURIComponent(paper.id)}`}
+                      >
+                        <span>
+                          <span className="block font-semibold leading-6 text-foreground group-hover:text-[var(--primary)]">
+                            {paper.title}
+                          </span>
+                          <span className="mt-2 block text-sm text-muted-foreground">
+                            {paper.authors || 'Authors not listed'}
+                          </span>
+                        </span>
+                        <span className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                          <span>
+                            {[paper.year, paper.courseName || paper.schoolName]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-semibold text-[var(--primary)]">
+                            Explore{' '}
+                            <ArrowUpRight
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
         )}
         {graph.isPending && recordId && (
           <p role="status">Loading relationships…</p>

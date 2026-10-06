@@ -73,9 +73,31 @@ describe('knowledge graph discovery', () => {
     )
   })
 
-  it('explains how to choose a paper when no center is supplied', () => {
+  it('lists recent papers as graph entry points when no center is supplied', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [
+        {
+          id: '33333333-3333-4333-8333-333333333333',
+          title: 'Recent paper',
+          authors: 'A. Researcher',
+          schoolName: 'School of Computing',
+          courseName: 'BS Information Technology',
+          year: '2026',
+        },
+      ],
+      page: 1,
+      hasMore: false,
+    } as never)
     renderPage('/graph')
-    expect(screen.getByText(/Choose/)).toBeInTheDocument()
-    expect(apiFetch).not.toHaveBeenCalled()
+    expect(
+      await screen.findByRole('link', { name: /Recent paper/ }),
+    ).toHaveAttribute(
+      'href',
+      '/graph?record=33333333-3333-4333-8333-333333333333',
+    )
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/search/records?q=&page=1&sort=newest',
+      'test-token',
+    )
   })
 })

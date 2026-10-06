@@ -138,7 +138,8 @@ claim IDs and counts only — never the API key, chunk text, or vectors.
 Development activation is verified 2026-10-03: manual Job
 `suluan-processing` (`asia-southeast1`) execution `suluan-processing-lssfx`
 completed against the deployed Worker and remote R2, and the fixture became
-`Full text searchable`. Scheduler stays undeployed; manual execution is the
-approved development trigger. The `workers.dev` edge requires the runner's
-browser-compatible `User-Agent`; bare non-browser clients fail with Cloudflare
-1010 before reaching the Worker.
+`Full text searchable`. Staging's `suluan-processing-staging` Job is now
+started automatically every 15 minutes by Cloud Scheduler; development remains
+manual. The `workers.dev` edge requires the runner's browser-compatible
+`User-Agent`; bare non-browser clients fail with Cloudflare 1010 before
+reaching the Worker.

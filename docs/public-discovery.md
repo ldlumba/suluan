@@ -3,14 +3,18 @@
 ## What changed (2026-10-01)
 
 - **Search is public.** `/search` works signed out. Results are filtered by
-  each record's visibility; the "Prepare extracted papers" button stays
-  manager-only because it writes keyword snapshots.
+  each record's visibility; extracted papers are indexed automatically by the
+  Worker's scheduled sweep.
 - **Per-paper visibility** is set when a manager accepts: `PUBLIC` (default),
   `UA_ONLY`, or `RESTRICTED`.
 - **Optional embargo date** auto-lifts a restricted paper to public. It only
   appears for non-public visibility, and a date on a PUBLIC paper is ignored.
 - **Public downloads** of accepted public papers are served from
   `GET /api/records/:id/download`.
+- **Paper details** are served from `GET /api/records/:id`; the metadata route
+  uses the same effective-visibility predicate and returns a uniform 404 for
+  missing or unauthorized records. The web app links only to details the
+  current viewer can open.
 - **My submissions** (`/submissions`) shows each submitter their own papers,
   status, and reviewer remarks. It does not grant file access.
 

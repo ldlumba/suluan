@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -37,14 +38,14 @@ USER_AGENT = "Mozilla/5.0 (compatible; SULUAN-Embed-Job/1.0)"
 EMBED_DIMS = 768
 
 
-def gemini_body(texts):
-    """Batch embedding request with the asymmetric document task type."""
+def gemini_body(texts, task_type="RETRIEVAL_DOCUMENT"):
+    """Batch embedding request with the approved asymmetric task type."""
     return {
         "requests": [
             {
                 "model": "models/gemini-embedding-001",
                 "content": {"parts": [{"text": text}]},
-                "taskType": "RETRIEVAL_DOCUMENT",
+                "taskType": task_type,
                 "outputDimensionality": EMBED_DIMS,
             }
             for text in texts
@@ -72,11 +73,11 @@ def parse_gemini_vectors(payload, expected):
     return vectors
 
 
-def embed_texts(texts, api_key, opener=None):
+def embed_texts(texts, api_key, opener=None, task_type="RETRIEVAL_DOCUMENT"):
     """One bounded Gemini call from this pinned region. No retries here."""
     if not api_key:
         raise ValueError("A Gemini API key is required")
-    data = json.dumps(gemini_body(texts)).encode()
+    data = json.dumps(gemini_body(texts, task_type)).encode()
     request = urllib.request.Request(
         GEMINI_BATCH_URL,
         data=data,
@@ -116,6 +117,38 @@ def process_claim(client, api_key, claim):
     return result.get("embedded", 0)
 
 
+def process_query(client, api_key, query):
+    """Embed one query and return visibility-filtered Worker ranking."""
+    claim = client.json(
+        "/api/internal/embeddings/query/claim",
+        {"query": query, "viewer": "MANAGER", "page": 1},
+    )
+    vector = embed_texts(
+        [claim["query"]], api_key, task_type="RETRIEVAL_QUERY"
+    )[0]
+    return client.json(
+        "/api/internal/embeddings/query/result",
+        {"claimToken": claim["claimToken"], "values": vector},
+    )
+
+
+def safe_query_result(probe_id, result):
+    """Keep evaluation logs free of extracted snippets and document text."""
+    return {
+        "id": probe_id,
+        "semanticStatus": result.get("semanticStatus"),
+        "page": result.get("page"),
+        "hasMore": result.get("hasMore"),
+        "items": [
+            {
+                key: item.get(key)
+                for key in ("id", "title", "visibility", "distance")
+            }
+            for item in result.get("items", [])
+        ],
+    }
+
+
 def run_claims(client, api_key, *, max_claims=5, record_id=None, emit=print):
     completed = 0
     embedded = 0
@@ -147,6 +180,21 @@ def main():
         "--max-claims", type=int, default=int(os.environ.get("SULUAN_MAX_CLAIMS", "5"))
     )
     parser.add_argument(
+        "--query",
+        default=os.environ.get("SULUAN_QUERY"),
+        help="Run one pinned-region retrieval-query evaluation instead of document claims.",
+    )
+    parser.add_argument(
+        "--query-file",
+        default=os.environ.get("SULUAN_QUERY_FILE"),
+        help="Run a frozen JSON probe list in the pinned region.",
+    )
+    parser.add_argument(
+        "--query-interval",
+        type=float,
+        default=float(os.environ.get("SULUAN_QUERY_INTERVAL", "3")),
+    )
+    parser.add_argument(
         "--record-id",
         default=os.environ.get("SULUAN_RECORD_ID"),
         help="Scope claims to one record (tests and single-paper recovery). Omit to drain the backlog.",
@@ -156,7 +204,14 @@ def main():
         parser.error("--api and --audience (or their environment variables) are required")
     if not 1 <= args.max_claims <= 10:
         parser.error("--max-claims must be between 1 and 10")
-    api_key = os.environ.get("GEMINI_API_KEY")
+    if args.query_file and args.query:
+        parser.error("use --query or --query-file, not both")
+    if args.query_interval < 1:
+        parser.error("--query-interval must be at least 1 second")
+    # Secret Manager values are expected to be newline-free, but strip at the
+    # process boundary as defense in depth. A pasted CRLF must never become an
+    # invalid HTTP header (or appear in a provider error).
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         parser.error("GEMINI_API_KEY environment variable is required")
 
@@ -173,7 +228,27 @@ def main():
 
     client = ServiceWorkerClient(args.api, token_provider)
     try:
-        run_claims(client, api_key, max_claims=args.max_claims, record_id=args.record_id)
+        if args.query_file:
+            with open(args.query_file, encoding="utf-8") as handle:
+                probes = json.load(handle)
+            for number, probe in enumerate(probes, 1):
+                result = process_query(client, api_key, probe["query"])
+                if result.get("semanticStatus") != "ready":
+                    raise RuntimeError(
+                        f"query {probe['id']} returned "
+                        f"semanticStatus={result.get('semanticStatus')}"
+                    )
+                print(json.dumps(
+                    safe_query_result(probe["id"], result),
+                    separators=(",", ":"),
+                ))
+                if number < len(probes):
+                    time.sleep(args.query_interval)
+        elif args.query:
+            result = process_query(client, api_key, args.query)
+            print(json.dumps(result, separators=(",", ":")))
+        else:
+            run_claims(client, api_key, max_claims=args.max_claims, record_id=args.record_id)
     except urllib.error.HTTPError as error:
         raise SystemExit(
             f"{format_worker_error(error, client.last_token)}; "

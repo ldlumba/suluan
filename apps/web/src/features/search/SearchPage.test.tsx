@@ -49,9 +49,9 @@ const semanticItem = {
 
 describe('keyword search', () => {
   beforeEach(() => vi.clearAllMocks())
-  it('lets ordinary UA users search but hides the manager-only prepare action', async () => {
+  it('does not expose the retired manual indexing action', async () => {
     vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
-    renderPage('USER')
+    renderPage('ADMIN')
     await waitFor(() => expect(apiFetch).toHaveBeenCalled())
     expect(
       screen.queryByRole('button', { name: /prepare extracted papers/i }),

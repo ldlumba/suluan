@@ -10,6 +10,8 @@ import { CHUNKER_VERSION } from './chunking'
 import { normalizeVector, toVectorLiteral } from './embeddings'
 import { consumeQuota, embeddingLimits } from './quota'
 import { EMBED_INPUT_BATCH, EMBED_PAPER_BATCH } from './search'
+import { semanticSearchByVector } from './search'
+import type { ViewerRole } from './visibility'
 
 const claimSchema = z
   .object({ recordId: z.string().uuid().optional() })
@@ -22,6 +24,19 @@ const resultSchema = z
   .object({
     claimToken: z.string().uuid(),
     vectors: z.array(vectorSchema).min(1).max(EMBED_INPUT_BATCH),
+  })
+  .strict()
+const queryClaimSchema = z
+  .object({
+    query: z.string().trim().min(1).max(200),
+    viewer: z.enum(['PUBLIC', 'UA_USER', 'MANAGER']).default('MANAGER'),
+    page: z.number().int().min(1).max(1000).default(1),
+  })
+  .strict()
+const queryResultSchema = z
+  .object({
+    claimToken: z.string().uuid(),
+    values: z.array(z.number()).max(4096),
   })
   .strict()
 
@@ -57,6 +72,70 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
   app.use('*', async (c, next) => {
     c.header('Cache-Control', 'private, no-store')
     await next()
+  })
+
+  // Evaluation-only query claim/result flow. The pinned Cloud Run runner
+  // claims quota before calling Gemini, then returns the vector for the exact
+  // same visibility-aware ranking SQL used by the public route.
+  app.post('/query/claim', zValidator('json', queryClaimSchema), async (c) => {
+    const db = createDb(c.env.DATABASE_URL)
+    const body = c.req.valid('json')
+    const quota = await consumeQuota(
+      db,
+      'dev_global',
+      'all',
+      1,
+      1,
+      embeddingLimits(c.env.EMBEDDING_DAILY_REQUEST_LIMIT),
+    )
+    if (!quota.allowed) return c.json({ error: 'quota_exhausted', reason: quota.reason }, 429)
+    const claimToken = crypto.randomUUID()
+    const inserted = await db.execute(sql`
+      insert into embedding_claims
+        (claim_token, kind, inputs, payload, expires_at)
+      values (${claimToken}, 'query', 1,
+        ${JSON.stringify({ query: body.query, viewer: body.viewer, page: body.page })}::jsonb,
+        now() + interval '10 minutes')
+      returning id as "claimId"
+    `)
+    return c.json({
+      claimId: (inserted.rows[0] as { claimId: string }).claimId,
+      claimToken,
+      query: body.query,
+    })
+  })
+
+  app.post('/query/result', zValidator('json', queryResultSchema), async (c) => {
+    const db = createDb(c.env.DATABASE_URL)
+    const body = c.req.valid('json')
+    const claims = await db.execute(sql`
+      select payload, used_at as "usedAt"
+      from embedding_claims
+      where claim_token = ${body.claimToken}
+        and kind = 'query' and expires_at > now()
+      limit 1
+    `)
+    if (!claims.rows.length || (claims.rows[0] as { usedAt: string | null }).usedAt)
+      return c.json({ error: 'stale_claim' }, 409)
+    const claim = claims.rows[0] as {
+      payload: { viewer: ViewerRole; page: number }
+    }
+    let vector: number[]
+    try {
+      vector = normalizeVector(body.values)
+      if (vector.length !== 768 || vector.some((value) => !Number.isFinite(value)))
+        throw new Error('invalid vector')
+    } catch {
+      return c.json({ error: 'invalid_vector' }, 422)
+    }
+    await db.execute(sql`
+      update embedding_claims set used_at = now()
+      where claim_token = ${body.claimToken} and used_at is null
+    `)
+    return c.json({
+      ...(await semanticSearchByVector(db, claim.payload.viewer, vector, claim.payload.page)),
+      semanticStatus: 'ready' as const,
+    })
   })
 
   app.post('/claim', zValidator('json', claimSchema), async (c) => {

@@ -24,6 +24,18 @@ does not require another Google login or billing account:
 | Artifact Registry | staging-project repository `suluan` |
 | Browser | local Vite `http://localhost:5174` |
 
+When the browser is started with the staging web environment, its API base is
+`https://suluan-api-staging.ctrlfinder.workers.dev`. Deploying only
+`apps/worker/wrangler.toml` updates the development API and does not update the
+staging browser. Deploy staging explicitly from `apps/worker` with:
+
+```powershell
+npx wrangler deploy -c wrangler.staging.toml
+```
+
+The development and staging Workers have separate Neon, R2, Queue, and API
+origins; verify the active `VITE_API_BASE_URL` before live UI checks.
+
 ## Locked boundaries for this stage
 
 - Use the normal submission, individual review, acceptance, processing, and
@@ -166,9 +178,15 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   service account `suluan-processing-staging@suluan-staging.iam.gserviceaccount.com`.
   Image digest is
   `sha256:780dc0e5c584fb14c227f6a0c8572fdf59a40ea2a517001cd4749a06a902b59f`.
-- No Cloud Run Scheduler, `GEMINI_API_KEY`, embeddings, OCR, service-account
-  JSON key, or institutional Gmail sender is configured. The staging Worker
-  has a five-minute outbox sweep and temporary UA OAuth sender approved on
+- Cloud Scheduler job `suluan-processing-trigger` now starts that Job every 15
+  minutes in UTC. It uses the least-privilege
+  `suluan-processing-scheduler@suluan-staging.iam.gserviceaccount.com` identity,
+  which has `roles/run.invoker` only on the processing Job. The first manually
+  forced Scheduler run completed successfully on 2026-10-06; database claim
+  leases remain the overlap and stale-worker safeguard.
+- `GEMINI_API_KEY`, embeddings, OCR, service-account JSON key, and institutional
+  Gmail sender are not configured. The staging Worker has a five-minute outbox
+  and keyword-index sweep plus the temporary UA OAuth sender approved on
   2026-10-05.
 
 ### Database recovery
@@ -269,8 +287,8 @@ After this exit, Stage 7 reliability/security hardening runs before the full
 - Scheduler/queue policy (owner-approved): consumer `max_retries` 3, then
   `suluan-notifications-staging-dlq`; the DLQ handler emails `REO_MAILBOX` and
   always acknowledges so it can never loop. Worker `dd93d8ef` serves both
-  consumers. The 5-minute outbox sweep stands; Cloud Run scheduling stays
-  undeployed.
+  consumers. The 5-minute outbox sweep stands; the staging processing Job is
+  now started by its bounded 15-minute Cloud Scheduler trigger.
 - Log policy (owner-approved): IDs and routing addresses only — never paper
   titles, remarks, or bodies — on Cloudflare default retention. The log
   adapter no longer prints subjects.

@@ -17,10 +17,16 @@ function renderAt(path: string) {
 }
 
 describe('app routing', () => {
-  it('renders the placeholder home screen at /', () => {
+  it('renders the repository home screen at /', () => {
     renderAt('/')
-    expect(screen.getByRole('heading', { name: 'SULUAN' })).toBeInTheDocument()
-    expect(screen.getByText(/no features are wired yet/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: /Find the work that moves UA forward/i,
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Explore the repository/i }),
+    ).toBeInTheDocument()
   })
 
   it('renders the sign-in screen at /signin', () => {
@@ -37,7 +43,9 @@ describe('app routing', () => {
 
   it('redirects signed-out visitors away from /submit and /review', async () => {
     renderAt('/submit')
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Sign in' }),
+    ).toBeInTheDocument()
   })
 
   it('renders the not-found screen for unknown routes', () => {
