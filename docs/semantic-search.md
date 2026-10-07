@@ -223,6 +223,23 @@ development; staging migration, Worker deployment, dedicated Job creation, and
 the no-paid-call smoke test remain activation work. The frozen adviser suite is
 not rerun until those checks pass and quota has reset.
 
+### Chunking audit — 2026-10-07
+
+A content-free aggregate audit covered all 1,227 current staging chunks. Of
+1,188 non-final chunks, 24 ended at sentence punctuation and 23 ended at a
+newline; median and maximum length were both 2,000 characters. Eighty chunks
+contained the word `references`. This confirms that v1 is a fixed window rather
+than a section-aware academic-paper chunker.
+
+The current `chars-2000-overlap-200-v1` strategy remains frozen for the governed
+pilot. Its 200-character overlap preserves context across hard boundaries, and
+the same version already produced 20/20 development Hit@1; changing it now
+would invalidate that baseline and require an unvalidated full re-embedding.
+Section-aware boundaries, title/heading prefixes, and reference exclusion are
+explicit candidates only if the completed-corpus evaluation identifies a
+failure attributable to chunking. They must be compared as a new version, not
+silently substituted after observing the frozen results.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for
