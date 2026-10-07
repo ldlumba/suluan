@@ -319,6 +319,24 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   `2c011e64` verifies semantic as unconfigured. Full aggregate evidence is in
   `docs/stage8-pilot-results.md`.
 
+### Isolated semantic evaluator activation — 2026-10-07
+
+- Migration `0012` and Worker version
+  `246a3cbd-7560-4684-b31e-a74923073fdb` activated the batch evaluation and
+  quota-free preflight routes.
+- Manual Job `suluan-semantic-eval-staging` is pinned to image digest
+  `sha256:bf4fcc89fe91c101e5c2fe6df6726cd36a20cacb32f7d7d9827a81da79e0b741`,
+  has one task, parallelism one, zero retries, no Gemini secret, and no
+  Scheduler binding. The existing Scheduler still targets only the extraction
+  Job.
+- Preflight execution `suluan-semantic-eval-staging-jp9zs` authenticated and
+  verified the frozen 16-query hash, 39 eligible records/1,227 chunks, zero
+  missing embeddings, zero unindexed records, and corpus snapshot
+  `603a92476dff09f45cfdd081fb5949e3e2753ce4646eefc11900097a1eb21bcc`.
+  It failed closed only on quota headroom (20/20 requests already consumed),
+  without changing the 20-request/20-input usage or creating an evaluation
+  claim. No paid evaluation was run.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,

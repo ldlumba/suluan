@@ -218,13 +218,21 @@ provider request per query. The replacement path fixes both before another run:
 - normal logs receive only the run/artifact hashes and counts. Full vectors and
   distance arrays no longer need to be reconstructed from Cloud Logging.
 
-The evaluation must run from a separate, manually invoked
+The evaluation runs from a separate, manually invoked
 `suluan-semantic-eval-staging` Cloud Run Job with no Scheduler binding. The
 existing `suluan-processing-staging` extraction Job must never again be
-repointed. Code and migration `0012` are implemented and verified in
-development; staging migration, Worker deployment, dedicated Job creation, and
-the no-paid-call smoke test remain activation work. The frozen adviser suite is
-not rerun until those checks pass and quota has reset.
+repointed. Migration `0012`, Worker version
+`246a3cbd-7560-4684-b31e-a74923073fdb`, and the digest-pinned Job were activated
+in staging on 2026-10-07. Quota-free execution
+`suluan-semantic-eval-staging-jp9zs` authenticated and verified the frozen
+16-query hash, 39 eligible records/1,227 chunks, zero missing embeddings, zero
+unindexed records, and corpus snapshot
+`603a92476dff09f45cfdd081fb5949e3e2753ce4646eefc11900097a1eb21bcc`.
+It correctly reported `ready: false` solely because the earlier invalid run had
+already consumed 20/20 daily requests. Usage stayed at 20 requests/20 inputs,
+no evaluation claim was created, and Gemini was not configured or called. This
+is activation evidence only; the frozen adviser suite is not rerun until quota
+has reset and the completed legacy corpus is frozen.
 
 ### Chunking audit — 2026-10-07
 

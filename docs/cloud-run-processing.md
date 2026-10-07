@@ -93,10 +93,27 @@ This avoids overlapping scheduler executions, duplicate paid calls, and
 stdout-only evidence. The Gemini secret is attached only to the dedicated
 evaluation Job; the public Worker remains unconfigured for direct Gemini calls.
 
-Live creation remains pending the staging migration and Worker deployment. No
-evaluation may run merely because the container exists: first verify the frozen
-query hash, corpus snapshot, zero missing eligible embeddings, daily quota, and
-the absence of a Scheduler binding.
+Staging activation completed on 2026-10-07: migration `0012` was applied through
+the direct Neon endpoint, Worker version
+`246a3cbd-7560-4684-b31e-a74923073fdb` was deployed, and the dedicated Job was
+created by immutable digest with one task, parallelism one, zero retries, no
+secret, and no Scheduler binding. The extraction Scheduler still targets only
+`suluan-processing-staging`.
+
+Quota-free execution `suluan-semantic-eval-staging-jp9zs` reached the Worker
+with the expected workload identity and verified the frozen 16-query source
+hash, 39 eligible records/1,227 chunks, zero missing embeddings, zero unindexed
+records, and corpus snapshot
+`603a92476dff09f45cfdd081fb5949e3e2753ce4646eefc11900097a1eb21bcc`.
+It exited nonzero because quota headroom was intentionally part of readiness and
+the earlier invalid run had already consumed 20/20 requests. Database evidence
+remained 20 requests/20 inputs with zero active evaluation claims, proving that
+preflight created no claim and consumed no quota. This is a successful
+fail-closed smoke test, not a scored semantic evaluation.
+
+No paid evaluation may run merely because the Job exists. Wait for quota reset
+and the completed legacy corpus, rerun preflight against that final snapshot,
+then attach the Gemini key only for the bounded manual execution.
 
 The isolated evaluator image with quota-free `--preflight` support was built
 without executing it on 2026-10-07:
