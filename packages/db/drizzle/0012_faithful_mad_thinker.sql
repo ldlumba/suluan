@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "embedding_claims_active_evaluation_unique" ON "embedding_claims" USING btree ("kind") WHERE "embedding_claims"."kind" = 'evaluation' and "embedding_claims"."used_at" is null;

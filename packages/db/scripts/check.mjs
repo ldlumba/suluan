@@ -130,6 +130,22 @@ try {
     failures.push('document_embeddings unique chunk_id')
   }
 
+  // A frozen evaluation is one paid batch. Even if two operators start the
+  // dedicated Job together, PostgreSQL must arbitrate a single active claim.
+  const { rows: evaluationLock } = await client.query(
+    `select count(*)::int as n from pg_indexes
+     where schemaname = current_schema()
+       and indexname = 'embedding_claims_active_evaluation_unique'
+       and indexdef like '%UNIQUE%'
+       and indexdef like '%evaluation%'`,
+  )
+  if (evaluationLock[0]?.n === 1) {
+    console.log('ok   one active semantic evaluation claim')
+  } else {
+    console.log('FAIL embedding_claims missing active evaluation guard')
+    failures.push('embedding_claims active evaluation guard')
+  }
+
   // Locked rule: remarks required before either decision.
   const { rows: remarks } = await client.query(
     `select is_nullable from information_schema.columns

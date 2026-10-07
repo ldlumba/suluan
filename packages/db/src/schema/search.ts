@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
@@ -107,9 +108,7 @@ export const semanticIndexes = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [
-    unique().on(table.keywordIndexId, table.model, table.dimensions),
-  ],
+  (table) => [unique().on(table.keywordIndexId, table.model, table.dimensions)],
 )
 
 /**
@@ -163,7 +162,9 @@ export const embeddingUsage = pgTable(
     requests: integer('requests').notNull().default(0),
     inputs: integer('inputs').notNull().default(0),
   },
-  (table) => [primaryKey({ columns: [table.bucket, table.actorKey, table.day] })],
+  (table) => [
+    primaryKey({ columns: [table.bucket, table.actorKey, table.day] }),
+  ],
 )
 
 /**
@@ -180,15 +181,26 @@ export const embeddingUsage = pgTable(
  * Chunk text itself is returned in the claim response (Job memory only) and
  * is never persisted here — only chunk IDs travel back.
  */
-export const embeddingClaims = pgTable('embedding_claims', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  claimToken: uuid('claim_token').notNull().unique(),
-  kind: text('kind').notNull().default('prep'),
-  inputs: integer('inputs').notNull().default(0),
-  payload: jsonb('payload').notNull(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  usedAt: timestamp('used_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-})
+export const embeddingClaims = pgTable(
+  'embedding_claims',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    claimToken: uuid('claim_token').notNull().unique(),
+    kind: text('kind').notNull().default('prep'),
+    inputs: integer('inputs').notNull().default(0),
+    payload: jsonb('payload').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // The evaluation Job is intentionally scheduler-free, but the database is
+    // the final concurrency boundary. Expired claims are closed before a new
+    // claim is inserted, and this partial index arbitrates simultaneous starts.
+    uniqueIndex('embedding_claims_active_evaluation_unique')
+      .on(table.kind)
+      .where(sql`${table.kind} = 'evaluation' and ${table.usedAt} is null`),
+  ],
+)

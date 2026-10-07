@@ -77,6 +77,27 @@ The workload identity is not a Firebase user, is never auto-created as a Neon
 profile, cannot call manager routes, and records system audit events with a null
 user actor plus its service-account email in audit context.
 
+## Semantic evaluation Job separation — 2026-10-07
+
+Semantic evaluation must use a distinct manual Cloud Run Job,
+`suluan-semantic-eval-staging`. It may reuse the pinned processing service
+identity and container image, but it has no Scheduler trigger and its fixed
+command is `python embed_runner.py --query-file <frozen-file>`. The scheduled
+`suluan-processing-staging` Job remains extraction-only.
+
+The evaluation runner claims an entire suite before calling Gemini, embeds up
+to 20 queries in one `batchEmbedContents` request, and posts the exact vector
+set once. The Worker enforces corpus completeness, one active claim, quota
+reservation, visibility-aware ranking, and private R2 artifact persistence.
+This avoids overlapping scheduler executions, duplicate paid calls, and
+stdout-only evidence. The Gemini secret is attached only to the dedicated
+evaluation Job; the public Worker remains unconfigured for direct Gemini calls.
+
+Live creation remains pending the staging migration and Worker deployment. No
+evaluation may run merely because the container exists: first verify the frozen
+query hash, corpus snapshot, zero missing eligible embeddings, daily quota, and
+the absence of a Scheduler binding.
+
 ## Configuration contract
 
 Worker deployment configuration:

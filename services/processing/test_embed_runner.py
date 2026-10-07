@@ -10,6 +10,7 @@ from embed_runner import (
     gemini_body,
     parse_gemini_vectors,
     process_claim,
+    process_evaluation_batch,
     run_claims,
 )
 
@@ -204,6 +205,49 @@ class EmbedRunnerTests(unittest.TestCase):
         self.assertEqual(result["chunkDistances"], {"record-1": [0.2, 0.3]})
         self.assertEqual(len(vector), 768)
         self.assertTrue(client.calls[0][1]["includeDiagnostics"])
+
+    def test_evaluation_suite_uses_one_provider_batch(self):
+        class EvaluationClient:
+            def __init__(self):
+                self.calls = []
+
+            def json(self, path, body=None):
+                self.calls.append((path, body))
+                if path.endswith("/evaluation/claim"):
+                    return {
+                        "claimToken": "00000000-0000-4000-8000-000000000001",
+                        "probes": body["probes"],
+                    }
+                return {"semanticStatus": "ready", "probeCount": 2}
+
+        client = EvaluationClient()
+        provider_calls = []
+        original = embed_runner.embed_texts
+
+        def fake_embed(texts, key, task_type="RETRIEVAL_DOCUMENT"):
+            provider_calls.append((texts, task_type))
+            return [[0.2] * 768 for _ in texts]
+
+        embed_runner.embed_texts = fake_embed
+        try:
+            result = process_evaluation_batch(
+                client,
+                "test-key",
+                [
+                    {"id": "p1", "query": "first query"},
+                    {"id": "p2", "query": "second query"},
+                ],
+                "a" * 64,
+            )
+        finally:
+            embed_runner.embed_texts = original
+        self.assertEqual(result["probeCount"], 2)
+        self.assertEqual(len(provider_calls), 1)
+        self.assertEqual(provider_calls[0][0], ["first query", "second query"])
+        self.assertEqual(provider_calls[0][1], "RETRIEVAL_QUERY")
+        self.assertEqual(client.calls[0][0], "/api/internal/embeddings/evaluation/claim")
+        self.assertEqual(client.calls[1][0], "/api/internal/embeddings/evaluation/result")
+        self.assertEqual(len(client.calls[1][1]["vectors"]), 2)
 
 
 if __name__ == "__main__":

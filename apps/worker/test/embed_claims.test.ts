@@ -57,8 +57,14 @@ describe('embedding workload identity', () => {
       email: 'boss@ua.edu.ph',
     })
     expect(
-      (await serviceRequest(auth, '/api/internal/embeddings/claim', firebase, {}))
-        .status,
+      (
+        await serviceRequest(
+          auth,
+          '/api/internal/embeddings/claim',
+          firebase,
+          {},
+        )
+      ).status,
     ).toBe(401)
   })
 
@@ -260,10 +266,7 @@ needsDb('region-stable embedding claims', () => {
       const raw = row.embedding as unknown
       const values = Array.isArray(raw)
         ? (raw as number[])
-        : String(raw)
-            .replace(/[[\]]/g, '')
-            .split(',')
-            .map(Number)
+        : String(raw).replace(/[[\]]/g, '').split(',').map(Number)
       expect(values).toHaveLength(768)
       const norm = Math.sqrt(values.reduce((n, v) => n + v * v, 0))
       // Six-decimal literal serialization costs ~1e-5 of norm precision.
@@ -336,6 +339,49 @@ needsDb('region-stable embedding claims', () => {
       },
     )
     expect([409, 422]).toContain(malformed.status)
+    // Leave the shared integration corpus complete so the evaluation
+    // preflight below tests its intended success path rather than inheriting
+    // this fixture's deliberately incomplete claim.
+    if (partial.status !== 200) {
+      const completed = await serviceRequest(
+        auth,
+        '/api/internal/embeddings/result',
+        serviceToken,
+        {
+          claimToken: claim.claimToken,
+          vectors: claim.items.map((item) => ({
+            chunkId: item.chunkId,
+            values: unitVector(),
+          })),
+        },
+      )
+      expect(completed.status).toBe(200)
+    }
+  }, 60_000)
+
+  it('fails evaluation preflight closed when the corpus is incomplete', async () => {
+    const probes = [
+      { id: 'probe-1', query: 'evaluation study' },
+      { id: 'probe-2', query: 'unrelated evaluation question' },
+    ]
+    const claimRes = await serviceRequest(
+      auth,
+      '/api/internal/embeddings/evaluation/claim',
+      serviceToken,
+      {
+        sourceSha256: 'c'.repeat(64),
+        probes,
+        returnArtifact: true,
+      },
+      {
+        EMBEDDING_DAILY_REQUEST_LIMIT: '1000',
+        EMBEDDING_DAILY_INPUT_LIMIT: '10000',
+      },
+    )
+    expect(claimRes.status).toBe(409)
+    expect((await claimRes.json()) as unknown).toMatchObject({
+      error: 'corpus_incomplete',
+    })
   }, 60_000)
 
   it('fails closed with 429 when the daily quota is exhausted', async () => {

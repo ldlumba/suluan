@@ -193,6 +193,36 @@ attempt supplies no ranking or abstention evidence and must not be counted as a
 pass or failure of the preregistered gate. The gate remains pending a fresh
 quota day with the scheduler paused during the bounded run.
 
+### Evaluation isolation and batching — implemented, live activation pending
+
+The failed run exposed two avoidable process defects: a scheduled extraction
+Job was temporarily reused for evaluation, and the frozen suite used one paid
+provider request per query. The replacement path fixes both before another run:
+
+- `POST /api/internal/embeddings/evaluation/claim` accepts 1–20 frozen probes,
+  verifies that every eligible current-snapshot chunk has the approved model
+  embedding, reports extracted records missing keyword indexes, computes a
+  deterministic corpus snapshot hash, and reserves **one request plus N
+  inputs** from the server-side quota;
+- a database partial unique index permits only one unused evaluation claim;
+- `embed_runner.py --query-file` sends the whole suite in one Gemini
+  `batchEmbedContents` call with `RETRIEVAL_QUERY` rather than one call per
+  probe;
+- the result endpoint validates the exact probe set and vector geometry,
+  computes all visibility-aware rankings/distances, and writes one sanitized
+  immutable JSON artifact under private R2
+  `operations/semantic-evaluations/<run-id>.json`;
+- normal logs receive only the run/artifact hashes and counts. Full vectors and
+  distance arrays no longer need to be reconstructed from Cloud Logging.
+
+The evaluation must run from a separate, manually invoked
+`suluan-semantic-eval-staging` Cloud Run Job with no Scheduler binding. The
+existing `suluan-processing-staging` extraction Job must never again be
+repointed. Code and migration `0012` are implemented and verified in
+development; staging migration, Worker deployment, dedicated Job creation, and
+the no-paid-call smoke test remain activation work. The frozen adviser suite is
+not rerun until those checks pass and quota has reset.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for

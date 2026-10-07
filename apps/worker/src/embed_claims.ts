@@ -43,6 +43,35 @@ const queryResultSchema = z
     values: z.array(z.number()).max(4096),
   })
   .strict()
+const evaluationProbeSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  query: z.string().trim().min(1).max(200),
+})
+const evaluationClaimSchema = z
+  .object({
+    sourceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    probes: z.array(evaluationProbeSchema).min(1).max(20),
+    viewer: z.enum(['PUBLIC', 'UA_USER', 'MANAGER']).default('MANAGER'),
+    page: z.number().int().min(1).max(1000).default(1),
+    returnArtifact: z.boolean().default(false),
+  })
+  .strict()
+  .superRefine((body, ctx) => {
+    if (
+      new Set(body.probes.map((probe) => probe.id)).size !== body.probes.length
+    )
+      ctx.addIssue({ code: 'custom', message: 'probe ids must be unique' })
+  })
+const evaluationVectorSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  values: z.array(z.number()).max(4096),
+})
+const evaluationResultSchema = z
+  .object({
+    claimToken: z.string().uuid(),
+    vectors: z.array(evaluationVectorSchema).min(1).max(20),
+  })
+  .strict()
 
 interface ClaimItem {
   chunkId: string
@@ -50,6 +79,41 @@ interface ClaimItem {
   recordId: string
   sourceSha256: string
   content: string
+}
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(value),
+  )
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+type SafeSemanticResult = {
+  semanticStatus: 'ready'
+  page: number
+  hasMore: boolean
+  items: { id: string; title: string; visibility: string; distance: number }[]
+}
+
+function safeSemanticResult(result: {
+  page: number
+  hasMore: boolean
+  items: Record<string, unknown>[]
+}): SafeSemanticResult {
+  return {
+    semanticStatus: 'ready',
+    page: result.page,
+    hasMore: result.hasMore,
+    items: result.items.map((item) => ({
+      id: String(item.id),
+      title: String(item.title),
+      visibility: String(item.visibility),
+      distance: Number(item.distance),
+    })),
+  }
 }
 
 /**
@@ -176,6 +240,255 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
             }
           : {}),
         semanticStatus: 'ready' as const,
+      })
+    },
+  )
+
+  /**
+   * Frozen-suite evaluation contract. Unlike the interactive one-query route,
+   * one claim reserves one provider request for up to 20 query inputs. The Job
+   * calls Gemini batchEmbedContents once, then returns every vector together.
+   * The Worker ranks against one immutable corpus snapshot and persists a
+   * sanitized artifact to private R2; vectors never need to be reconstructed
+   * from Cloud Logging.
+   */
+  app.post(
+    '/evaluation/claim',
+    zValidator('json', evaluationClaimSchema),
+    async (c) => {
+      const db = createDb(c.env.DATABASE_URL)
+      const body = c.req.valid('json')
+      const corpus = await db.execute(sql`
+        select k.record_id as "recordId", k.source_sha256 as "sourceSha256",
+          count(d.id)::integer as "chunkCount",
+          count(si.id)::integer as "embeddedCount"
+        from keyword_indexes k
+        join document_chunks d on d.index_id = k.id
+        join research_records r on r.id = k.record_id
+        join submissions s on s.id = r.submission_id
+        left join document_embeddings e on e.chunk_id = d.id
+        left join semantic_indexes si on si.id = e.semantic_index_id
+          and si.model = ${EMBEDDING_MODEL}
+          and si.dimensions = ${EMBEDDING_DIMS}
+          and si.chunker_version = ${CHUNKER_VERSION}
+        where s.status = 'ACCEPTED'
+          and k.chunker_version = ${CHUNKER_VERSION}
+        group by k.record_id, k.source_sha256
+        order by k.record_id
+      `)
+      const rows = corpus.rows as {
+        recordId: string
+        sourceSha256: string
+        chunkCount: number
+        embeddedCount: number
+      }[]
+      const missingChunks = rows.reduce(
+        (total, row) => total + row.chunkCount - row.embeddedCount,
+        0,
+      )
+      const unindexed = await db.execute(sql`
+        select count(*)::integer as count
+        from processing_jobs p
+        join research_records r on r.id = p.record_id
+        join submissions s on s.id = r.submission_id
+        where s.status = 'ACCEPTED' and p.status = 'EXTRACTED'
+          and not exists (
+            select 1 from keyword_indexes k
+            join document_chunks d on d.index_id = k.id
+            where k.record_id = r.id
+              and k.chunker_version = ${CHUNKER_VERSION}
+          )
+      `)
+      const unindexedRecords = Number(
+        (unindexed.rows[0] as { count: number }).count,
+      )
+      if (rows.length === 0 || missingChunks > 0 || unindexedRecords > 0) {
+        return c.json(
+          {
+            error: 'corpus_incomplete',
+            records: rows.length,
+            missingChunks,
+            unindexedRecords,
+          },
+          409,
+        )
+      }
+      const corpusSnapshot = await sha256(
+        JSON.stringify(
+          rows.map(({ recordId, sourceSha256, chunkCount }) => ({
+            recordId,
+            sourceSha256,
+            chunkCount,
+          })),
+        ),
+      )
+      const claimToken = crypto.randomUUID()
+      const payload = {
+        sourceSha256: body.sourceSha256,
+        corpusSnapshot,
+        probes: body.probes,
+        viewer: body.viewer,
+        page: body.page,
+        returnArtifact: body.returnArtifact,
+      }
+      try {
+        const inserted = await db.execute(sql`
+          with expired as (
+            update embedding_claims set used_at = now()
+            where kind = 'evaluation' and used_at is null and expires_at <= now()
+          )
+          insert into embedding_claims
+            (claim_token, kind, inputs, payload, expires_at)
+          values (${claimToken}, 'evaluation', ${body.probes.length},
+            ${JSON.stringify(payload)}::jsonb, now() + interval '15 minutes')
+          returning id as "claimId", created_at as "createdAt"
+        `)
+        const claim = inserted.rows[0] as {
+          claimId: string
+          createdAt: string
+        }
+        const quota = await consumeQuota(
+          db,
+          'dev_global',
+          'all',
+          1,
+          body.probes.length,
+          embeddingLimits(
+            c.env.EMBEDDING_DAILY_REQUEST_LIMIT,
+            c.env.EMBEDDING_DAILY_INPUT_LIMIT,
+          ),
+        )
+        if (!quota.allowed) {
+          await db.execute(sql`
+            update embedding_claims set used_at = now()
+            where id = ${claim.claimId}::uuid and used_at is null
+          `)
+          return c.json({ error: 'quota_exhausted', reason: quota.reason }, 429)
+        }
+        return c.json({
+          ...claim,
+          claimToken,
+          sourceSha256: body.sourceSha256,
+          corpusSnapshot,
+          model: EMBEDDING_MODEL,
+          dimensions: EMBEDDING_DIMS,
+          taskType: 'RETRIEVAL_QUERY',
+          probes: body.probes,
+        })
+      } catch (error) {
+        // PostgreSQL 23505 is the active-evaluation partial unique index. Do
+        // not expose database details for any other insert failure.
+        if ((error as { code?: string }).code === '23505')
+          return c.json({ error: 'evaluation_in_progress' }, 409)
+        throw error
+      }
+    },
+  )
+
+  app.post(
+    '/evaluation/result',
+    bodyLimit({ maxSize: 4 * 1024 * 1024 }),
+    zValidator('json', evaluationResultSchema),
+    async (c) => {
+      const db = createDb(c.env.DATABASE_URL)
+      const body = c.req.valid('json')
+      const claims = await db.execute(sql`
+        select id as "claimId", payload, used_at as "usedAt",
+          created_at as "createdAt"
+        from embedding_claims
+        where claim_token = ${body.claimToken}
+          and kind = 'evaluation' and expires_at > now()
+        limit 1
+      `)
+      if (!claims.rows.length) return c.json({ error: 'stale_claim' }, 409)
+      const claim = claims.rows[0] as {
+        claimId: string
+        usedAt: string | null
+        createdAt: string
+        payload: {
+          sourceSha256: string
+          corpusSnapshot: string
+          probes: { id: string; query: string }[]
+          viewer: ViewerRole
+          page: number
+          returnArtifact: boolean
+        }
+      }
+      if (claim.usedAt) return c.json({ error: 'stale_claim' }, 409)
+      const claimedIds = new Set(claim.payload.probes.map((probe) => probe.id))
+      const vectorIds = new Set(body.vectors.map((vector) => vector.id))
+      if (
+        claimedIds.size !== vectorIds.size ||
+        ![...claimedIds].every((id) => vectorIds.has(id))
+      )
+        return c.json({ error: 'claim_mismatch' }, 409)
+
+      const vectors = new Map<string, number[]>()
+      try {
+        for (const item of body.vectors) {
+          const vector = normalizeVector(item.values)
+          if (vector.length !== EMBEDDING_DIMS)
+            throw new Error('invalid vector')
+          vectors.set(item.id, vector)
+        }
+      } catch {
+        return c.json({ error: 'invalid_vector' }, 422)
+      }
+
+      const evaluated = await Promise.all(
+        claim.payload.probes.map(async (probe) => {
+          const vector = vectors.get(probe.id) as number[]
+          const [result, chunkDistances] = await Promise.all([
+            semanticSearchByVector(
+              db,
+              claim.payload.viewer,
+              vector,
+              claim.payload.page,
+            ),
+            semanticChunkDistancesByVector(db, claim.payload.viewer, vector),
+          ])
+          return {
+            id: probe.id,
+            vector,
+            chunkDistances,
+            rankedItems: safeSemanticResult(result).items,
+          }
+        }),
+      )
+      const artifact = {
+        version: 1,
+        runId: claim.claimId,
+        generatedAt: claim.createdAt,
+        sourceSha256: claim.payload.sourceSha256,
+        corpusSnapshot: claim.payload.corpusSnapshot,
+        model: EMBEDDING_MODEL,
+        taskType: 'RETRIEVAL_QUERY',
+        dimensions: EMBEDDING_DIMS,
+        complete: true,
+        probeCount: evaluated.length,
+        vectors: evaluated,
+      }
+      const encoded = JSON.stringify(artifact)
+      const artifactSha256 = await sha256(encoded)
+      const artifactKey = `operations/semantic-evaluations/${claim.claimId}.json`
+      await c.env.DOCUMENTS.put(artifactKey, encoded, {
+        httpMetadata: { contentType: 'application/json' },
+      })
+      const used = await db.execute(sql`
+        update embedding_claims set used_at = now()
+        where id = ${claim.claimId}::uuid and used_at is null
+        returning id
+      `)
+      if (!used.rows.length) return c.json({ error: 'stale_claim' }, 409)
+      return c.json({
+        semanticStatus: 'ready' as const,
+        runId: claim.claimId,
+        artifactKey,
+        artifactSha256,
+        sourceSha256: claim.payload.sourceSha256,
+        corpusSnapshot: claim.payload.corpusSnapshot,
+        probeCount: evaluated.length,
+        ...(claim.payload.returnArtifact ? { artifact } : {}),
       })
     },
   )

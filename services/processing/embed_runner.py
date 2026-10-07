@@ -16,7 +16,6 @@ import hashlib
 import json
 import os
 import sys
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -146,21 +145,37 @@ def process_query(
     return (result, vector) if include_vector else result
 
 
-def safe_query_result(probe_id, result):
-    """Keep evaluation logs free of extracted snippets and document text."""
-    return {
-        "id": probe_id,
-        "semanticStatus": result.get("semanticStatus"),
-        "page": result.get("page"),
-        "hasMore": result.get("hasMore"),
-        "items": [
-            {
-                key: item.get(key)
-                for key in ("id", "title", "visibility", "distance")
-            }
-            for item in result.get("items", [])
-        ],
-    }
+def process_evaluation_batch(
+    client, api_key, probes, source_sha256, *, return_artifact=False
+):
+    """Embed one frozen suite in one paid provider request."""
+    claim = client.json(
+        "/api/internal/embeddings/evaluation/claim",
+        {
+            "sourceSha256": source_sha256,
+            "probes": [
+                {"id": probe["id"], "query": probe["query"]} for probe in probes
+            ],
+            "viewer": "MANAGER",
+            "page": 1,
+            "returnArtifact": return_artifact,
+        },
+    )
+    vectors = embed_texts(
+        [probe["query"] for probe in claim["probes"]],
+        api_key,
+        task_type="RETRIEVAL_QUERY",
+    )
+    return client.json(
+        "/api/internal/embeddings/evaluation/result",
+        {
+            "claimToken": claim["claimToken"],
+            "vectors": [
+                {"id": probe["id"], "values": vector}
+                for probe, vector in zip(claim["probes"], vectors)
+            ],
+        },
+    )
 
 
 def run_claims(client, api_key, *, max_claims=5, record_id=None, emit=print):
@@ -219,11 +234,6 @@ def main():
         ),
     )
     parser.add_argument(
-        "--query-interval",
-        type=float,
-        default=float(os.environ.get("SULUAN_QUERY_INTERVAL", "3")),
-    )
-    parser.add_argument(
         "--record-id",
         default=os.environ.get("SULUAN_RECORD_ID"),
         help="Scope claims to one record (tests and single-paper recovery). Omit to drain the backlog.",
@@ -239,8 +249,6 @@ def main():
         parser.error("--query-vectors-output requires --query-file")
     if args.query_vectors_stdout and not args.query_file:
         parser.error("--query-vectors-stdout requires --query-file")
-    if args.query_interval < 1:
-        parser.error("--query-interval must be at least 1 second")
     # Secret Manager values are expected to be newline-free, but strip at the
     # process boundary as defense in depth. A pasted CRLF must never become an
     # invalid HTTP header (or appear in a provider error).
@@ -266,55 +274,44 @@ def main():
                 probes = json.load(handle)
             with open(args.query_file, "rb") as handle:
                 query_file_sha256 = hashlib.sha256(handle.read()).hexdigest()
-            vector_artifact = {
-                "sourceSha256": query_file_sha256,
-                "model": "gemini-embedding-001",
-                "taskType": "RETRIEVAL_QUERY",
-                "dimensions": EMBED_DIMS,
-                "vectors": [],
-            }
-            for number, probe in enumerate(probes, 1):
-                result, vector = process_query(
-                    client,
-                    api_key,
-                    probe["query"],
-                    include_vector=True,
-                    include_diagnostics=bool(
-                        args.query_vectors_output or args.query_vectors_stdout
-                    ),
+            if not isinstance(probes, list) or not 1 <= len(probes) <= 20:
+                parser.error("--query-file must contain between 1 and 20 probes")
+            ids = [probe.get("id") for probe in probes]
+            if any(not probe_id for probe_id in ids) or len(set(ids)) != len(ids):
+                parser.error("--query-file probe ids must be non-empty and unique")
+            if args.query_vectors_stdout:
+                parser.error(
+                    "--query-vectors-stdout is disabled; evaluations persist one "
+                    "sanitized artifact in private R2"
                 )
-                if result.get("semanticStatus") != "ready":
-                    raise RuntimeError(
-                        f"query {probe['id']} returned "
-                        f"semanticStatus={result.get('semanticStatus')}"
-                    )
-                safe_result = safe_query_result(probe["id"], result)
-                print(json.dumps(safe_result, separators=(",", ":")))
-                if args.query_vectors_output:
-                    vector_artifact["vectors"].append({
-                        "id": probe["id"],
-                        "vector": vector,
-                        "chunkDistances": result.get("chunkDistances", {}),
-                        "rankedItems": safe_result["items"],
-                    })
-                if args.query_vectors_stdout:
-                    print(
-                        "SULUAN_EVAL_PROBE "
-                        + json.dumps(
-                            {
-                                "id": probe["id"],
-                                "vector": vector,
-                                "chunkDistances": result.get("chunkDistances", {}),
-                                "rankedItems": safe_result["items"],
-                            },
-                            separators=(",", ":"),
-                        )
-                    )
-                if number < len(probes):
-                    time.sleep(args.query_interval)
+            result = process_evaluation_batch(
+                client,
+                api_key,
+                probes,
+                query_file_sha256,
+                return_artifact=bool(args.query_vectors_output),
+            )
+            summary = {
+                key: result.get(key)
+                for key in (
+                    "semanticStatus",
+                    "runId",
+                    "artifactKey",
+                    "artifactSha256",
+                    "sourceSha256",
+                    "corpusSnapshot",
+                    "probeCount",
+                )
+            }
+            print(json.dumps(summary, separators=(",", ":")))
             if args.query_vectors_output:
+                vector_artifact = result.get("artifact")
+                if not isinstance(vector_artifact, dict):
+                    raise RuntimeError("Worker did not return the requested artifact")
                 output = os.path.abspath(args.query_vectors_output)
-                os.makedirs(os.path.dirname(output), exist_ok=True)
+                directory = os.path.dirname(output)
+                if directory:
+                    os.makedirs(directory, exist_ok=True)
                 with open(output, "w", encoding="utf-8") as handle:
                     json.dump(vector_artifact, handle, indent=2)
         elif args.query:
