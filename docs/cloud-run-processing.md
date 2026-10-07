@@ -98,6 +98,15 @@ evaluation may run merely because the container exists: first verify the frozen
 query hash, corpus snapshot, zero missing eligible embeddings, daily quota, and
 the absence of a Scheduler binding.
 
+The isolated evaluator image was built without executing it on 2026-10-07:
+
+- Cloud Build: `dc23b061-1dce-4523-bf01-b7a80ba6dcf0`
+- tag: `semantic-eval-batch-20261007`
+- immutable digest:
+  `sha256:708ddec9a497bf4078a1416529f4343b7203a0bc662f782c336f80cdeb9a2b35`
+
+Deploy the dedicated Job by digest, never by the mutable tag.
+
 ## Configuration contract
 
 Worker deployment configuration:
