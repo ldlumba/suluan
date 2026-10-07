@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { EMBEDDING_DIMS, EMBEDDING_MODEL } from '@suluan/db/schema'
 import type { AppContext } from './app'
-import { createDb } from './db'
+import { createDb, type Db } from './db'
 import { CHUNKER_VERSION } from './chunking'
 import { normalizeVector, toVectorLiteral } from './embeddings'
 import { consumeQuota, embeddingLimits } from './quota'
@@ -72,6 +72,12 @@ const evaluationResultSchema = z
     vectors: z.array(evaluationVectorSchema).min(1).max(20),
   })
   .strict()
+const evaluationPreflightSchema = z
+  .object({
+    sourceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    probeCount: z.number().int().min(1).max(20),
+  })
+  .strict()
 
 interface ClaimItem {
   chunkId: string
@@ -89,6 +95,70 @@ async function sha256(value: string): Promise<string> {
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
+}
+
+async function evaluationCorpus(db: Db) {
+  const corpus = await db.execute(sql`
+    select k.record_id as "recordId", k.source_sha256 as "sourceSha256",
+      count(d.id)::integer as "chunkCount",
+      count(si.id)::integer as "embeddedCount"
+    from keyword_indexes k
+    join document_chunks d on d.index_id = k.id
+    join research_records r on r.id = k.record_id
+    join submissions s on s.id = r.submission_id
+    left join document_embeddings e on e.chunk_id = d.id
+    left join semantic_indexes si on si.id = e.semantic_index_id
+      and si.model = ${EMBEDDING_MODEL}
+      and si.dimensions = ${EMBEDDING_DIMS}
+      and si.chunker_version = ${CHUNKER_VERSION}
+    where s.status = 'ACCEPTED'
+      and k.chunker_version = ${CHUNKER_VERSION}
+    group by k.record_id, k.source_sha256
+    order by k.record_id
+  `)
+  const rows = corpus.rows as {
+    recordId: string
+    sourceSha256: string
+    chunkCount: number
+    embeddedCount: number
+  }[]
+  const missingChunks = rows.reduce(
+    (total, row) => total + row.chunkCount - row.embeddedCount,
+    0,
+  )
+  const unindexed = await db.execute(sql`
+    select count(*)::integer as count
+    from processing_jobs p
+    join research_records r on r.id = p.record_id
+    join submissions s on s.id = r.submission_id
+    where s.status = 'ACCEPTED' and p.status = 'EXTRACTED'
+      and not exists (
+        select 1 from keyword_indexes k
+        join document_chunks d on d.index_id = k.id
+        where k.record_id = r.id
+          and k.chunker_version = ${CHUNKER_VERSION}
+      )
+  `)
+  const unindexedRecords = Number(
+    (unindexed.rows[0] as { count: number }).count,
+  )
+  const corpusSnapshot = await sha256(
+    JSON.stringify(
+      rows.map(({ recordId, sourceSha256, chunkCount }) => ({
+        recordId,
+        sourceSha256,
+        chunkCount,
+      })),
+    ),
+  )
+  return {
+    corpusSnapshot,
+    records: rows.length,
+    chunks: rows.reduce((total, row) => total + row.chunkCount, 0),
+    missingChunks,
+    unindexedRecords,
+    ready: rows.length > 0 && missingChunks === 0 && unindexedRecords === 0,
+  }
 }
 
 type SafeSemanticResult = {
@@ -253,79 +323,68 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
    * from Cloud Logging.
    */
   app.post(
+    '/evaluation/preflight',
+    zValidator('json', evaluationPreflightSchema),
+    async (c) => {
+      const db = createDb(c.env.DATABASE_URL)
+      const body = c.req.valid('json')
+      const corpus = await evaluationCorpus(db)
+      const limits = embeddingLimits(
+        c.env.EMBEDDING_DAILY_REQUEST_LIMIT,
+        c.env.EMBEDDING_DAILY_INPUT_LIMIT,
+      )
+      const usage = await db.execute(sql`
+        select requests, inputs from embedding_usage
+        where bucket = 'dev_global' and actor_key = 'all'
+          and day = current_date
+        limit 1
+      `)
+      const used = (usage.rows[0] as
+        | { requests: number; inputs: number }
+        | undefined) ?? { requests: 0, inputs: 0 }
+      return c.json({
+        sourceSha256: body.sourceSha256,
+        probeCount: body.probeCount,
+        ...corpus,
+        ready:
+          corpus.ready &&
+          used.requests + 1 <= limits.maxRequests &&
+          used.inputs + body.probeCount <= limits.maxInputs,
+        model: EMBEDDING_MODEL,
+        dimensions: EMBEDDING_DIMS,
+        chunkerVersion: CHUNKER_VERSION,
+        quota: {
+          requests: used.requests,
+          inputs: used.inputs,
+          maxRequests: limits.maxRequests,
+          maxInputs: limits.maxInputs,
+        },
+      })
+    },
+  )
+
+  app.post(
     '/evaluation/claim',
     zValidator('json', evaluationClaimSchema),
     async (c) => {
       const db = createDb(c.env.DATABASE_URL)
       const body = c.req.valid('json')
-      const corpus = await db.execute(sql`
-        select k.record_id as "recordId", k.source_sha256 as "sourceSha256",
-          count(d.id)::integer as "chunkCount",
-          count(si.id)::integer as "embeddedCount"
-        from keyword_indexes k
-        join document_chunks d on d.index_id = k.id
-        join research_records r on r.id = k.record_id
-        join submissions s on s.id = r.submission_id
-        left join document_embeddings e on e.chunk_id = d.id
-        left join semantic_indexes si on si.id = e.semantic_index_id
-          and si.model = ${EMBEDDING_MODEL}
-          and si.dimensions = ${EMBEDDING_DIMS}
-          and si.chunker_version = ${CHUNKER_VERSION}
-        where s.status = 'ACCEPTED'
-          and k.chunker_version = ${CHUNKER_VERSION}
-        group by k.record_id, k.source_sha256
-        order by k.record_id
-      `)
-      const rows = corpus.rows as {
-        recordId: string
-        sourceSha256: string
-        chunkCount: number
-        embeddedCount: number
-      }[]
-      const missingChunks = rows.reduce(
-        (total, row) => total + row.chunkCount - row.embeddedCount,
-        0,
-      )
-      const unindexed = await db.execute(sql`
-        select count(*)::integer as count
-        from processing_jobs p
-        join research_records r on r.id = p.record_id
-        join submissions s on s.id = r.submission_id
-        where s.status = 'ACCEPTED' and p.status = 'EXTRACTED'
-          and not exists (
-            select 1 from keyword_indexes k
-            join document_chunks d on d.index_id = k.id
-            where k.record_id = r.id
-              and k.chunker_version = ${CHUNKER_VERSION}
-          )
-      `)
-      const unindexedRecords = Number(
-        (unindexed.rows[0] as { count: number }).count,
-      )
-      if (rows.length === 0 || missingChunks > 0 || unindexedRecords > 0) {
+      const corpus = await evaluationCorpus(db)
+      if (!corpus.ready) {
         return c.json(
           {
             error: 'corpus_incomplete',
-            records: rows.length,
-            missingChunks,
-            unindexedRecords,
+            records: corpus.records,
+            missingChunks: corpus.missingChunks,
+            unindexedRecords: corpus.unindexedRecords,
           },
           409,
         )
       }
-      const corpusSnapshot = await sha256(
-        JSON.stringify(
-          rows.map(({ recordId, sourceSha256, chunkCount }) => ({
-            recordId,
-            sourceSha256,
-            chunkCount,
-          })),
-        ),
-      )
       const claimToken = crypto.randomUUID()
       const payload = {
         sourceSha256: body.sourceSha256,
-        corpusSnapshot,
+        corpusSnapshot: corpus.corpusSnapshot,
         probes: body.probes,
         viewer: body.viewer,
         page: body.page,
@@ -369,7 +428,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
           ...claim,
           claimToken,
           sourceSha256: body.sourceSha256,
-          corpusSnapshot,
+          corpusSnapshot: corpus.corpusSnapshot,
           model: EMBEDDING_MODEL,
           dimensions: EMBEDDING_DIMS,
           taskType: 'RETRIEVAL_QUERY',

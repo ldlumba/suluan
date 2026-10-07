@@ -364,6 +364,20 @@ needsDb('region-stable embedding claims', () => {
       { id: 'probe-1', query: 'evaluation study' },
       { id: 'probe-2', query: 'unrelated evaluation question' },
     ]
+    const preflightRes = await serviceRequest(
+      auth,
+      '/api/internal/embeddings/evaluation/preflight',
+      serviceToken,
+      { sourceSha256: 'c'.repeat(64), probeCount: probes.length },
+      { EMBEDDING_DAILY_REQUEST_LIMIT: '1000' },
+    )
+    expect(preflightRes.status).toBe(200)
+    expect((await preflightRes.json()) as unknown).toMatchObject({
+      ready: false,
+      probeCount: 2,
+      model: 'gemini-embedding-001',
+      dimensions: 768,
+    })
     const claimRes = await serviceRequest(
       auth,
       '/api/internal/embeddings/evaluation/claim',

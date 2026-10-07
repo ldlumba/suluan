@@ -234,6 +234,11 @@ def main():
         ),
     )
     parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Verify the frozen suite, corpus, identity, and quota without calling Gemini.",
+    )
+    parser.add_argument(
         "--record-id",
         default=os.environ.get("SULUAN_RECORD_ID"),
         help="Scope claims to one record (tests and single-paper recovery). Omit to drain the backlog.",
@@ -249,11 +254,13 @@ def main():
         parser.error("--query-vectors-output requires --query-file")
     if args.query_vectors_stdout and not args.query_file:
         parser.error("--query-vectors-stdout requires --query-file")
+    if args.preflight and not args.query_file:
+        parser.error("--preflight requires --query-file")
     # Secret Manager values are expected to be newline-free, but strip at the
     # process boundary as defense in depth. A pasted CRLF must never become an
     # invalid HTTP header (or appear in a provider error).
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not api_key:
+    if not api_key and not args.preflight:
         parser.error("GEMINI_API_KEY environment variable is required")
 
     host = urllib.parse.urlsplit(args.api).hostname
@@ -284,6 +291,18 @@ def main():
                     "--query-vectors-stdout is disabled; evaluations persist one "
                     "sanitized artifact in private R2"
                 )
+            if args.preflight:
+                result = client.json(
+                    "/api/internal/embeddings/evaluation/preflight",
+                    {
+                        "sourceSha256": query_file_sha256,
+                        "probeCount": len(probes),
+                    },
+                )
+                print(json.dumps(result, separators=(",", ":")))
+                if not result.get("ready"):
+                    raise RuntimeError("evaluation preflight did not pass")
+                return
             result = process_evaluation_batch(
                 client,
                 api_key,
