@@ -204,6 +204,9 @@ provider request per query. The replacement path fixes both before another run:
   embedding, reports extracted records missing keyword indexes, computes a
   deterministic corpus snapshot hash, and reserves **one request plus N
   inputs** from the server-side quota;
+- `POST /api/internal/embeddings/evaluation/preflight` performs the same corpus,
+  model, query-count, workload-identity, and quota-headroom checks without
+  creating a claim, consuming quota, requiring a Gemini key, or calling Gemini;
 - a database partial unique index permits only one unused evaluation claim;
 - `embed_runner.py --query-file` sends the whole suite in one Gemini
   `batchEmbedContents` call with `RETRIEVAL_QUERY` rather than one call per
@@ -211,7 +214,7 @@ provider request per query. The replacement path fixes both before another run:
 - the result endpoint validates the exact probe set and vector geometry,
   computes all visibility-aware rankings/distances, and writes one sanitized
   immutable JSON artifact under private R2
-  `operations/semantic-evaluations/<run-id>.json`;
+`operations/semantic-evaluations/<run-id>.json`;
 - normal logs receive only the run/artifact hashes and counts. Full vectors and
   distance arrays no longer need to be reconstructed from Cloud Logging.
 
