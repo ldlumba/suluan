@@ -159,6 +159,40 @@ five clean negatives also all returned nearest papers, at distances
 `0.405–0.458`, so the current retrieval path has no safe abstention behavior.
 Semantic mode remains unapproved and disabled.
 
+## Interim adviser-approved evaluation gate — 2026-10-07
+
+Before the one-run evaluation, the owner approved this preregistered policy for
+the current 43-record staging corpus:
+
+- record score: existing `MIN` distance across a paper's chunks;
+- abstention floor: return no semantic result when the score is greater than
+  `0.38`;
+- no margin or alternate aggregator is used for the primary gate.
+
+Primary pass criteria:
+
+- seven direct/concept positive cases: expected paper ranked first, `7/7`;
+- four boundary cases: expected winner beats its named contrast, `4/4`;
+- one multi-result farming case: both expected papers appear;
+- four clean-negative cases: all abstain, `4/4`.
+
+This is explicitly an **interim** gate because staging currently contains 43
+accepted records rather than the planned legacy corpus. A pass does not enable
+production semantic search or establish that `0.38` generalizes to the larger
+corpus. A failure remains a useful result and keeps semantic disabled.
+
+### 2026-10-07 attempt — invalid, not scored
+
+The first execution was not a valid evaluation. The manual Cloud Run execution
+overlapped the enabled 15-minute staging extraction scheduler after the Job was
+temporarily repointed to the evaluation command. Both executions claimed
+queries, the daily quota reached its 20-request limit, and neither produced a
+complete persisted evaluation artifact. The staging Job was restored to the
+normal extraction image and command, with the Gemini secret removed. This
+attempt supplies no ranking or abstention evidence and must not be counted as a
+pass or failure of the preregistered gate. The gate remains pending a fresh
+quota day with the scheduler paused during the bounded run.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for
