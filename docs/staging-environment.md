@@ -386,6 +386,22 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   request plus 16 inputs for the frozen batched evaluation after 100% document
   coverage and a passing preflight.
 
+#### Owner-approved temporary request revision
+
+- Provider evidence showed Gemini Embedding 1 free-tier limits of 100 RPM,
+  30K TPM, and 1,000 RPD. The staging Worker request ceiling was temporarily
+  raised from 20 to 110 while the 2,000-input ceiling stayed unchanged. Worker
+  `679e15f5-efa1-4085-9927-2505d1709cde` deployed the override; production
+  defaults were not changed.
+- The same one-claim Job and ≥30-second pacing completed another 81 paid claims.
+  The next execution received no claim and no quota increment, proving the
+  retained input boundary stopped work. Final daily usage was 101 requests/
+  1,992 inputs; all 101 claims were used, none remained active, and geometry
+  mismatches remained zero.
+- Coverage ended at 3,219/5,334 chunks, leaving 2,115. Revert the staging
+  overrides after complete document coverage and the one isolated frozen
+  evaluation, or by 2026-10-15, whichever comes first.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,

@@ -15,8 +15,13 @@ crons = ["*/5 * * * *"]
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"
 ALLOWED_ORIGINS = "http://localhost:5174"
-# Semantic evaluation overrides are intentionally absent. The default shared
-# embedding budget remains code-owned at 20 requests / 2,000 inputs per day.
+# Owner-approved temporary staging override (2026-10-08): accelerate the
+# governed full-corpus document backfill without increasing the 2,000-input
+# daily cost ceiling. Revert both overrides after 100% document coverage and
+# the one isolated frozen-suite evaluation, or by 2026-10-15, whichever comes
+# first. Production remains on code-owned defaults.
+EMBEDDING_DAILY_REQUEST_LIMIT = "110"
+EMBEDDING_DAILY_INPUT_LIMIT = "2000"
 
 # Private staging storage. Browser access remains Worker-authorized only.
 [[r2_buckets]]

@@ -271,6 +271,18 @@ code-owned 20-request ceiling. The frozen evaluation remains prohibited until
 coverage reaches 100%, preflight passes on the final snapshot, and one request
 plus 16 inputs is reserved for the batch.
 
+The owner subsequently approved a temporary **staging-only** request revision:
+110 requests/day while retaining 2,000 inputs/day. Provider limits were verified
+as 100 RPM, 30K TPM, and 1,000 RPD; the one-claim Job, ≥30-second pacing, zero
+retries, and no Scheduler binding remained unchanged. Worker
+`679e15f5-efa1-4085-9927-2505d1709cde` deployed the override. Another 81 claims
+completed once, and the next execution made no quota increment at the input
+boundary. Day-end evidence was 101 requests/1,992 inputs, 101 used claims, zero
+active claims, zero geometry mismatches, and 3,219/5,334 embedded chunks (2,115
+missing). Production defaults remain unchanged. Revert the staging overrides
+after complete document embedding plus the one isolated evaluation, or by
+2026-10-15, whichever comes first.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for

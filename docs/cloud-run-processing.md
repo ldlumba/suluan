@@ -143,6 +143,16 @@ later UTC days without changing the quota. Do not repurpose this document Job
 for the frozen query suite; evaluation remains isolated in
 `suluan-semantic-eval-staging`.
 
+The owner then approved a temporary staging request-limit revision after the
+provider dashboard confirmed 100 RPM, 30K TPM, and 1,000 RPD for Gemini
+Embedding 1. Worker `679e15f5-efa1-4085-9927-2505d1709cde` raised only the
+request ceiling to 110/day; the 2,000-input ceiling and every Job safeguard
+remained unchanged. Another 81 paid executions completed once. The next
+execution received no claim/quota increment, stopping at 101 requests/1,992
+inputs with 3,219/5,334 chunks embedded and no active claim. Revert the two
+explicit staging overrides after complete document coverage and the isolated
+evaluation, or by 2026-10-15. Production keeps the code-owned defaults.
+
 ## Configuration contract
 
 Worker deployment configuration:
