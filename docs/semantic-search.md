@@ -251,6 +251,18 @@ explicit candidates only if the completed-corpus evaluation identifies a
 failure attributable to chunking. They must be compared as a new version, not
 silently substituted after observing the frozen results.
 
+### Full-corpus staging progress — 2026-10-08
+
+The authorized legacy importer created 139 staging submissions after a clean
+dry-run (139 ready, 18 intentional skips, zero errors/warnings). Immediate
+replay returned the same 139 IDs with zero duplicates. All imported rows remain
+`PENDING`, with zero decisions and zero repository records; consequently they
+are not included in retrieval, processing, indexing, corpus snapshots, or
+embedding eligibility. The reset embedding quota must remain unused until
+authorized individual review, extraction, keyword indexing, and document
+embedding complete. The current 39-record/1,227-chunk semantic snapshot remains
+interim and must not be used for the final frozen evaluation.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for

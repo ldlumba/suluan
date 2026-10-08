@@ -337,6 +337,28 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   without changing the 20-request/20-input usage or creating an evaluation
   claim. No paid evaluation was run.
 
+### Authorized legacy corpus import — 2026-10-08
+
+- The final compressed source contained 139 opted-in papers and 18 intentional
+  skips (11 without manifests and seven marked `[NO TITLE]`), with zero errors
+  or warnings. Pajarillo and the temporary Word lock file were absent.
+- Comparison with the governed development set matched all 139 logical paths
+  and metadata fields. Sixty-eight source documents were intentionally converted
+  to PDF; every unchanged-format document retained its prior hash.
+- The staging dry-run passed before apply. The normal Worker submission route
+  then created 139 submissions and 139 unique private-file keys. Every row
+  remained `PENDING`; Neon reconciliation found zero decisions and zero
+  repository records, so no imported paper became searchable or eligible for
+  extraction or embeddings.
+- An immediate apply replay returned all 139 original submission IDs and created
+  zero rows, live-verifying environment-scoped idempotency. Notification outbox
+  delivery continued asynchronously and did not affect durable submission
+  success.
+- Redacted operator reports remain outside Git at
+  `C:\Users\Lims\AppData\Local\Temp\opencode\staging-legacy-import-{dry-run,apply,replay}-20261008.json`.
+  The next gate is authorized individual review. No bulk acceptance path was
+  introduced or used.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,
