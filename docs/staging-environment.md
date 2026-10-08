@@ -359,6 +359,33 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   The next gate is authorized individual review. No bulk acceptance path was
   introduced or used.
 
+### Legacy review, extraction, and indexing — 2026-10-08
+
+- The authorized manager individually accepted all 139 imported submissions
+  through the normal review workflow. No bulk-acceptance route or direct
+  database write was used.
+- Thirty sequential manual executions of the existing bounded extraction Job
+  ran safely alongside its scheduler. Database leases arbitrated claims; all
+  139 legacy jobs reached `EXTRACTED` with zero failures.
+- The Worker keyword sweep indexed all 139 records into 4,107 chunks. The
+  complete extractable staging corpus is now 178 records/5,334 chunks. Four
+  accepted pilot safe-failure fixtures remain correctly non-extractable and are
+  not part of that retrieval corpus.
+
+### Full-corpus embedding day 1 — 2026-10-08
+
+- The manual, scheduler-free `suluan-embed-staging` Job was pinned to immutable
+  digest `sha256:bf4fcc89fe91c101e5c2fe6df6726cd36a20cacb32f7d7d9827a81da79e0b741`,
+  restricted to one claim per execution, and kept at one task/parallelism one/
+  zero retries. Stale query-evaluation environment variables were removed.
+- One canary and 19 additional executions were paced at least 30 seconds apart.
+  All 20 claims completed once with approved model, 768 dimensions, and frozen
+  chunker geometry. The daily code-owned limit closed at 20 requests/395 inputs.
+- Coverage is 1,622/5,334 chunks, leaving 3,712. No evaluation was attempted.
+  Continue only after UTC quota resets. The final embedding day must reserve one
+  request plus 16 inputs for the frozen batched evaluation after 100% document
+  coverage and a passing preflight.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,

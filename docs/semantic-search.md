@@ -255,13 +255,21 @@ silently substituted after observing the frozen results.
 
 The authorized legacy importer created 139 staging submissions after a clean
 dry-run (139 ready, 18 intentional skips, zero errors/warnings). Immediate
-replay returned the same 139 IDs with zero duplicates. All imported rows remain
-`PENDING`, with zero decisions and zero repository records; consequently they
-are not included in retrieval, processing, indexing, corpus snapshots, or
-embedding eligibility. The reset embedding quota must remain unused until
-authorized individual review, extraction, keyword indexing, and document
-embedding complete. The current 39-record/1,227-chunk semantic snapshot remains
-interim and must not be used for the final frozen evaluation.
+replay returned the same 139 IDs with zero duplicates. The manager subsequently
+completed 139 individual acceptances. Bounded extraction produced 139/139
+`EXTRACTED` with zero failures, and scheduled keyword indexing created 4,107
+legacy chunks. The complete extractable staging corpus is now 178 records/5,334
+chunks.
+
+Document embedding day 1 used the manual scheduler-free Job pinned to digest
+`sha256:bf4fcc89fe91c101e5c2fe6df6726cd36a20cacb32f7d7d9827a81da79e0b741`.
+The Job was tightened to one claim per execution and 20 executions were paced
+at least 30 seconds apart. All claims completed once, consuming 20 requests/395
+inputs and bringing coverage to 1,622/5,334 chunks; geometry mismatches are
+zero. The remaining 3,712 chunks require later UTC quota days under the
+code-owned 20-request ceiling. The frozen evaluation remains prohibited until
+coverage reaches 100%, preflight passes on the final snapshot, and one request
+plus 16 inputs is reserved for the batch.
 
 ## Scoring workbench — 2026-10-06
 

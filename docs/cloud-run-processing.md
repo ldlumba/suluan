@@ -125,6 +125,24 @@ without executing it on 2026-10-07:
 
 Deploy the dedicated Job by digest, never by the mutable tag.
 
+## Full-corpus document embedding operations — 2026-10-08
+
+After the 139-paper legacy corpus was accepted, extracted, and indexed, the
+manual `suluan-embed-staging` Job was repinned to the same immutable processing
+image digest used by the evaluator. Unlike the evaluator Job, it retains the
+staging Gemini secret and runs document claims only. Obsolete
+`SULUAN_QUERY_FILE`/`SULUAN_QUERY_INTERVAL` values were removed, and
+`SULUAN_MAX_CLAIMS=1` enforces one provider request per execution. The Job has
+one task, parallelism one, zero retries, and no Scheduler binding.
+
+One canary plus 19 executions were paced by at least 30 seconds. All 20 claims
+completed exactly once (395 inputs; some paper-bounded claims contained fewer
+than 20 chunks), increasing coverage from 1,227 to 1,622 vectors. The daily
+request ceiling then stopped work with 3,712/5,334 chunks missing. Continue on
+later UTC days without changing the quota. Do not repurpose this document Job
+for the frozen query suite; evaluation remains isolated in
+`suluan-semantic-eval-staging`.
+
 ## Configuration contract
 
 Worker deployment configuration:
