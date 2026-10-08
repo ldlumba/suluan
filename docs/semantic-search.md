@@ -283,6 +283,23 @@ missing). Production defaults remain unchanged. Revert the staging overrides
 after complete document embedding plus the one isolated evaluation, or by
 2026-10-15, whichever comes first.
 
+Exact final-day planning found 2,115 chunks across 62 partially or wholly
+missing papers. Paper-bounded selection requires at least 133 document claims;
+the frozen suite requires one additional request and 16 inputs. The owner
+therefore approved a superseding staging-only ceiling of **145 requests and
+2,200 inputs** for the next reset day. This leaves request/input margin while
+remaining below the verified provider limits. Run document claims first, verify
+100% coverage and the final corpus snapshot, then spend exactly one request on
+the frozen suite. Revert the overrides immediately afterward (or by
+2026-10-15), regardless of evaluation outcome.
+
+Worker `ef9619d3-abd7-4e88-8f11-21c25458284e` deployed the final-day limits.
+Quota-free preflight execution `suluan-semantic-eval-staging-w5mt9` confirmed
+145 requests/2,200 inputs, the frozen source hash, 178 records/5,334 chunks,
+zero unindexed records, and 2,115 missing embeddings. Its expected
+`ready: false` created no claim and consumed no quota. No newly exposed input
+headroom was used before the planned reset-day run.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for

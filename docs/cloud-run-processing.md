@@ -153,6 +153,17 @@ inputs with 3,219/5,334 chunks embedded and no active claim. Revert the two
 explicit staging overrides after complete document coverage and the isolated
 evaluation, or by 2026-10-15. Production keeps the code-owned defaults.
 
+Final-day accounting found that the remaining 2,115 chunks across 62 papers
+need at least 133 paper-bounded document claims; the frozen suite needs one
+additional request and 16 inputs. The owner therefore approved a superseding
+staging-only ceiling of 145 requests/2,200 inputs. Worker
+`ef9619d3-abd7-4e88-8f11-21c25458284e` deployed it. Quota-free evaluator
+preflight `suluan-semantic-eval-staging-w5mt9` confirmed those limits, the
+unchanged frozen-query hash, 178 records/5,334 chunks, zero unindexed records,
+and 2,115 missing embeddings. Its expected `ready: false` spent no quota.
+Complete and verify document coverage before running the isolated evaluation,
+then revert the overrides and detach its Gemini secret immediately.
+
 ## Configuration contract
 
 Worker deployment configuration:

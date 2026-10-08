@@ -402,6 +402,20 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   overrides after complete document coverage and the one isolated frozen
   evaluation, or by 2026-10-15, whichever comes first.
 
+#### Final-day capacity
+
+The 2,115 remaining chunks span 62 papers and require at least 133
+paper-bounded document claims. Including the one-request/16-input frozen suite,
+the owner approved a superseding next-reset staging ceiling of 145 requests/
+2,200 inputs. Document coverage must reach 100% before evaluation uses its
+reservation. The override is still staging-only, manually paced, scheduler-free,
+and subject to the same immediate/post-run or 2026-10-15 forced revert.
+
+Worker `ef9619d3-abd7-4e88-8f11-21c25458284e` deployed the ceiling. Quota-free
+preflight `suluan-semantic-eval-staging-w5mt9` verified the limits, unchanged
+frozen-query hash, 178 records/5,334 chunks, zero unindexed records, and 2,115
+missing embeddings. It failed closed as expected and consumed no quota.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,
