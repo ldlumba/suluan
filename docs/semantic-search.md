@@ -300,6 +300,30 @@ zero unindexed records, and 2,115 missing embeddings. Its expected
 `ready: false` created no claim and consumed no quota. No newly exposed input
 headroom was used before the planned reset-day run.
 
+### Completed-corpus evaluation — 2026-10-09
+
+The final document backfill completed at 178 accepted records and 5,334
+chunks, with zero missing embeddings. Quota-free preflight passed against
+corpus snapshot
+`27d166be4500324a5e5bc9feb496bf2799fa82431e072f239c46581e0d1ed420` and the
+unchanged frozen adviser hash
+`c459cbc52eaa77155efa2a9700818f4b53a6086e0d843158a2e2d8964dc7e5ca`. The
+isolated evaluator then made exactly one batched provider request for all 16
+probes and persisted run `d3f267f2-983f-4496-954d-703018e584b4` as the private
+artifact with SHA-256
+`70c460ec37f04e08e1b390e6046a96e4bea3c0723c868b06b029a11f745072cf`.
+
+The preregistered primary policy (paper `MIN` distance with a 0.38 abstention
+floor) **failed** on the completed corpus: semantic positive Hit@1 was 0% for
+the labeled non-negative probes, while clean-negative abstention was 75% (the
+required result was 100%). The multi-positive probe did contain both expected
+papers, but that does not offset the primary ranking and abstention failures.
+This is a valid failed gate, not a runtime failure. The evaluator Gemini secret
+was detached, the staging 145/2,200 temporary limits were reverted to 20/2,000,
+and semantic search remains disabled. Do not tune a production threshold to
+this same holdout; any retry needs a separately approved, independently
+labeled policy/holdout and must preserve keyword as the dependable path.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for

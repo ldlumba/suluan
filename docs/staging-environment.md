@@ -416,6 +416,23 @@ preflight `suluan-semantic-eval-staging-w5mt9` verified the limits, unchanged
 frozen-query hash, 178 records/5,334 chunks, zero unindexed records, and 2,115
 missing embeddings. It failed closed as expected and consumed no quota.
 
+### Completed-corpus semantic evaluation — 2026-10-09
+
+The remaining document backfill completed with 5,334/5,334 chunks embedded.
+Final preflight `suluan-semantic-eval-staging-hwckc` reported `ready: true`,
+zero missing/unindexed records, corpus snapshot
+`27d166be4500324a5e5bc9feb496bf2799fa82431e072f239c46581e0d1ed420`, and the
+approved frozen-query hash. The isolated evaluator run
+`suluan-semantic-eval-staging-6fpfj` completed one 16-input batch and stored
+private artifact run `d3f267f2-983f-4496-954d-703018e584b4` with SHA-256
+`70c460ec37f04e08e1b390e6046a96e4bea3c0723c868b06b029a11f745072cf`.
+
+Offline scoring failed the preregistered MIN/0.38 gate: positive Hit@1 was 0%
+and clean-negative abstention was 75%. The evaluator Gemini secret was removed,
+the Job was restored to quota-free `--preflight`, and Worker
+`fc6f8e95-e397-42d1-8cce-f0d9d4bd5e69` restored the staging request/input
+defaults to 20/2,000. No semantic or Assistant activation followed.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,
