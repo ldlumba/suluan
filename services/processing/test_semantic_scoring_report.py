@@ -64,6 +64,29 @@ class SemanticScoringReportTests(unittest.TestCase):
         self.assertTrue(report["rows"][0]["expectedAllFound"])
         self.assertEqual(report["byKind"]["multi_positive"]["allExpectedFound"], 1)
 
+    def test_report_accepts_any_record_when_titles_are_not_unique(self):
+        queries = [{"id": "p", "kind": "positive", "expectedTitle": "Same title"}]
+        artifact = {
+            "vectors": [
+                {
+                    "id": "p",
+                    "chunkDistances": {"first": [0.1], "second": [0.2]},
+                    "rankedItems": [
+                        {"id": "first", "title": "Same title"},
+                        {"id": "second", "title": "Same title"},
+                    ],
+                }
+            ]
+        }
+        report = evaluate(
+            queries,
+            artifact,
+            strategy="min",
+            max_score=0.3,
+            min_margin=None,
+        )
+        self.assertEqual(report["rows"][0]["expectedRank"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

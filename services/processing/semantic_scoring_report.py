@@ -20,20 +20,23 @@ def evaluate(queries, artifact, *, strategy, max_score, min_margin):
         reason = abstention_reason(
             ranked, max_score=max_score, min_margin=min_margin
         )
-        title_to_id = {
-            item.get("title"): item.get("id")
-            for item in saved.get("rankedItems", [])
-        }
+        title_to_ids = {}
+        for item in saved.get("rankedItems", []):
+            title_to_ids.setdefault(item.get("title"), []).append(item.get("id"))
         expected_titles = probe.get("expectedTitles")
         if expected_titles is None:
             expected_titles = [probe["expectedTitle"]] if probe.get("expectedTitle") else []
-        expected_ids = [title_to_id.get(title) for title in expected_titles]
+        expected_ids = [title_to_ids.get(title, []) for title in expected_titles]
         expected_ranks = [
-            next(
-                (rank for rank, item in enumerate(ranked, 1) if item.record_id == expected_id),
-                None,
+            min(
+                (
+                    rank
+                    for rank, item in enumerate(ranked, 1)
+                    if item.record_id in expected_id_set
+                ),
+                default=None,
             )
-            for expected_id in expected_ids
+            for expected_id_set in expected_ids
         ]
         expected_rank = expected_ranks[0] if expected_ranks else None
         rows.append(
