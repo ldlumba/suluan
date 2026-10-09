@@ -598,6 +598,30 @@ needsDb('semantic search', () => {
     expect(distances).toEqual(sorted)
   })
 
+  dbIt('scores one paper from its strongest three chunks', async () => {
+    await testDb().execute(sql`delete from embedding_usage`)
+    stubThresholdGemini()
+    const paperWithOneLuckyChunk = await paper('PUBLIC', [
+      `threshold-close ${tag}`,
+      `threshold-far ${tag}`,
+      `threshold-far ${tag}`,
+    ])
+    expect((await embedAll(paperWithOneLuckyChunk.recordId)).embedded).toBe(3)
+
+    const res = await get('/api/search/semantic?q=threshold calibration', manager)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      items: { id: string; distance: number }[]
+      semanticStatus: string
+    }
+    expect(body.semanticStatus).toBe('ready')
+    const matches = body.items.filter((item) => item.id === paperWithOneLuckyChunk.recordId)
+    expect(matches).toHaveLength(1)
+    // One close chunk plus two far chunks must score as (0 + 1 + 1) / 3,
+    // rather than inheriting MIN's lucky zero.
+    expect(Number(matches[0].distance)).toBeCloseTo(2 / 3, 5)
+  })
+
   dbIt('serves anonymous results cacheably and signed-in results privately', async () => {
     const p = await paper('PUBLIC', `cache ${tag} header semantics`)
     expect((await embedAll(p.recordId)).embedded).toBe(1)

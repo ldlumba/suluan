@@ -44,6 +44,8 @@ const PAGE_SIZE = 10
  * relevance method only after evaluation against a labeled SULUAN corpus.
  */
 export const MAX_SEMANTIC_DISTANCE = 0.7
+/** Number of strongest chunks used to score one paper. */
+export const SEMANTIC_RECORD_TOP_K = 3
 /** Bounded per-call batch; the production pipeline prepares per paper. */
 const INDEX_BATCH = 10
 /** Semantic preparation is operator-triggered, so it is bounded hard. */
@@ -130,26 +132,35 @@ export async function semanticSearchByVector(
 ) {
   const queryVector = toVectorLiteral(vector)
   const rows = await db.execute(sql`
-    with best as (
-      select e.semantic_index_id, k.record_id,
-        min(e.embedding <=> cast(${queryVector} as vector)) as distance,
-        regexp_replace(btrim((array_agg(
-          d.content order by e.embedding <=> cast(${queryVector} as vector)
-        ))[1]), '[[:space:]]+', ' ', 'g') as snippet
+    with chunk_scores as (
+      select k.record_id, d.id as chunk_id, d.content,
+        e.embedding <=> cast(${queryVector} as vector) as distance
       from document_embeddings e
       join document_chunks d on d.id = e.chunk_id
       join semantic_indexes si on si.id = e.semantic_index_id
       join keyword_indexes k on k.id = si.keyword_index_id
       where si.model = ${EMBEDDING_MODEL} and si.dimensions = ${EMBEDDING_DIMS}
         and si.chunker_version = ${CHUNKER_VERSION}
-      group by e.semantic_index_id, k.record_id
+    ), ranked_chunks as (
+      select chunk_scores.*,
+        row_number() over (
+          partition by record_id order by distance asc, chunk_id asc
+        ) as chunk_rank
+      from chunk_scores
+    ), best as (
+      select record_id,
+        (avg(distance) filter (where chunk_rank <= ${SEMANTIC_RECORD_TOP_K}))::double precision as distance,
+        regexp_replace(btrim((array_agg(
+          content order by distance asc, chunk_id asc
+        ))[1]), '[[:space:]]+', ' ', 'g') as snippet
+      from ranked_chunks
+      group by record_id
     ), ranked as (
-      select distinct on (b.record_id) b.record_id, b.distance, b.snippet
+      select b.record_id, b.distance, b.snippet
       from best b
       join research_records r on r.id = b.record_id
       join submissions s on s.id = r.submission_id
       where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
-      order by b.record_id, b.distance asc
     )
     select r.id, r.title, r.submission_id as "submissionId",
       coalesce(authors.names, s.authors) as authors,
@@ -437,11 +448,10 @@ export function searchRoutes(
         })
       }
 
-      // Best distance per record: chunks of the same paper are not separate
-      // results, they are evidence for one result. This MIN aggregation is not
-      // yet a calibrated relevance method: longer papers get more chances for
-      // one spuriously close chunk, so corpus evaluation must compare it with
-      // margin/relative scoring and hybrid keyword + vector retrieval.
+      // Chunks of the same paper are evidence for one result, never separate
+      // results. The record score uses the strongest few chunks rather than
+      // one extreme-value match, which gives long papers more chances for a
+      // spuriously close chunk.
       const result = await semanticSearchByVector(db, viewer, vector, page)
       return c.json({
         ...result,

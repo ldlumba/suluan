@@ -33,6 +33,37 @@ class SemanticScoringReportTests(unittest.TestCase):
         self.assertEqual(report["positiveHitAt1"], 1)
         self.assertEqual(report["negativeAbstention"], 1)
 
+    def test_report_supports_multi_expected_titles(self):
+        queries = [
+            {
+                "id": "m",
+                "kind": "multi_positive",
+                "expectedTitles": ["First", "Second"],
+            }
+        ]
+        artifact = {
+            "vectors": [
+                {
+                    "id": "m",
+                    "chunkDistances": {"a": [0.1], "b": [0.2]},
+                    "rankedItems": [
+                        {"id": "a", "title": "First"},
+                        {"id": "b", "title": "Second"},
+                    ],
+                }
+            ]
+        }
+        report = evaluate(
+            queries,
+            artifact,
+            strategy="min",
+            max_score=0.3,
+            min_margin=None,
+        )
+        self.assertEqual(report["rows"][0]["expectedRanks"], [1, 2])
+        self.assertTrue(report["rows"][0]["expectedAllFound"])
+        self.assertEqual(report["byKind"]["multi_positive"]["allExpectedFound"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
