@@ -445,6 +445,20 @@ top-3 aggregation reached 15/15 positive, 5/5 hard-positive, and 5/5 negative
 abstention results. Offline keyword Hit@1 was 15%; record-level RRF was 100%.
 This is diagnostic evidence only; the failed adviser gate still governs launch.
 
+### Length-penalty scorer retest — 2026-10-10
+
+The opt-in `log_length_penalized_min` scorer was temporarily deployed for a
+bounded 16-query adviser retest. Preflight verified the final 178-record,
+5,334-chunk corpus with zero missing vectors. Run
+`e64e4019-a541-44e9-af94-d946b2af2f58` completed one provider request and
+stored artifact SHA-256
+`d4bda4dbd56817a42792dddd4b4418cfab2aa5e1906de46a16bade623fdb531b`.
+Offline scoring reached 6/7 direct, 4/4 hard-positive, and 100% negative
+abstention; the direct gate still failed on the TikTok query. A propagation bug
+in the evaluation endpoint was fixed after this run, so no claim is made that
+this artifact exercised the Worker scorer. The evaluator secret was detached,
+the Job restored to preflight-only, and the Worker variable removed.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,

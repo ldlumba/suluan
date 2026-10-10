@@ -359,6 +359,24 @@ default remains top-3 mean and no deployment has enabled the option. This
 keeps the candidate strategy testable without silently changing the current
 semantic behavior.
 
+### Length-penalty staging retest — 2026-10-10
+
+The opt-in scorer was deployed to staging for a bounded adviser-suite retest.
+Preflight confirmed the unchanged final corpus snapshot, 178 accepted records,
+5,334 chunks, and zero missing vectors. The isolated batch completed as run
+`e64e4019-a541-44e9-af94-d946b2af2f58`, artifact SHA-256
+`d4bda4dbd56817a42792dddd4b4418cfab2aa5e1906de46a16bade623fdb531b`, using
+one provider request for all 16 probes. Offline scoring with the length-penalty
+policy and a diagnostic 0.36 floor produced 6/7 direct positive Hit@1, 4/4
+hard-positive Hit@1, and 100% clean-negative abstention. The direct-positive
+gate still fails because the TikTok target remains rank 2.
+
+The batch also exposed that the evaluation endpoint did not propagate
+`SEMANTIC_SCORING_MODE` to its internal ranking call. That propagation is now
+fixed and tested; no second paid batch was run. Gemini was detached, the Job
+returned to preflight-only, the Worker scorer variable was removed, and staging
+quota remained at 3 requests/41 inputs with no active claims.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for

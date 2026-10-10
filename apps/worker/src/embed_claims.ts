@@ -297,6 +297,8 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
         claim.payload.viewer,
         vector,
         claim.payload.page,
+        undefined,
+        c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
       )
       return c.json({
         ...result,
@@ -503,6 +505,8 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
               claim.payload.viewer,
               vector,
               claim.payload.page,
+              undefined,
+              c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
             ),
             semanticChunkDistancesByVector(db, claim.payload.viewer, vector),
           ])
