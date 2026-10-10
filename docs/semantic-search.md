@@ -325,6 +325,25 @@ and semantic search remains disabled. Do not tune a production threshold to
 this same holdout; any retry needs a separately approved, independently
 labeled policy/holdout and must preserve keyword as the dependable path.
 
+### Independent registered holdout — 2026-10-10
+
+The separate 25-query holdout has SHA-256
+`118734b708ab02b526bc858017bdc12180f2f4877f8ed2a7f30262ff1887c90b` and has
+zero query overlap with the 16-query adviser suite. It was evaluated in two
+bounded batches against the same final corpus snapshot
+`27d166be4500324a5e5bc9feb496bf2799fa82431e072f239c46581e0d1ed420`:
+`bde88fc3-9193-4e71-8966-34bf5a693ac4` (20 probes, artifact
+`20990eb831bf97e5b15b94f5434fee2669f96f38574641869f50f12f39252fe6`) and
+`d5720549-50c9-4902-b477-aeec836564cc` (five probes, artifact
+`ce27c38d3fec8331073130cdf6fb3855249cf74155ad500e8a940aa749c6da78`).
+
+Both `MIN` and top-3 aggregation achieved 15/15 positive Hit@1, 5/5
+hard-positive Hit@1, and 5/5 clean-negative abstention at the diagnostic 0.38
+floor. The offline keyword baseline achieved 15% Hit@1; record-level RRF
+achieved 100% Hit@1 on this holdout. This is encouraging independent evidence,
+not launch approval: the adviser suite still failed, the holdout is a small
+registered set, and its results must not be used to tune a production cutoff.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for

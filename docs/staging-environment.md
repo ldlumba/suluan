@@ -434,6 +434,16 @@ the Job was restored to quota-free `--preflight`, and Worker
 `fc6f8e95-e397-42d1-8cce-f0d9d4bd5e69` restored the staging request/input
 defaults to 20/2,000. No semantic or Assistant activation followed.
 
+### Independent registered holdout — 2026-10-10
+
+The 25-query holdout (`118734b708ab02b526bc858017bdc12180f2f4877f8ed2a7f30262ff1887c90b`,
+zero overlap with the adviser suite) was run in two bounded batches against the
+final corpus snapshot. Runs `bde88fc3-9193-4e71-8966-34bf5a693ac4` (20) and
+`d5720549-50c9-4902-b477-aeec836564cc` (5) completed successfully. Both MIN and
+top-3 aggregation reached 15/15 positive, 5/5 hard-positive, and 5/5 negative
+abstention results. Offline keyword Hit@1 was 15%; record-level RRF was 100%.
+This is diagnostic evidence only; the failed adviser gate still governs launch.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,

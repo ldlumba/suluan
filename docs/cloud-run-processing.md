@@ -125,6 +125,12 @@ without executing it on 2026-10-07:
 
 Deploy the dedicated Job by digest, never by the mutable tag.
 
+On 2026-10-10 the evaluator was rebuilt at immutable digest
+`sha256:1d3212d2bcd24451a8909c0dcb8dd645cc14b3f88f26f0ad399feba659ac49ab`
+to support bounded slices of the registered 25-query holdout. The Job was
+restored to adviser-suite `--preflight` with no Gemini secret after the two
+diagnostic batches.
+
 ## Full-corpus document embedding operations — 2026-10-08
 
 After the 139-paper legacy corpus was accepted, extracted, and indexed, the
