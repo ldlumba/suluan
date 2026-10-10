@@ -90,6 +90,22 @@ def score_records(
     return sorted(scored, key=lambda item: (item.score, item.record_id))
 
 
+def reciprocal_rank_fusion(
+    ranked_lists: Sequence[Sequence[str]], constant: int = 60
+) -> list[str]:
+    """Fuse stable record-ID rankings without comparing incompatible scores."""
+    if constant < 1:
+        raise ValueError("constant must be positive")
+    scores: dict[str, float] = {}
+    for ranked in ranked_lists:
+        for rank, record_id in enumerate(ranked, 1):
+            scores[record_id] = scores.get(record_id, 0.0) + 1 / (constant + rank)
+    return [
+        record_id
+        for record_id, _ in sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+
 def abstention_reason(
     ranked: Sequence[ScoredRecord],
     *,

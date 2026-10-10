@@ -6,11 +6,22 @@ import argparse
 import json
 import pathlib
 
-from semantic_scoring import abstention_reason, score_records
+from semantic_scoring import abstention_reason, reciprocal_rank_fusion, score_records
 
 
-def evaluate(queries, artifact, *, strategy, max_score, min_margin):
+def evaluate(
+    queries,
+    artifact,
+    *,
+    strategy,
+    max_score,
+    min_margin,
+    keyword_artifact=None,
+):
     by_id = {item["id"]: item for item in artifact.get("vectors", [])}
+    keyword_by_id = {
+        item["id"]: item.get("items", []) for item in (keyword_artifact or [])
+    }
     rows = []
     for probe in queries:
         saved = by_id.get(probe["id"])
@@ -20,8 +31,9 @@ def evaluate(queries, artifact, *, strategy, max_score, min_margin):
         reason = abstention_reason(
             ranked, max_score=max_score, min_margin=min_margin
         )
+        keyword_items = keyword_by_id.get(probe["id"], [])
         title_to_ids = {}
-        for item in saved.get("rankedItems", []):
+        for item in [*saved.get("rankedItems", []), *keyword_items]:
             title_to_ids.setdefault(item.get("title"), []).append(item.get("id"))
         expected_titles = probe.get("expectedTitles")
         if expected_titles is None:
@@ -39,19 +51,40 @@ def evaluate(queries, artifact, *, strategy, max_score, min_margin):
             for expected_id_set in expected_ids
         ]
         expected_rank = expected_ranks[0] if expected_ranks else None
-        rows.append(
-            {
-                "id": probe["id"],
-                "kind": probe["kind"],
-                "abstention": reason,
-                "topRecordId": ranked[0].record_id if ranked and not reason else None,
-                "topScore": ranked[0].score if ranked else None,
-                "expectedRank": expected_rank,
-                "expectedRanks": expected_ranks,
-                "expectedAllFound": bool(expected_ranks)
-                and all(rank is not None for rank in expected_ranks),
-            }
-        )
+        row = {
+            "id": probe["id"],
+            "kind": probe["kind"],
+            "abstention": reason,
+            "topRecordId": ranked[0].record_id if ranked and not reason else None,
+            "topScore": ranked[0].score if ranked else None,
+            "expectedRank": expected_rank,
+            "expectedRanks": expected_ranks,
+            "expectedAllFound": bool(expected_ranks)
+            and all(rank is not None for rank in expected_ranks),
+        }
+        if keyword_artifact is not None:
+            keyword_ids = [item.get("id") for item in keyword_items]
+            hybrid_ids = reciprocal_rank_fusion(
+                [[item.record_id for item in ranked], keyword_ids]
+            )
+            expected_id_set = set(expected_ids[0]) if expected_ids else set()
+            row["keywordRank"] = next(
+                (
+                    rank
+                    for rank, record_id in enumerate(keyword_ids, 1)
+                    if record_id in expected_id_set
+                ),
+                None,
+            )
+            row["hybridRank"] = next(
+                (
+                    rank
+                    for rank, record_id in enumerate(hybrid_ids, 1)
+                    if record_id in expected_id_set
+                ),
+                None,
+            )
+        rows.append(row)
     positives = [row for row in rows if row["kind"] != "clean_negative"]
     negatives = [row for row in rows if row["kind"] == "clean_negative"]
     by_kind = {}
@@ -63,7 +96,7 @@ def evaluate(queries, artifact, *, strategy, max_score, min_margin):
             "allExpectedFound": sum(row["expectedAllFound"] for row in subset) / len(subset),
             "abstained": sum(row["abstention"] is not None for row in subset) / len(subset),
         }
-    return {
+    report = {
         "strategy": strategy,
         "maxScore": max_score,
         "minMargin": min_margin,
@@ -78,6 +111,14 @@ def evaluate(queries, artifact, *, strategy, max_score, min_margin):
         "byKind": by_kind,
         "rows": rows,
     }
+    if keyword_artifact is not None:
+        report["keywordHitAt1"] = sum(
+            row.get("keywordRank") == 1 for row in positives
+        ) / len(positives) if positives else None
+        report["hybridHitAt1"] = sum(
+            row.get("hybridRank") == 1 for row in positives
+        ) / len(positives) if positives else None
+    return report
 
 
 def main():
@@ -87,9 +128,19 @@ def main():
     parser.add_argument("--strategy", default="top_k_mean")
     parser.add_argument("--max-score", type=float, required=True)
     parser.add_argument("--min-margin", type=float)
+    parser.add_argument(
+        "--keyword-artifact",
+        type=pathlib.Path,
+        help="Optional per-query keyword ranking artifact for offline RRF comparison.",
+    )
     args = parser.parse_args()
     queries = json.loads(args.queries.read_text(encoding="utf-8"))
     artifact = json.loads(args.artifact.read_text(encoding="utf-8"))
+    keyword_artifact = (
+        json.loads(args.keyword_artifact.read_text(encoding="utf-8"))
+        if args.keyword_artifact
+        else None
+    )
     print(
         json.dumps(
             evaluate(
@@ -98,6 +149,7 @@ def main():
                 strategy=args.strategy,
                 max_score=args.max_score,
                 min_margin=args.min_margin,
+                keyword_artifact=keyword_artifact,
             ),
             indent=2,
         )

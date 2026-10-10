@@ -4,6 +4,7 @@ from semantic_scoring import (
     abstention_reason,
     log_length_penalized_min,
     proportional_top_k_mean,
+    reciprocal_rank_fusion,
     score_records,
     top_k_mean,
 )
@@ -31,6 +32,17 @@ class SemanticScoringTests(unittest.TestCase):
             {"b": [0.2, 0.2], "a": [0.2, 0.2]}, strategy="top_k_mean", top_k=2
         )
         self.assertEqual([item.record_id for item in ranked], ["a", "b"])
+
+    def test_rrf_rewards_records_present_in_both_rankings(self):
+        ranked = reciprocal_rank_fusion(
+            [["semantic-only", "shared"], ["shared", "keyword-only"]]
+        )
+        self.assertEqual(ranked[0], "shared")
+        self.assertEqual(set(ranked), {"semantic-only", "shared", "keyword-only"})
+
+    def test_rrf_rejects_invalid_constant(self):
+        with self.assertRaises(ValueError):
+            reciprocal_rank_fusion([["a"]], constant=0)
 
     def test_abstention_never_returns_nearest_for_a_failed_floor(self):
         ranked = score_records({"paper": [0.42, 0.45]}, strategy="top_k_mean")

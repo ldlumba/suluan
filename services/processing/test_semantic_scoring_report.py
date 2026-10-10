@@ -87,6 +87,37 @@ class SemanticScoringReportTests(unittest.TestCase):
         )
         self.assertEqual(report["rows"][0]["expectedRank"], 1)
 
+    def test_report_compares_keyword_and_hybrid_rankings(self):
+        queries = [{"id": "p", "kind": "positive", "expectedTitle": "Target"}]
+        artifact = {
+            "vectors": [
+                {
+                    "id": "p",
+                    "chunkDistances": {"semantic": [0.1], "target": [0.2]},
+                    "rankedItems": [
+                        {"id": "semantic", "title": "Other"},
+                        {"id": "target", "title": "Target"},
+                    ],
+                }
+            ]
+        }
+        keyword = [
+            {
+                "id": "p",
+                "items": [{"id": "target", "title": "Target"}],
+            }
+        ]
+        report = evaluate(
+            queries,
+            artifact,
+            strategy="min",
+            max_score=0.3,
+            min_margin=None,
+            keyword_artifact=keyword,
+        )
+        self.assertEqual(report["keywordHitAt1"], 1)
+        self.assertEqual(report["hybridHitAt1"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
