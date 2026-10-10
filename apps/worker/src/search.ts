@@ -22,6 +22,7 @@ import {
 } from './embeddings'
 import { normalizeKeyword } from './keywords'
 import { consumeQuota, consumeQueryQuota, embeddingLimits } from './quota'
+import { reciprocalRankFusion } from './ranking'
 
 const querySchema = z.object({
   q: z.string().trim().max(200).default(''),
@@ -36,6 +37,7 @@ const keywordQuerySchema = querySchema.extend({
 })
 const indexSchema = z.object({ recordId: z.string().uuid().optional() })
 const PAGE_SIZE = 10
+const HYBRID_CANDIDATE_LIMIT = 100
 /**
  * Defensive cosine-distance guardrail (0 = identical, 2 = opposite), not a
  * calibrated relevance decision. In the initial two-paper development corpus,
@@ -129,6 +131,7 @@ export async function semanticSearchByVector(
   viewer: ViewerRole,
   vector: number[],
   page: number,
+  limit = PAGE_SIZE,
 ) {
   const queryVector = toVectorLiteral(vector)
   const rows = await db.execute(sql`
@@ -187,12 +190,12 @@ export async function semanticSearchByVector(
     ) authors on true
     where ranked.distance <= ${MAX_SEMANTIC_DISTANCE}
     order by ranked.distance asc, r.id
-    limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
-  `)
-  return {
-    items: rows.rows.slice(0, PAGE_SIZE),
+      limit ${limit + 1} offset ${(page - 1) * limit}
+    `)
+    return {
+    items: rows.rows.slice(0, limit),
     page,
-    hasMore: rows.rows.length > PAGE_SIZE,
+    hasMore: rows.rows.length > limit,
   }
 }
 
@@ -222,6 +225,63 @@ export async function semanticChunkDistancesByVector(
     ;(distances[row.recordId] ??= []).push(Number(row.distance))
   }
   return distances
+}
+
+/** Keyword candidates for the opt-in record-level hybrid path. */
+async function keywordCandidatesByQuery(
+  db: Db,
+  viewer: ViewerRole,
+  q: string,
+  limit: number,
+) {
+  const rows = await db.execute(sql`
+    with query as (select websearch_to_tsquery('simple', ${q}) as terms),
+    eligible as (
+      select r.id, r.title, r.submission_id,
+        coalesce(authors.names, s.authors) as authors,
+        school.name as school_name, course.name as course_name,
+        r.year, i.id as index_id,
+        to_tsvector('simple', r.title || ' '
+          || coalesce(authors.names, s.authors, '') || ' '
+          || coalesce(school.name, '') || ' ' || coalesce(course.name, '')
+          || ' ' || r.year::text) as metadata,
+        ${visibilityCase()} as visibility
+      from research_records r join submissions s on s.id = r.submission_id
+      left join schools school on school.id = s.school_id
+      left join courses course on course.id = s.course_id
+      left join lateral (
+        select string_agg(a.name, ', ' order by a.position, a.id) as names
+        from record_authors a where a.record_id = r.id
+      ) authors on true
+      left join processing_jobs j on j.record_id = r.id
+      left join keyword_indexes i on i.record_id = r.id
+        and i.extraction_claim_token = j.claim_token
+        and i.chunker_version = ${CHUNKER_VERSION} and j.status = 'EXTRACTED'
+      where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
+    )
+    select e.id, e.title, e.submission_id as "submissionId", e.authors,
+      e.school_name as "schoolName", e.course_name as "courseName",
+      e.year::text as year, e.visibility, 'READY' as "fullTextStatus",
+      case
+        when char_length(best.content) <= 400 then best.content
+        else rtrim(regexp_replace(
+          left(best.content, 400), '[[:space:]]+[^[:space:]]*$', ''
+        )) || '…'
+      end as snippet
+    from eligible e cross join query
+    left join lateral (
+      select regexp_replace(btrim(d.content), '[[:space:]]+', ' ', 'g') as content,
+        ts_rank_cd(d.search_vector, query.terms) as rank
+      from document_chunks d where d.index_id = e.index_id
+        and d.search_vector @@ query.terms
+      order by rank desc, d.ordinal limit 1
+    ) best on true
+    where e.metadata @@ query.terms or best.content is not null
+    order by ts_rank_cd(e.metadata, query.terms) * 2 + coalesce(best.rank, 0) desc,
+      e.id
+    limit ${limit}
+  `)
+  return rows.rows as { id: string; [key: string]: unknown }[]
 }
 
 /**
@@ -452,10 +512,39 @@ export function searchRoutes(
       // results. The record score uses the strongest few chunks rather than
       // one extreme-value match, which gives long papers more chances for a
       // spuriously close chunk.
+      if (c.env.SEMANTIC_SEARCH_MODE === 'hybrid') {
+        const semantic = await semanticSearchByVector(
+          db,
+          viewer,
+          vector,
+          1,
+          HYBRID_CANDIDATE_LIMIT,
+        )
+        const keyword = await keywordCandidatesByQuery(
+          db,
+          viewer,
+          q,
+          HYBRID_CANDIDATE_LIMIT,
+        )
+        const fused = reciprocalRankFusion([
+          semantic.items as { id: string }[],
+          keyword,
+        ])
+        const offset = (page - 1) * PAGE_SIZE
+        return c.json({
+          items: fused.slice(offset, offset + PAGE_SIZE),
+          page,
+          hasMore: fused.length > offset + PAGE_SIZE,
+          semanticStatus: 'ready' as const,
+          retrievalMode: 'hybrid' as const,
+        })
+      }
+
       const result = await semanticSearchByVector(db, viewer, vector, page)
       return c.json({
         ...result,
         semanticStatus: 'ready' as const,
+        retrievalMode: 'semantic' as const,
       })
     },
   )

@@ -161,11 +161,11 @@ needsDb('semantic search', () => {
     return { ...t.testEnv(), GEMINI_API_KEY: 'AQ.test-key', ...extra }
   }
 
-  function get(path: string, token: string | null) {
+  function get(path: string, token: string | null, extra: Record<string, string> = {}) {
     return t.app.request(
       path,
       { headers: token ? { authorization: `Bearer ${token}` } : {} },
-      env(),
+      env(extra),
     )
   }
 
@@ -596,6 +596,25 @@ needsDb('semantic search', () => {
     for (const d of distances) expect(d).toBeGreaterThanOrEqual(0)
     const sorted = [...distances].sort((a, b) => a - b)
     expect(distances).toEqual(sorted)
+  })
+
+  dbIt('supports the opt-in record-level hybrid path', async () => {
+    await testDb().execute(sql`delete from embedding_usage`)
+    const p = await paper('PUBLIC', `hybrid keyword candidate ${tag}`)
+    expect((await embedAll(p.recordId)).embedded).toBe(1)
+
+    const res = await get('/api/search/semantic?q=hybrid%20keyword', manager, {
+      SEMANTIC_SEARCH_MODE: 'hybrid',
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      items: { id: string }[]
+      semanticStatus: string
+      retrievalMode: string
+    }
+    expect(body.semanticStatus).toBe('ready')
+    expect(body.retrievalMode).toBe('hybrid')
+    expect(new Set(body.items.map((item) => item.id)).size).toBe(body.items.length)
   })
 
   dbIt('scores one paper from its strongest three chunks', async () => {

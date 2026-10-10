@@ -66,6 +66,8 @@ export interface Env {
    */
   EMBEDDING_DAILY_REQUEST_LIMIT?: string
   EMBEDDING_DAILY_INPUT_LIMIT?: string
+  /** Retrieval mode; hybrid remains opt-in until the independent gate passes. */
+  SEMANTIC_SEARCH_MODE?: 'semantic' | 'hybrid'
   /** Exact audience requested from the Cloud Run metadata identity endpoint. */
   PROCESSING_SERVICE_AUDIENCE?: string
   /** Exact dedicated Cloud Run Job service-account email. */
