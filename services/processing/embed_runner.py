@@ -234,6 +234,18 @@ def main():
         ),
     )
     parser.add_argument(
+        "--query-start",
+        type=int,
+        default=0,
+        help="Zero-based start offset for a bounded slice of a query file.",
+    )
+    parser.add_argument(
+        "--query-limit",
+        type=int,
+        default=20,
+        help="Maximum probes in this evaluation batch (maximum 20).",
+    )
+    parser.add_argument(
         "--preflight",
         action="store_true",
         help="Verify the frozen suite, corpus, identity, and quota without calling Gemini.",
@@ -250,6 +262,10 @@ def main():
         parser.error("--max-claims must be between 1 and 10")
     if args.query_file and args.query:
         parser.error("use --query or --query-file, not both")
+    if args.query_start < 0:
+        parser.error("--query-start must not be negative")
+    if not 1 <= args.query_limit <= 20:
+        parser.error("--query-limit must be between 1 and 20")
     if args.query_vectors_output and not args.query_file:
         parser.error("--query-vectors-output requires --query-file")
     if args.query_vectors_stdout and not args.query_file:
@@ -281,11 +297,14 @@ def main():
                 probes = json.load(handle)
             with open(args.query_file, "rb") as handle:
                 query_file_sha256 = hashlib.sha256(handle.read()).hexdigest()
-            if not isinstance(probes, list) or not 1 <= len(probes) <= 20:
-                parser.error("--query-file must contain between 1 and 20 probes")
+            if not isinstance(probes, list) or not 1 <= len(probes) <= 40:
+                parser.error("--query-file must contain between 1 and 40 probes")
             ids = [probe.get("id") for probe in probes]
             if any(not probe_id for probe_id in ids) or len(set(ids)) != len(ids):
                 parser.error("--query-file probe ids must be non-empty and unique")
+            probes = probes[args.query_start : args.query_start + args.query_limit]
+            if not probes:
+                parser.error("query slice is empty")
             if args.query_vectors_stdout:
                 parser.error(
                     "--query-vectors-stdout is disabled; evaluations persist one "
