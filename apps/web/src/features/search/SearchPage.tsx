@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
-import { BookOpen, Network, Search, SlidersHorizontal, X } from 'lucide-react'
+import { BookOpen, Network, Search, X } from 'lucide-react'
 import { z } from 'zod'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -156,7 +156,6 @@ export function SearchPage() {
     values: { q },
   })
   const formQuery = useWatch({ control: form.control, name: 'q' })
-  const client = useQueryClient()
   const semantic = useQuery({
     queryKey: ['semantic-search', profile?.id, profile?.role, q, page],
     enabled:
@@ -198,22 +197,6 @@ export function SearchPage() {
         await getIdToken(),
       ),
   })
-  const embed = useMutation({
-    mutationFn: async () =>
-      apiFetch<{ embedded: number; papers: number; hasMore: boolean }>(
-        '/api/search/semantic/prepare',
-        await getIdToken(),
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{}',
-        },
-      ),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['semantic-search'] })
-    },
-  })
-
   const results = semanticUnavailable
     ? keyword
     : mode === 'semantic'
@@ -258,53 +241,6 @@ export function SearchPage() {
         </div>
       </header>
       <div className="space-y-6">
-        {manager && (
-          <div className="border-t-2 border-[var(--archive-gold)] bg-white p-5 sm:p-6">
-            <div className="flex items-start gap-3">
-              <SlidersHorizontal
-                className="mt-0.5 size-5 text-[var(--primary)]"
-                aria-hidden="true"
-              />
-              <div>
-                <h2 className="font-semibold">Semantic index maintenance</h2>
-                <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
-                  Prepare a bounded batch of accepted papers for semantic
-                  search.
-                </p>
-              </div>
-            </div>
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                disabled={embed.isPending}
-                onClick={() => embed.mutate()}
-              >
-                {embed.isPending
-                  ? 'Embedding…'
-                  : 'Embed papers for semantic search'}
-              </Button>
-              <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-                Sends one bounded batch of up to 2 papers (20 chunks) to Gemini.
-                Wait at least 30 seconds between batches. Counts against the
-                daily embedding limit. Papers are embedded once per extraction.
-              </p>
-              {embed.isSuccess && (
-                <p role="status">
-                  Embedded {embed.data.embedded} chunks from {embed.data.papers}{' '}
-                  papers.
-                  {embed.data.hasMore ? ' More remain; run another batch.' : ''}
-                </p>
-              )}
-              {embed.isError && (
-                <p role="alert">
-                  {embed.error instanceof ApiError
-                    ? embed.error.message
-                    : 'Could not embed papers.'}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
         <form
           className="space-y-2"
           onSubmit={form.handleSubmit((values) =>

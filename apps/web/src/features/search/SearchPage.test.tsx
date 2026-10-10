@@ -291,7 +291,7 @@ describe('semantic search', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('offers embedding only to managers', async () => {
+  it('does not expose manual embedding controls', async () => {
     vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
     renderPage('USER', '/search?q=humidity&mode=semantic')
     await waitFor(() => expect(apiFetch).toHaveBeenCalled())
@@ -299,11 +299,9 @@ describe('semantic search', () => {
       screen.queryByRole('button', { name: /embed papers for semantic search/i }),
     ).not.toBeInTheDocument()
 
-    vi.clearAllMocks()
-    renderPage('ADMIN', '/search?q=humidity&mode=semantic')
     expect(
-      await screen.findByRole('button', { name: /embed papers for semantic search/i }),
-    ).toBeInTheDocument()
+      screen.queryByRole('button', { name: /embed papers for semantic search/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('does not call the semantic API for public visitors', async () => {
