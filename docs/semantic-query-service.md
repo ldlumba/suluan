@@ -76,10 +76,17 @@ falls back to keyword results. Public paid semantic limits remain TBD.
 
 ## Authenticated staging canary activated — 2026-10-10
 
-Worker `4d17bb95-7f45-4cbe-a2fe-a64d2bf1425b` activated the regional URL,
+Worker `dd8c6d77-5ec0-45c8-b638-6d0d2afe93d0` activated the regional URL,
 length-penalized scorer, 0.36 ceiling, and authenticated-only gate. Cloud Run
 revision `suluan-query-staging-00005-ntj` holds the staging Gemini secret; the
 Worker has no Gemini key. The evaluator Job remains preflight-only with no
 secret. An anonymous live request returned `authentication_required` and did
 not change usage. Post-evaluation usage was 8 requests/69 inputs with zero
 active claims. This is a staging canary, not production activation.
+
+The first owner browser check returned the expected tuberculosis and AgriKlima
+papers at rank 1 and abstained for “Invasion of Countries.” It also exposed
+duplicate-title corpus copies as duplicate cards. Semantic presentation now
+collapses normalized exact-title copies after visibility filtering, retaining
+the best-scoring record with stable ID tie-breaking. This affects presentation
+only; no repository records or derivatives are deleted or merged.

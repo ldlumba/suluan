@@ -176,6 +176,12 @@ export async function semanticSearchByVector(
       join research_records r on r.id = b.record_id
       join submissions s on s.id = r.submission_id
       where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
+    ), deduplicated as (
+      select ranked.*, row_number() over (
+        partition by lower(regexp_replace(btrim(r.title), '[[:space:]]+', ' ', 'g'))
+        order by ranked.distance, ranked.record_id
+      ) as duplicate_rank
+      from ranked join research_records r on r.id = ranked.record_id
     )
     select r.id, r.title, r.submission_id as "submissionId",
       coalesce(authors.names, s.authors) as authors,
@@ -191,7 +197,7 @@ export async function semanticSearchByVector(
         )) || '…'
       end as snippet,
       ranked.distance
-    from ranked
+    from deduplicated ranked
     join research_records r on r.id = ranked.record_id
     join submissions s on s.id = r.submission_id
     left join schools school on school.id = s.school_id
@@ -200,7 +206,7 @@ export async function semanticSearchByVector(
       select string_agg(a.name, ', ' order by a.position, a.id) as names
       from record_authors a where a.record_id = r.id
     ) authors on true
-    where ranked.distance <= ${maxScore}
+    where ranked.distance <= ${maxScore} and ranked.duplicate_rank = 1
     order by ranked.distance asc, r.id
       limit ${limit + 1} offset ${(page - 1) * limit}
     `)

@@ -185,11 +185,12 @@ needsDb('semantic search', () => {
   async function paper(
     visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED',
     text: string | string[],
+    title = `Sem ${visibility} ${tag} ${recordIds.length}`,
   ) {
     const chunkTexts = Array.isArray(text) ? text : [text]
     const form = new FormData()
     form.append('file', new File(['x'.repeat(300)], 'paper.pdf', { type: 'application/pdf' }))
-    form.append('title', `Sem ${visibility} ${tag}`)
+    form.append('title', title)
     form.append('idempotencyKey', crypto.randomUUID())
     const created = await t.app.request(
       '/api/submissions',
@@ -670,6 +671,18 @@ needsDb('semantic search', () => {
       expect(abstained.status).toBe(200)
       expect(await abstained.json()).toMatchObject({ items: [], hasMore: false })
     }
+  })
+
+  dbIt('presents same-title corpus copies as one semantic result', async () => {
+    await testDb().execute(sql`delete from embedding_usage`)
+    const title = `duplicate semantic title ${tag}`
+    const first = await paper('PUBLIC', title, title)
+    const second = await paper('PUBLIC', title, title)
+    expect((await embedAll(first.recordId)).embedded).toBe(1)
+    expect((await embedAll(second.recordId)).embedded).toBe(1)
+    const res = await get('/api/search/semantic?q=duplicate semantic title', manager)
+    const body = (await res.json()) as { items: { title: string }[] }
+    expect(body.items.filter((item) => item.title === title)).toHaveLength(1)
   })
 
   dbIt('serves anonymous results cacheably and signed-in results privately', async () => {
