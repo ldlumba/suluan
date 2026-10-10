@@ -328,7 +328,7 @@ approved, independently labeled policy/holdout and must preserve keyword as
 the dependable path.
 
 The same audit tested a length-penalized minimum-distance strategy
-(`distance + 0.02 * ln(chunk_count)`) without changing frozen vectors. At a
+(`minimum_distance + 0.02 * ln(1 + chunk_count)`) without changing frozen vectors. At a
 diagnostic 0.36 floor it reached 4/4 hard positives and 100% negative
 abstention, but only 6/7 direct positives because the TikTok target remained
 rank 2. This is a candidate for further validation, not an approved Worker
@@ -355,7 +355,7 @@ registered set, and its results must not be used to tune a production cutoff.
 
 The Worker now exposes the length-penalized scorer only through the explicit
 `SEMANTIC_SCORING_MODE=log_length_penalized_min` environment option; the
-default remains top-3 mean and no deployment has enabled the option. This
+default remains top-3 mean; the temporary staging override was removed. This
 keeps the candidate strategy testable without silently changing the current
 semantic behavior.
 
@@ -373,9 +373,38 @@ gate still fails because the TikTok target remains rank 2.
 
 The batch also exposed that the evaluation endpoint did not propagate
 `SEMANTIC_SCORING_MODE` to its internal ranking call. That propagation is now
-fixed and tested; no second paid batch was run. Gemini was detached, the Job
+fixed; the existing semantic tests passed but did not test that endpoint's mode propagation. No second paid batch was run. Gemini was detached, the Job
 returned to preflight-only, the Worker scorer variable was removed, and staging
 quota remained at 3 requests/41 inputs with no active claims.
+
+### Deployment-readiness correction — 2026-10-10
+
+A subsequent audit found the Worker candidate incorrectly used top-3 mean plus
+`0.02 * ln(count)`, whereas Python used minimum plus `0.02 * ln(1 + count)`.
+The Worker now matches Python, with a mixed-distance regression fixture, and
+hybrid candidate retrieval also receives the selected mode. Earlier staging
+artifacts are not evidence that the candidate policy ran end to end.
+
+The offline report now distinguishes raw rank-1 hits from served hits after
+abstention. Reusing the saved adviser artifact at 0.36 yields 6/7 served direct
+hits, 4/4 hard hits, and 4/4 negative abstentions; b2 is abstained with raw target
+rank 2. The saved 25-query set still passes. No additional Gemini calls were
+needed. These are exploratory results, not fresh blinded validation.
+
+Deployment additionally requires a region-stable interactive query transport:
+the current public endpoint still calls Gemini from Worker egress. The approved
+Cloud Run Job evaluator does not implement interactive transport. The Worker
+also retains its defensive 0.7 bound, not the diagnostic 0.36 abstention policy.
+Neither a passing offline score nor attaching a Worker key resolves these gaps.
+
+An optional `SEMANTIC_MAX_SCORE` now applies a server-side score ceiling in
+public semantic/hybrid retrieval and both internal evaluation paths. Unset
+retains 0.7; values must be finite and between 0 and 0.7. Invalid public-route
+configuration returns unavailable before quota consumption/provider work.
+With an explicit ceiling, hybrid lexical candidates are limited to records
+passing semantic eligibility and the score ceiling, so fusion cannot undo
+abstention. This is candidate-policy infrastructure, not approval of 0.36 or
+any other relevance threshold. No deployed override was enabled for this change.
 
 ## Scoring workbench — 2026-10-06
 

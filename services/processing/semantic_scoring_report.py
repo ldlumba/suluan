@@ -76,15 +76,17 @@ def evaluate(
             "expectedRank": expected_rank,
             "expectedRanks": expected_ranks,
             "expectedAllFound": bool(expected_ranks)
+            and reason is None
             and all(rank is not None for rank in expected_ranks),
-            "hitAt1": any(rank == 1 for rank in expected_ranks),
+            "rawHitAt1": any(rank == 1 for rank in expected_ranks),
+            "hitAt1": reason is None and any(rank == 1 for rank in expected_ranks),
         }
         if keyword_artifact is not None:
             keyword_ids = [item.get("id") for item in keyword_items]
             hybrid_ids = reciprocal_rank_fusion(
                 [[item.record_id for item in ranked], keyword_ids]
             )
-            expected_id_set = set(expected_ids[0]) if expected_ids else set()
+            expected_id_set = {record_id for ids in expected_ids for record_id in ids}
             row["keywordRank"] = next(
                 (
                     rank
@@ -117,6 +119,7 @@ def evaluate(
         "strategy": strategy,
         "maxScore": max_score,
         "minMargin": min_margin,
+        "lengthPenalty": length_penalty,
         "positiveHitAt1": sum(row["hitAt1"] for row in positives)
         / len(positives)
         if positives

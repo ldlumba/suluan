@@ -1,0 +1,11 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.query
+      - -t
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/suluan/query-service:bootstrap
+      - .
+images:
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/suluan/query-service:bootstrap

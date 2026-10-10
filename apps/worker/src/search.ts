@@ -23,6 +23,8 @@ import {
 import { normalizeKeyword } from './keywords'
 import { consumeQuota, consumeQueryQuota, embeddingLimits } from './quota'
 import { reciprocalRankFusion } from './ranking'
+import { semanticMaxScore } from './semantic-policy'
+import { queryServiceUrl, regionalQueryVector } from './query-transport'
 
 const querySchema = z.object({
   q: z.string().trim().max(200).default(''),
@@ -135,6 +137,7 @@ export async function semanticSearchByVector(
   page: number,
   limit = PAGE_SIZE,
   scoringMode: SemanticScoringMode = 'top_k_mean',
+  maxScore = MAX_SEMANTIC_DISTANCE,
 ) {
   const queryVector = toVectorLiteral(vector)
   const rows = await db.execute(sql`
@@ -156,6 +159,7 @@ export async function semanticSearchByVector(
     ), best as (
       select record_id,
         (avg(distance) filter (where chunk_rank <= ${SEMANTIC_RECORD_TOP_K}))::double precision as distance,
+        min(distance)::double precision as minimum_distance,
         count(*)::double precision as chunk_count,
         regexp_replace(btrim((array_agg(
           content order by distance asc, chunk_id asc
@@ -164,9 +168,9 @@ export async function semanticSearchByVector(
       group by record_id
     ), ranked as (
        select b.record_id,
-         b.distance + case when ${scoringMode} = 'log_length_penalized_min'
-           then ${SEMANTIC_LENGTH_PENALTY} * ln(b.chunk_count)
-           else 0 end as distance,
+         case when ${scoringMode} = 'log_length_penalized_min'
+           then b.minimum_distance + ${SEMANTIC_LENGTH_PENALTY} * ln(1 + b.chunk_count)
+           else b.distance end as distance,
          b.snippet
       from best b
       join research_records r on r.id = b.record_id
@@ -196,7 +200,7 @@ export async function semanticSearchByVector(
       select string_agg(a.name, ', ' order by a.position, a.id) as names
       from record_authors a where a.record_id = r.id
     ) authors on true
-    where ranked.distance <= ${MAX_SEMANTIC_DISTANCE}
+    where ranked.distance <= ${maxScore}
     order by ranked.distance asc, r.id
       limit ${limit + 1} offset ${(page - 1) * limit}
     `)
@@ -462,13 +466,31 @@ export function searchRoutes(
           semanticStatus: 'empty_query' as const,
         })
       }
-      if (!isSemanticEnabled(c.env.GEMINI_API_KEY)) {
+      if (c.env.SEMANTIC_AUTHENTICATED_ONLY === 'true' && !profile) {
+        return c.json({
+          items: [], page, hasMore: false,
+          semanticStatus: 'authentication_required' as const,
+        })
+      }
+      if (!c.env.QUERY_EMBEDDING_URL && !isSemanticEnabled(c.env.GEMINI_API_KEY)) {
         return c.json({
           items: [],
           page,
           hasMore: false,
           semanticStatus: 'unconfigured' as const,
         })
+      }
+      let maxScore: number
+      try {
+        maxScore = semanticMaxScore(c.env.SEMANTIC_MAX_SCORE)
+        if (c.env.QUERY_EMBEDDING_URL) {
+          queryServiceUrl(c.env.QUERY_EMBEDDING_URL)
+          if (!c.env.QUERY_SERVICE_ACCOUNT || !c.env.QUERY_SERVICE_AUDIENCE) {
+            throw new Error('Regional identity missing')
+          }
+        }
+      } catch {
+        return c.json({ items: [], page, hasMore: false, semanticStatus: 'unavailable' as const })
       }
       const quota = await consumeQueryQuota(
         db,
@@ -495,11 +517,15 @@ export function searchRoutes(
       let vector: number[]
       try {
         // RETRIEVAL_QUERY (not DOCUMENT) is what makes asymmetric retrieval work.
-        ;[vector] = await embedTexts(
+        if (c.env.QUERY_EMBEDDING_URL) {
+          vector = await regionalQueryVector(db, c.env.QUERY_EMBEDDING_URL, q)
+        } else {
+          ;[vector] = await embedTexts(
           c.env.GEMINI_API_KEY as string,
           [q],
           'RETRIEVAL_QUERY',
         )
+        }
       } catch (err) {
         return c.json({
           items: [],
@@ -527,6 +553,8 @@ export function searchRoutes(
           vector,
           1,
           HYBRID_CANDIDATE_LIMIT,
+          c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
+          maxScore,
         )
         const keyword = await keywordCandidatesByQuery(
           db,
@@ -536,7 +564,10 @@ export function searchRoutes(
         )
         const fused = reciprocalRankFusion([
           semantic.items as { id: string }[],
-          keyword,
+          // A lexical match must not bypass a configured semantic abstention policy.
+          c.env.SEMANTIC_MAX_SCORE === undefined
+            ? keyword
+            : keyword.filter((item) => semantic.items.some((candidate) => candidate.id === item.id)),
         ])
         const offset = (page - 1) * PAGE_SIZE
         return c.json({
@@ -555,6 +586,7 @@ export function searchRoutes(
          page,
          PAGE_SIZE,
          c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
+         maxScore,
        )
       return c.json({
         ...result,

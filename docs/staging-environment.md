@@ -459,6 +459,17 @@ in the evaluation endpoint was fixed after this run, so no claim is made that
 this artifact exercised the Worker scorer. The evaluator secret was detached,
 the Job restored to preflight-only, and the Worker variable removed.
 
+### Authenticated semantic canary — 2026-10-10
+
+The owner-reviewed frozen 25-query launch suite passed 15/15 ordinary and 5/5
+hard positives at rank 1 plus 5/5 negative abstention under the corrected
+length-penalty/0.36 policy. The pinned regional query service passed one paid
+end-to-end transport smoke in 4.675 seconds. Worker
+`4d17bb95-7f45-4cbe-a2fe-a64d2bf1425b` then enabled an authenticated-UA-only
+staging canary. Anonymous requests return `authentication_required` before
+quota. Worker Gemini remains unset; the key exists only on Cloud Run revision
+`suluan-query-staging-00005-ntj`. Evaluator remains keyless/preflight-only.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,

@@ -4,6 +4,18 @@ from semantic_scoring_report import evaluate
 
 
 class SemanticScoringReportTests(unittest.TestCase):
+    def test_abstained_positive_is_not_a_served_hit(self):
+        report = evaluate(
+            [{"id": "p", "kind": "positive", "expectedTitle": "Target"}],
+            {"vectors": [{"id": "p", "chunkDistances": {"a": [0.5]},
+                          "rankedItems": [{"id": "a", "title": "Target"}]}]},
+            strategy="min", max_score=0.3, min_margin=None,
+        )
+        self.assertTrue(report["rows"][0]["rawHitAt1"])
+        self.assertFalse(report["rows"][0]["hitAt1"])
+        self.assertFalse(report["rows"][0]["expectedAllFound"])
+        self.assertEqual(report["positiveHitAt1"], 0)
+
     def test_report_measures_positive_rank_and_negative_abstention(self):
         queries = [
             {"id": "p", "kind": "positive", "expectedTitle": "Target"},

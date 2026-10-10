@@ -70,6 +70,14 @@ export interface Env {
   SEMANTIC_SEARCH_MODE?: 'semantic' | 'hybrid'
   /** Candidate record scorer; the length penalty remains evaluation-only by default. */
   SEMANTIC_SCORING_MODE?: 'top_k_mean' | 'log_length_penalized_min'
+  /** Optional evaluated score ceiling. Invalid configuration fails closed. */
+  SEMANTIC_MAX_SCORE?: string
+  /** Regional query-only service; enabling remains gated on launch review. */
+  QUERY_EMBEDDING_URL?: string
+  QUERY_SERVICE_ACCOUNT?: string
+  QUERY_SERVICE_AUDIENCE?: string
+  /** First rollout is UA-authenticated only; public semantic limits remain TBD. */
+  SEMANTIC_AUTHENTICATED_ONLY?: 'true'
   /** Exact audience requested from the Cloud Run metadata identity endpoint. */
   PROCESSING_SERVICE_AUDIENCE?: string
   /** Exact dedicated Cloud Run Job service-account email. */

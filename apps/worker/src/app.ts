@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 import { Hono, type MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
+import { bodyLimit } from 'hono/body-limit'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { courses, profiles, schools, submissions } from '@suluan/db/schema'
@@ -224,6 +225,32 @@ export function createApp(
     '/api/internal/embeddings',
     serviceEmbedRoutes(requireProcessingService),
   )
+  // Dedicated query service identity cannot access document processing routes.
+  app.post('/api/internal/query-tickets/redeem', bodyLimit({ maxSize: 256 }), async (c) => {
+    c.header('Cache-Control', 'private, no-store')
+    const audience = c.env.QUERY_SERVICE_AUDIENCE
+    const account = c.env.QUERY_SERVICE_ACCOUNT
+    const header = c.req.header('authorization')
+    if (!audience || !account) return c.json({ error: 'unconfigured' }, 503)
+    if (!header?.startsWith('Bearer ')) return c.json({ error: 'unauthorized' }, 401)
+    try {
+      await verifyServiceToken(header.slice(7), serviceVerifier, audience, account)
+    } catch {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    if (Number(c.req.header('content-length') ?? 0) > 256) return c.json({ error: 'oversize' }, 413)
+    const parsed = z.object({ ticket: z.string().uuid() }).strict().safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return c.json({ error: 'invalid_ticket' }, 400)
+    const result = await createDb(c.env.DATABASE_URL).execute(sql`
+      update embedding_claims set used_at = now()
+      where claim_token = ${parsed.data.ticket} and kind = 'query'
+        and payload->>'transport' = 'interactive-v1'
+        and used_at is null and expires_at > now()
+      returning payload->>'sha256' as sha256
+    `)
+    if (!result.rows.length) return c.json({ error: 'stale_ticket' }, 409)
+    return c.json({ sha256: result.rows[0].sha256 })
+  })
   app.use('/api/processing/*', requireAuth)
   app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))
   // Search reads are public; preparation stays manager-only.

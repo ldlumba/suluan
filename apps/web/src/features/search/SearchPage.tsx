@@ -63,6 +63,7 @@ interface SemanticResult extends KeywordResult {
     | 'quota_exhausted'
     | 'provider_error'
     | 'unavailable'
+    | 'authentication_required'
   reason?: string
 }
 
@@ -75,6 +76,8 @@ const SEMANTIC_NOTICE: Record<string, string> = {
   unavailable:
     'Semantic search is temporarily unavailable. Showing keyword results instead.',
   empty_query: 'Enter a description to search semantically.',
+  authentication_required:
+    'Sign in with your UA account to use semantic search. Showing keyword results instead.',
 }
 
 /**

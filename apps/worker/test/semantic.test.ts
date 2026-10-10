@@ -658,7 +658,18 @@ needsDb('semantic search', () => {
     const body = (await res.json()) as { items: { id: string; distance: number }[] }
     const match = body.items.find((item) => item.id === p.recordId)
     expect(match).toBeDefined()
-    expect(Number(match?.distance)).toBeCloseTo(2 / 3 + 0.02 * Math.log(3), 5)
+    // Match Python's minimum + penalty * log1p(chunk_count), not penalized mean.
+    expect(Number(match?.distance)).toBeCloseTo(0.02 * Math.log1p(3), 5)
+
+    for (const mode of ['semantic', 'hybrid'] as const) {
+      const abstained = await get('/api/search/semantic?q=threshold calibration', manager, {
+        SEMANTIC_SCORING_MODE: 'log_length_penalized_min',
+        SEMANTIC_SEARCH_MODE: mode,
+        SEMANTIC_MAX_SCORE: '0',
+      })
+      expect(abstained.status).toBe(200)
+      expect(await abstained.json()).toMatchObject({ items: [], hasMore: false })
+    }
   })
 
   dbIt('serves anonymous results cacheably and signed-in results privately', async () => {
@@ -668,6 +679,19 @@ needsDb('semantic search', () => {
     expect(anon.headers.get('cache-control')).toContain('public')
     const signedIn = await get('/api/search/semantic?q=cache', author)
     expect(signedIn.headers.get('cache-control')).toBe('private, no-store')
+  })
+
+  dbIt('can require UA authentication before semantic quota or provider work', async () => {
+    await testDb().execute(sql`delete from embedding_usage`)
+    const res = await get('/api/search/semantic?q=private canary', null, {
+      SEMANTIC_AUTHENTICATED_ONLY: 'true',
+    })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      items: [], semanticStatus: 'authentication_required',
+    })
+    const usage = await testDb().execute(sql`select count(*)::int count from embedding_usage`)
+    expect(Number((usage.rows[0] as { count: number }).count)).toBe(0)
   })
 
   dbIt('degrades to keyword instead of failing when the provider errors', async () => {

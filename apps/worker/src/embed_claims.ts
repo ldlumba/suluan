@@ -7,6 +7,7 @@ import { EMBEDDING_DIMS, EMBEDDING_MODEL } from '@suluan/db/schema'
 import type { AppContext } from './app'
 import { createDb, type Db } from './db'
 import { CHUNKER_VERSION } from './chunking'
+import { semanticMaxScore } from './semantic-policy'
 import { normalizeVector, toVectorLiteral } from './embeddings'
 import { consumeQuota, embeddingLimits } from './quota'
 import { EMBED_INPUT_BATCH, EMBED_PAPER_BATCH } from './search'
@@ -299,6 +300,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
         claim.payload.page,
         undefined,
         c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
+        semanticMaxScore(c.env.SEMANTIC_MAX_SCORE),
       )
       return c.json({
         ...result,
@@ -507,6 +509,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
               claim.payload.page,
               undefined,
               c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
+              semanticMaxScore(c.env.SEMANTIC_MAX_SCORE),
             ),
             semanticChunkDistancesByVector(db, claim.payload.viewer, vector),
           ])

@@ -7,7 +7,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY extraction.py runner.py cloud_runner.py embed_runner.py semantic_relevance_queries.json semantic_holdout_queries.json semantic_adviser_approved_queries.json ./
+COPY extraction.py runner.py cloud_runner.py embed_runner.py semantic_relevance_queries.json semantic_holdout_queries.json semantic_adviser_approved_queries.json semantic_launch_queries.json ./
 
 RUN useradd --create-home --uid 10001 processor
 USER processor
