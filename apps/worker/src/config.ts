@@ -68,6 +68,8 @@ export interface Env {
   EMBEDDING_DAILY_INPUT_LIMIT?: string
   /** Retrieval mode; hybrid remains opt-in until the independent gate passes. */
   SEMANTIC_SEARCH_MODE?: 'semantic' | 'hybrid'
+  /** Candidate record scorer; the length penalty remains evaluation-only by default. */
+  SEMANTIC_SCORING_MODE?: 'top_k_mean' | 'log_length_penalized_min'
   /** Exact audience requested from the Cloud Run metadata identity endpoint. */
   PROCESSING_SERVICE_AUDIENCE?: string
   /** Exact dedicated Cloud Run Job service-account email. */

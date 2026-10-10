@@ -48,6 +48,8 @@ const HYBRID_CANDIDATE_LIMIT = 100
 export const MAX_SEMANTIC_DISTANCE = 0.7
 /** Number of strongest chunks used to score one paper. */
 export const SEMANTIC_RECORD_TOP_K = 3
+export const SEMANTIC_LENGTH_PENALTY = 0.02
+type SemanticScoringMode = 'top_k_mean' | 'log_length_penalized_min'
 /** Bounded per-call batch; the production pipeline prepares per paper. */
 const INDEX_BATCH = 10
 /** Semantic preparation is operator-triggered, so it is bounded hard. */
@@ -132,6 +134,7 @@ export async function semanticSearchByVector(
   vector: number[],
   page: number,
   limit = PAGE_SIZE,
+  scoringMode: SemanticScoringMode = 'top_k_mean',
 ) {
   const queryVector = toVectorLiteral(vector)
   const rows = await db.execute(sql`
@@ -153,13 +156,18 @@ export async function semanticSearchByVector(
     ), best as (
       select record_id,
         (avg(distance) filter (where chunk_rank <= ${SEMANTIC_RECORD_TOP_K}))::double precision as distance,
+        count(*)::double precision as chunk_count,
         regexp_replace(btrim((array_agg(
           content order by distance asc, chunk_id asc
         ))[1]), '[[:space:]]+', ' ', 'g') as snippet
       from ranked_chunks
       group by record_id
     ), ranked as (
-      select b.record_id, b.distance, b.snippet
+       select b.record_id,
+         b.distance + case when ${scoringMode} = 'log_length_penalized_min'
+           then ${SEMANTIC_LENGTH_PENALTY} * ln(b.chunk_count)
+           else 0 end as distance,
+         b.snippet
       from best b
       join research_records r on r.id = b.record_id
       join submissions s on s.id = r.submission_id
@@ -540,7 +548,14 @@ export function searchRoutes(
         })
       }
 
-      const result = await semanticSearchByVector(db, viewer, vector, page)
+       const result = await semanticSearchByVector(
+         db,
+         viewer,
+         vector,
+         page,
+         PAGE_SIZE,
+         c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
+       )
       return c.json({
         ...result,
         semanticStatus: 'ready' as const,

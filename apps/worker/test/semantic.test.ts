@@ -641,6 +641,26 @@ needsDb('semantic search', () => {
     expect(Number(matches[0].distance)).toBeCloseTo(2 / 3, 5)
   })
 
+  dbIt('supports the opt-in length-penalized semantic scorer', async () => {
+    await testDb().execute(sql`delete from embedding_usage`)
+    stubThresholdGemini()
+    const p = await paper('PUBLIC', [
+      `threshold-close ${tag}`,
+      `threshold-far ${tag}`,
+      `threshold-far ${tag}`,
+    ])
+    expect((await embedAll(p.recordId)).embedded).toBe(3)
+
+    const res = await get('/api/search/semantic?q=threshold calibration', manager, {
+      SEMANTIC_SCORING_MODE: 'log_length_penalized_min',
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { items: { id: string; distance: number }[] }
+    const match = body.items.find((item) => item.id === p.recordId)
+    expect(match).toBeDefined()
+    expect(Number(match?.distance)).toBeCloseTo(2 / 3 + 0.02 * Math.log(3), 5)
+  })
+
   dbIt('serves anonymous results cacheably and signed-in results privately', async () => {
     const p = await paper('PUBLIC', `cache ${tag} header semantics`)
     expect((await embedAll(p.recordId)).embedded).toBe(1)

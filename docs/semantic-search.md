@@ -353,6 +353,12 @@ achieved 100% Hit@1 on this holdout. This is encouraging independent evidence,
 not launch approval: the adviser suite still failed, the holdout is a small
 registered set, and its results must not be used to tune a production cutoff.
 
+The Worker now exposes the length-penalized scorer only through the explicit
+`SEMANTIC_SCORING_MODE=log_length_penalized_min` environment option; the
+default remains top-3 mean and no deployment has enabled the option. This
+keeps the candidate strategy testable without silently changing the current
+semantic behavior.
+
 ## Scoring workbench — 2026-10-06
 
 The Worker now exposes an internal, service-authenticated evaluation option for
