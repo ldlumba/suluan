@@ -90,3 +90,9 @@ duplicate-title corpus copies as duplicate cards. Semantic presentation now
 collapses normalized exact-title copies after visibility filtering, retaining
 the best-scoring record with stable ID tie-breaking. This affects presentation
 only; no repository records or derivatives are deleted or merged.
+
+The owner reran both affected queries after Worker
+`dd8c6d77-5ec0-45c8-b638-6d0d2afe93d0` deployed the presentation fix. Each
+showed exactly one expected card: the tuberculosis paper and AgriKlima,
+respectively. This completes the manual authenticated browser canary check.
+Final same-day evidence was 13 requests/74 inputs and zero active claims.

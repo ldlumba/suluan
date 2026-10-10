@@ -470,6 +470,12 @@ staging canary. Anonymous requests return `authentication_required` before
 quota. Worker Gemini remains unset; the key exists only on Cloud Run revision
 `suluan-query-staging-00005-ntj`. Evaluator remains keyless/preflight-only.
 
+The owner then verified the live browser path with a real UA Firebase session:
+tuberculosis and farmer queries returned their expected rank-1 papers, and the
+negative invasion query abstained. After exact-title semantic deduplication was
+deployed, both positive queries displayed one card rather than two corpus-copy
+cards. Final evidence was 13 requests/74 inputs and zero active claims.
+
 ### Knowledge Graph discovery — 2026-10-05
 
 - Worker `0e39cd2b-e8e5-4ea4-9c3b-496993bc4d23` deployed the read-only,
