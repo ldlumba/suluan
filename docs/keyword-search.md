@@ -19,6 +19,20 @@ incident/recovery escape hatch, but is not needed for normal operation.
 
 ## Scope
 
+Staging corpus audit on 2026-10-10 found 36 normalized exact-title pairs among
+182 accepted records. Every pair agreed on authors, school, course, and year;
+18 pairs also shared the extraction source SHA-256. These are separate accepted
+records rather than SQL join multiplication. Search presentation therefore
+collapses normalized exact-title copies before pagination, choosing the
+strongest queried match and then the newest record with stable ID tie-breaking.
+Blank browse mode chooses the newest copy. No source record, file, index, or
+embedding is deleted or merged by this presentation rule.
+
+Staging Worker `6872fab8-1c64-4265-94f4-bf85e5bfbcd5` live-verified the rule:
+an anonymous title-sorted crawl returned 141 visible results across 15 pages
+with zero repeated normalized titles, and direct AgriKlima and tuberculosis
+keyword probes each returned one result card.
+
 - Manager-only until publication/embargo rules are decided. Ordinary users and
   unauthenticated callers cannot index or retrieve results, snippets, or counts.
 - PostgreSQL keyword search only. The `simple` configuration matches words

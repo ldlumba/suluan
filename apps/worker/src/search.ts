@@ -366,30 +366,44 @@ export function searchRoutes(
               where rk.record_id = r.id
                 and k.normalized_name = ${keywordFilter}
             ))
+        ), matched as (
+          select e.*, best.content, best.rank,
+            ts_rank_cd(e.metadata, query.terms) * 2
+              + coalesce(best.rank, 0) as relevance_score
+          from eligible e cross join query
+          left join lateral (
+            select regexp_replace(btrim(d.content), '[[:space:]]+', ' ', 'g') as content,
+              ts_rank_cd(d.search_vector, query.terms) as rank
+            from document_chunks d where d.index_id = e.index_id
+              and (${q} = '' or d.search_vector @@ query.terms)
+            order by rank desc, d.ordinal limit 1
+          ) best on true
+          where ${q} = '' or e.metadata @@ query.terms or best.content is not null
+        ), deduplicated as (
+          select matched.*, row_number() over (
+            partition by lower(regexp_replace(btrim(title), '[[:space:]]+', ' ', 'g'))
+            order by
+              case when ${q} <> '' then relevance_score end desc nulls last,
+              created_at desc, id
+          ) as duplicate_rank
+          from matched
         )
         select e.id, e.title, e.submission_id as "submissionId", e.authors,
           e.school_name as "schoolName", e.course_name as "courseName",
           e.year::text as year, e.keywords,
           e.visibility, e.full_text_status as "fullTextStatus",
           case
-            when ${q} = '' or best.content is null then null
-            when char_length(best.content) <= 400 then best.content
+            when ${q} = '' or e.content is null then null
+            when char_length(e.content) <= 400 then e.content
             else rtrim(regexp_replace(
-              left(best.content, 400), '[[:space:]]+[^[:space:]]*$', ''
+              left(e.content, 400), '[[:space:]]+[^[:space:]]*$', ''
             )) || '…'
           end as snippet
-        from eligible e cross join query
-        left join lateral (
-          select regexp_replace(btrim(d.content), '[[:space:]]+', ' ', 'g') as content,
-            ts_rank_cd(d.search_vector, query.terms) as rank
-          from document_chunks d where d.index_id = e.index_id
-            and (${q} = '' or d.search_vector @@ query.terms)
-          order by rank desc, d.ordinal limit 1
-        ) best on true
-        where ${q} = '' or e.metadata @@ query.terms or best.content is not null
+        from deduplicated e
+        where e.duplicate_rank = 1
         order by
           case when ${sort} = 'relevance' and ${q} <> '' then
-            ts_rank_cd(e.metadata, query.terms) * 2 + coalesce(best.rank, 0)
+            e.relevance_score
           end desc,
           case when ${sort} = 'title' then lower(e.title) end asc,
           case when ${sort} = 'newest'

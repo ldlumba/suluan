@@ -78,7 +78,7 @@ needsDb('restricted keyword discovery', () => {
   async function fixture(
     status: 'PENDING' | 'ACCEPTED' | 'REJECTED',
     extracted = true,
-    title = `Study ${tag}`,
+    title = `Study ${tag} ${ids.length}`,
     authors = `Author ${tag}`,
     keywords: string[] = [],
     visibility?: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED',
@@ -181,6 +181,38 @@ needsDb('restricted keyword discovery', () => {
     expect((await request('/api/search/records?sort=invalid', manager)).status).toBe(
       400,
     )
+  })
+  dbIt('presents normalized duplicate titles once before pagination', async () => {
+    const stamp = crypto.randomUUID().replaceAll('-', '')
+    const keyword = `Duplicate ${stamp}`
+    await fixture(
+      'ACCEPTED',
+      false,
+      `Duplicate  Paper ${stamp}`,
+      `Earlier Author ${stamp}`,
+      [keyword],
+    )
+    const latest = await fixture(
+      'ACCEPTED',
+      false,
+      `duplicate paper ${stamp}`,
+      `Latest Author ${stamp}`,
+      [keyword],
+    )
+
+    const queried = (await (
+      await request(`/api/search/records?q=${stamp}&sort=title`, manager)
+    ).json()) as { items: { id: string }[] }
+    expect(queried.items.map((item) => item.id)).toEqual([latest.recordId])
+
+    const blankBrowse = (await (
+      await request(
+        `/api/search/records?q=&sort=newest&keyword=${encodeURIComponent(keyword)}`,
+        manager,
+      )
+    ).json()) as { items: { id: string }[]; hasMore: boolean }
+    expect(blankBrowse.items.map((item) => item.id)).toEqual([latest.recordId])
+    expect(blankBrowse.hasMore).toBe(false)
   })
   dbIt('indexes idempotently, matches full text and metadata, and excludes pending/rejected/queued records', async () => {
     const accepted = await fixture('ACCEPTED')
