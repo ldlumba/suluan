@@ -5,8 +5,15 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import unicodedata
 
 from semantic_scoring import abstention_reason, reciprocal_rank_fusion, score_records
+
+
+def normalized_title(value):
+    """Compare labels by title identity, not capitalization or whitespace."""
+    normalized = unicodedata.normalize("NFKC", value or "").casefold()
+    return " ".join(normalized.split())
 
 
 def evaluate(
@@ -17,6 +24,7 @@ def evaluate(
     max_score,
     min_margin,
     keyword_artifact=None,
+    length_penalty=0.02,
 ):
     by_id = {item["id"]: item for item in artifact.get("vectors", [])}
     keyword_by_id = {
@@ -27,18 +35,26 @@ def evaluate(
         saved = by_id.get(probe["id"])
         if not saved:
             raise ValueError(f"missing saved vector for {probe['id']}")
-        ranked = score_records(saved.get("chunkDistances", {}), strategy=strategy)
+        ranked = score_records(
+            saved.get("chunkDistances", {}),
+            strategy=strategy,
+            penalty=length_penalty,
+        )
         reason = abstention_reason(
             ranked, max_score=max_score, min_margin=min_margin
         )
         keyword_items = keyword_by_id.get(probe["id"], [])
         title_to_ids = {}
         for item in [*saved.get("rankedItems", []), *keyword_items]:
-            title_to_ids.setdefault(item.get("title"), []).append(item.get("id"))
+            title_to_ids.setdefault(normalized_title(item.get("title")), []).append(
+                item.get("id")
+            )
         expected_titles = probe.get("expectedTitles")
         if expected_titles is None:
             expected_titles = [probe["expectedTitle"]] if probe.get("expectedTitle") else []
-        expected_ids = [title_to_ids.get(title, []) for title in expected_titles]
+        expected_ids = [
+            title_to_ids.get(normalized_title(title), []) for title in expected_titles
+        ]
         expected_ranks = [
             min(
                 (
@@ -61,6 +77,7 @@ def evaluate(
             "expectedRanks": expected_ranks,
             "expectedAllFound": bool(expected_ranks)
             and all(rank is not None for rank in expected_ranks),
+            "hitAt1": any(rank == 1 for rank in expected_ranks),
         }
         if keyword_artifact is not None:
             keyword_ids = [item.get("id") for item in keyword_items]
@@ -92,7 +109,7 @@ def evaluate(
         subset = [row for row in rows if row["kind"] == kind]
         by_kind[kind] = {
             "queries": len(subset),
-            "hitAt1": sum(row["expectedRank"] == 1 for row in subset) / len(subset),
+            "hitAt1": sum(row["hitAt1"] for row in subset) / len(subset),
             "allExpectedFound": sum(row["expectedAllFound"] for row in subset) / len(subset),
             "abstained": sum(row["abstention"] is not None for row in subset) / len(subset),
         }
@@ -100,7 +117,7 @@ def evaluate(
         "strategy": strategy,
         "maxScore": max_score,
         "minMargin": min_margin,
-        "positiveHitAt1": sum(row["expectedRank"] == 1 for row in positives)
+        "positiveHitAt1": sum(row["hitAt1"] for row in positives)
         / len(positives)
         if positives
         else None,
@@ -129,6 +146,12 @@ def main():
     parser.add_argument("--max-score", type=float, required=True)
     parser.add_argument("--min-margin", type=float)
     parser.add_argument(
+        "--length-penalty",
+        type=float,
+        default=0.02,
+        help="Penalty used by log_length_penalized_min (default: 0.02).",
+    )
+    parser.add_argument(
         "--keyword-artifact",
         type=pathlib.Path,
         help="Optional per-query keyword ranking artifact for offline RRF comparison.",
@@ -150,6 +173,7 @@ def main():
                 max_score=args.max_score,
                 min_margin=args.min_margin,
                 keyword_artifact=keyword_artifact,
+                length_penalty=args.length_penalty,
             ),
             indent=2,
         )

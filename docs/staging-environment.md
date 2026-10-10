@@ -428,8 +428,9 @@ private artifact run `d3f267f2-983f-4496-954d-703018e584b4` with SHA-256
 `70c460ec37f04e08e1b390e6046a96e4bea3c0723c868b06b029a11f745072cf`.
 
 Offline scoring failed the preregistered MIN/0.38 gate: corrected record-ID
-scoring found 5/7 direct positives and 2/4 hard positives at rank 1, while
-clean-negative abstention was 75%. The evaluator Gemini secret was removed,
+the scorer audit corrected title-label normalization and found 6/7 direct
+positives and 3/4 hard positives at rank 1, while clean-negative abstention
+was 75% for the preregistered MIN/0.38 policy. The evaluator Gemini secret was removed,
 the Job was restored to quota-free `--preflight`, and Worker
 `fc6f8e95-e397-42d1-8cce-f0d9d4bd5e69` restored the staging request/input
 defaults to 20/2,000. No semantic or Assistant activation followed.

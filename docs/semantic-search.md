@@ -314,16 +314,25 @@ artifact with SHA-256
 `70c460ec37f04e08e1b390e6046a96e4bea3c0723c868b06b029a11f745072cf`.
 
 The preregistered primary policy (paper `MIN` distance with a 0.38 abstention
-floor) **failed** on the completed corpus. Corrected scoring treats repeated
-paper titles as multiple record IDs: 5/7 direct positives ranked first, 2/4
-hard positives ranked first, and clean-negative abstention was 75% (the
-required result was 100%). The multi-positive probe contained both expected
-papers, but that does not offset the ranking and abstention failures. This is a
-valid failed gate, not a runtime failure. The evaluator Gemini secret was
-detached, the staging 145/2,200 temporary limits were reverted to 20/2,000,
-and semantic search remains disabled. Do not tune a production threshold to
-this same holdout; any retry needs a separately approved, independently
-labeled policy/holdout and must preserve keyword as the dependable path.
+floor) **failed** on the completed corpus. Scoring treats repeated paper titles
+as multiple record IDs. A 2026-10-10 scorer audit also normalized Unicode,
+capitalization, and whitespace in expected title labels; the corrected figures
+are 6/7 direct positives ranked first, 3/4 hard positives ranked first, and
+75% clean-negative abstention (the required result was 100%). The multi-positive
+probe contained both expected papers, but that does not offset the ranking and
+abstention failures. This is a valid failed gate, not a runtime failure. The
+evaluator Gemini secret was detached, the staging 145/2,200 temporary limits
+were reverted to 20/2,000, and semantic search remains disabled. Do not tune a
+production threshold to this same holdout; any retry needs a separately
+approved, independently labeled policy/holdout and must preserve keyword as
+the dependable path.
+
+The same audit tested a length-penalized minimum-distance strategy
+(`distance + 0.02 * ln(chunk_count)`) without changing frozen vectors. At a
+diagnostic 0.36 floor it reached 4/4 hard positives and 100% negative
+abstention, but only 6/7 direct positives because the TikTok target remained
+rank 2. This is a candidate for further validation, not an approved Worker
+policy.
 
 ### Independent registered holdout — 2026-10-10
 

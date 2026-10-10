@@ -61,6 +61,7 @@ class SemanticScoringReportTests(unittest.TestCase):
             min_margin=None,
         )
         self.assertEqual(report["rows"][0]["expectedRanks"], [1, 2])
+        self.assertTrue(report["rows"][0]["hitAt1"])
         self.assertTrue(report["rows"][0]["expectedAllFound"])
         self.assertEqual(report["byKind"]["multi_positive"]["allExpectedFound"], 1)
 
@@ -81,6 +82,26 @@ class SemanticScoringReportTests(unittest.TestCase):
         report = evaluate(
             queries,
             artifact,
+            strategy="min",
+            max_score=0.3,
+            min_margin=None,
+        )
+        self.assertEqual(report["rows"][0]["expectedRank"], 1)
+
+    def test_report_matches_title_labels_case_insensitively(self):
+        report = evaluate(
+            [{"id": "p", "kind": "positive", "expectedTitle": "Food Heritage Institute"}],
+            {
+                "vectors": [
+                    {
+                        "id": "p",
+                        "chunkDistances": {"record": [0.1]},
+                        "rankedItems": [
+                            {"id": "record", "title": "Food heritage institute"}
+                        ],
+                    }
+                ]
+            },
             strategy="min",
             max_score=0.3,
             min_margin=None,
