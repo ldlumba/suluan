@@ -1,8 +1,10 @@
 # Local document processing
 
-This is the local, operator-driven extraction slice. Cloud Run deployment,
-authenticated service-to-service delivery, automatic queue consumption, OCR,
-indexing, and embeddings are deferred. No cloud service is activated by setup.
+This is the local extraction slice. Cloud Run deployment and authenticated
+service-to-service delivery are active in staging; OCR remains deferred. The
+staging processing Job runs automatically, and the bounded document-embedding
+Job now runs from a conservative Cloud Scheduler trigger. No cloud service is
+activated by local setup.
 
 ## Setup (from repository root, PowerShell)
 
@@ -74,7 +76,7 @@ and tables, not headers, footnotes, images, or a reliable page layout.
 
 ## Pace semantic preparation
 
-After extraction and keyword preparation, use the same manager token through the
+For local recovery or development, use the same manager token through the
 process-scoped `SULUAN_ID_TOKEN` variable to prepare missing semantic vectors:
 
 ```powershell
@@ -88,6 +90,13 @@ reports its daily development cap, or 20 batches have run. A provider error or
 may consume quota. Existing vectors remain intact, so rerunning later resumes
 only missing chunks. The command accepts localhost Worker origins only and never
 accepts the Firebase token as a command-line argument.
+
+In staging, `suluan-embed-staging` is invoked automatically every three hours.
+Each execution claims at most one paper-bounded batch, has zero Cloud Run task
+retries, and stops cleanly when the Worker quota is exhausted or no chunks are
+missing. The Worker quota is consumed before the provider call, so scheduled
+work cannot bypass the daily safety cap. Interactive semantic queries continue
+to fall back safely when the shared cap is reached.
 
 ## Evaluate semantic relevance
 

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { useAuth } from '@/features/auth/useAuth'
 import { apiFetch, ApiError } from '@/lib/api'
 import { SearchPage } from './SearchPage'
+import { SemanticAccessPage } from './SemanticAccessPage'
 
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => ({
@@ -303,5 +304,27 @@ describe('semantic search', () => {
     expect(
       await screen.findByRole('button', { name: /embed papers for semantic search/i }),
     ).toBeInTheDocument()
+  })
+
+  it('does not call the semantic API for public visitors', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      profile: null,
+      loading: false,
+      getIdToken: async () => null,
+    } as never)
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/search?q=humidity&mode=semantic']}>
+          <Routes>
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/search/semantic-access" element={<SemanticAccessPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Sign in to search by meaning' }),
+    ).toBeInTheDocument()
+    expect(apiFetch).not.toHaveBeenCalled()
   })
 })

@@ -34,6 +34,12 @@ describe('app routing', () => {
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
   })
 
+  it('renders the semantic access explanation for public visitors', () => {
+    renderAt('/search/semantic-access?q=humidity')
+    expect(screen.getByRole('heading', { name: 'Sign in to search by meaning' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /use keyword search/i })).toHaveAttribute('href', '/search?q=humidity')
+  })
+
   it('renders the public graph entry screen at /graph', async () => {
     renderAt('/graph')
     expect(

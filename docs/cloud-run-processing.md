@@ -139,7 +139,15 @@ image digest used by the evaluator. Unlike the evaluator Job, it retains the
 staging Gemini secret and runs document claims only. Obsolete
 `SULUAN_QUERY_FILE`/`SULUAN_QUERY_INTERVAL` values were removed, and
 `SULUAN_MAX_CLAIMS=1` enforces one provider request per execution. The Job has
-one task, parallelism one, zero retries, and no Scheduler binding.
+one task, parallelism one, and zero retries; it was scheduler-free during the
+manual backfill.
+
+The staging document-embedding Job is now automated separately: Cloud Scheduler
+job `suluan-embed-trigger` invokes `suluan-embed-staging` every three hours in
+UTC. It uses the existing least-privilege processing Scheduler identity, which
+has `roles/run.invoker` on this Job only. The Job remains one task with
+`SULUAN_MAX_CLAIMS=1`, zero task retries, and the Worker-enforced shared quota;
+the query evaluation Job remains scheduler-free and keyless.
 
 One canary plus 19 executions were paced by at least 30 seconds. All 20 claims
 completed exactly once (395 inputs; some paper-bounded claims contained fewer

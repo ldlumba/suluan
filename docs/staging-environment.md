@@ -184,10 +184,18 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   which has `roles/run.invoker` only on the processing Job. The first manually
   forced Scheduler run completed successfully on 2026-10-06; database claim
   leases remain the overlap and stale-worker safeguard.
-- `GEMINI_API_KEY`, embeddings, OCR, service-account JSON key, and institutional
-  Gmail sender are not configured. The staging Worker has a five-minute outbox
-  and keyword-index sweep plus the temporary UA OAuth sender approved on
-  2026-10-05.
+- Cloud Scheduler job `suluan-embed-trigger` starts `suluan-embed-staging` every
+  three hours in UTC. The same Scheduler identity has `roles/run.invoker` only
+  on this embedding Job. Each execution is limited to one claim, has zero task
+  retries, and is stopped by the Worker's shared daily quota before any paid
+  provider call when capacity is exhausted. A forced trigger on 2026-10-10
+  created execution `suluan-embed-staging-b2g7j`; the evaluator remains
+  scheduler-free.
+- The staging query and document-embedding services hold Gemini access only in
+  Cloud Run; the Worker has no Gemini key. OCR, service-account JSON keys, and
+  institutional Gmail sender approval remain absent. The staging Worker has a
+  five-minute outbox and keyword-index sweep plus the temporary UA OAuth sender
+  approved on 2026-10-05.
 
 ### Database recovery
 

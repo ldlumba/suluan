@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { Link, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { BookOpen, Network, Search, SlidersHorizontal, X } from 'lucide-react'
 import { z } from 'zod'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -131,6 +131,7 @@ function KeywordFilter({
 export function SearchPage() {
   const { profile, loading, getIdToken } = useAuth()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const q = params.get('q') ?? ''
   const rawPage = Number(params.get('page') ?? 1)
   const page =
@@ -158,7 +159,11 @@ export function SearchPage() {
   const client = useQueryClient()
   const semantic = useQuery({
     queryKey: ['semantic-search', profile?.id, profile?.role, q, page],
-    enabled: mode === 'semantic' && q.length <= 200 && q.length > 0,
+    enabled:
+      mode === 'semantic' &&
+      Boolean(profile) &&
+      q.length <= 200 &&
+      q.length > 0,
     retry: false,
     queryFn: async () =>
       apiFetch<SemanticResult>(
@@ -221,6 +226,13 @@ export function SearchPage() {
       : undefined
 
   if (loading) return <p>Checking permissions…</p>
+
+  // Keep the entry point visible to public visitors, but do not even issue a
+  // semantic API request until the server-backed UA profile exists.
+  if (mode === 'semantic' && !profile) {
+    const query = q ? `?q=${encodeURIComponent(q)}` : ''
+    return <Navigate to={`/search/semantic-access${query}`} replace />
+  }
 
   return (
     <div className="space-y-8">
@@ -361,7 +373,14 @@ export function SearchPage() {
               type="button"
               size="sm"
               variant={mode === 'semantic' ? 'default' : 'outline'}
-              onClick={() => setParams({ q, page: '1', mode: 'semantic' })}
+              onClick={() => {
+                if (!profile) {
+                  const query = q ? `?q=${encodeURIComponent(q)}` : ''
+                  navigate(`/search/semantic-access${query}`)
+                  return
+                }
+                setParams({ q, page: '1', mode: 'semantic' })
+              }}
             >
               Semantic
             </Button>
