@@ -36,14 +36,23 @@ describe('app routing', () => {
 
   it('renders the semantic access explanation for public visitors', () => {
     renderAt('/search/semantic-access?q=humidity')
-    expect(screen.getByRole('heading', { name: 'Sign in to search by meaning' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /use keyword search/i })).toHaveAttribute('href', '/search?q=humidity')
+    expect(
+      screen.getByRole('heading', { name: 'Sign in to use semantic search' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /use keyword search/i }),
+    ).toHaveAttribute('href', '/search?q=humidity')
   })
 
   it('renders the public graph entry screen at /graph', async () => {
     renderAt('/graph')
     expect(
-      await screen.findByRole('heading', { name: 'Research relationships' }),
+      // React Flow's lazy module can exceed the default 1s on cold CI runs.
+      await screen.findByRole(
+        'heading',
+        { name: 'Research relationships' },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument()
   })
 

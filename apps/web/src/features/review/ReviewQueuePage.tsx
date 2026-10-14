@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ClipboardCheck, Download, FileText, RefreshCw } from 'lucide-react'
+import {
+  CircleAlert,
+  ClipboardCheck,
+  Download,
+  FileText,
+  RefreshCw,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -31,6 +37,14 @@ interface QueueItem {
   createdAt: string
   submitterEmail: string | null
   keywords: string[]
+  possibleDuplicate: boolean
+  duplicateOf: {
+    id: string
+    title: string
+    status: string
+    createdAt: string
+    submitterEmail: string | null
+  }[]
   files: {
     fileName: string
     mimeType: string | null
@@ -253,6 +267,25 @@ export function ReviewQueuePage() {
                     {item.authors ?? 'Authors not listed'} ·{' '}
                     {item.submitterEmail ?? 'Submitter unknown'}
                   </div>
+                  {item.possibleDuplicate && (
+                    <div className="border border-[var(--archive-gold)] bg-[var(--secondary)] px-3 py-2 text-xs leading-5">
+                      <p className="inline-flex items-center gap-2 font-semibold text-foreground">
+                        <CircleAlert className="size-4" aria-hidden="true" />
+                        Possible duplicate title — compare before deciding
+                      </p>
+                      {item.duplicateOf.length > 0 && (
+                        <ul className="mt-2 space-y-1 font-normal text-foreground">
+                          {item.duplicateOf.map((match) => (
+                            <li key={match.id}>
+                              {match.title} · {match.status} ·{' '}
+                              {match.submitterEmail ?? 'submitter unknown'} ·{' '}
+                              {new Date(match.createdAt).toLocaleDateString()}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                   {item.keywords.length > 0 && (
                     <div className="flex flex-wrap gap-2 pt-1">
                       {item.keywords.map((keyword) => (
@@ -383,7 +416,7 @@ export function ReviewQueuePage() {
                 })
               }
             >
-              Reject
+              Return
             </Button>
             <Button
               disabled={decideMutation.isPending || remarks.trim().length === 0}

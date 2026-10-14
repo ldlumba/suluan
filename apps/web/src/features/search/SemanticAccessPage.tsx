@@ -1,6 +1,11 @@
 import { ArrowLeft, LockKeyhole, SearchCheck } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { SignInButton } from '@/features/auth/SignInButton'
 
@@ -19,12 +24,13 @@ export function SemanticAccessPage() {
             <div>
               <p className="eyebrow text-[var(--impact)]">UA access required</p>
               <h1 className="display-heading mt-2 text-3xl font-semibold sm:text-4xl">
-                Sign in to search by meaning
+                Sign in to use semantic search
               </h1>
               <CardDescription className="mt-3 leading-7">
-                Semantic Search understands the ideas behind your question. It is
-                available to authenticated University of the Assumption users;
-                public keyword search remains available to everyone.
+                Semantic Search combines meaning with exact-term evidence from
+                accepted papers. It is available to authenticated University of
+                the Assumption users; public keyword search remains available to
+                everyone.
               </CardDescription>
             </div>
           </div>
@@ -32,9 +38,13 @@ export function SemanticAccessPage() {
         <CardContent className="space-y-6">
           <div className="border-t border-[var(--border)] pt-5">
             <div className="flex items-start gap-3">
-              <SearchCheck className="mt-0.5 size-5 shrink-0 text-[var(--signal-blue)]" aria-hidden="true" />
+              <SearchCheck
+                className="mt-0.5 size-5 shrink-0 text-[var(--signal-blue)]"
+                aria-hidden="true"
+              />
               <p className="text-sm leading-6 text-[var(--ink-muted)]">
-                Sign in with your authorized <strong className="text-[var(--foreground)]">@ua.edu.ph</strong>{' '}
+                Sign in with your authorized{' '}
+                <strong className="text-[var(--foreground)]">@ua.edu.ph</strong>{' '}
                 Google account to continue. Signing in identifies you; access
                 permissions are still enforced by SULUAN.
               </p>

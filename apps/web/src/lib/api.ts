@@ -4,11 +4,19 @@ export class ApiError extends Error {
   status: number
   /** Machine-readable server code (e.g. 'upload_not_found'), when provided. */
   code: string | null
+  /** Full parsed error body, for safe extra fields like publicMatches. */
+  details: Record<string, unknown>
 
-  constructor(status: number, message: string, code: string | null = null) {
+  constructor(
+    status: number,
+    message: string,
+    code: string | null = null,
+    details: Record<string, unknown> = {},
+  ) {
     super(message)
     this.status = status
     this.code = code
+    this.details = details
   }
 }
 
@@ -36,17 +44,19 @@ export async function apiFetch<T>(
   if (!res.ok) {
     let code: string | null = null
     let message = 'Request failed.'
+    let details: Record<string, unknown> = {}
     try {
       const body = (await res.clone().json()) as {
         error?: unknown
         message?: unknown
-      }
+      } & Record<string, unknown>
       if (typeof body.error === 'string') code = body.error
       if (typeof body.message === 'string') message = body.message
+      details = body
     } catch {
       // Non-JSON error body; fall through to the generic message.
     }
-    throw new ApiError(res.status, message, code)
+    throw new ApiError(res.status, message, code, details)
   }
   return (await res.json()) as T
 }
@@ -82,7 +92,6 @@ export async function apiDownload(
   const disposition = res.headers.get('content-disposition') ?? ''
   const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1]
   const quoted = /filename="([^"]+)"/i.exec(disposition)?.[1]
-  const fileName =
-    (star ? decodeURIComponent(star) : quoted) ?? 'document'
+  const fileName = (star ? decodeURIComponent(star) : quoted) ?? 'document'
   return { blob: await res.blob(), fileName }
 }

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
 import { NewSubmissionPage } from './NewSubmissionPage'
@@ -47,23 +48,25 @@ function renderPage() {
     defaultOptions: { queries: { retry: false } },
   })
   render(
-    <QueryClientProvider client={client}>
-      <NewSubmissionPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <NewSubmissionPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
 }
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe('NewSubmissionPage catalog UX', () => {
-  it('shows the compact catalog helper and derives year at acceptance', async () => {
+  it('shows the compact catalog helper without a year field', async () => {
     renderPage()
 
     expect(screen.queryByLabelText('Research type')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Year')).not.toBeInTheDocument()
     expect(
-      screen.getByText(/year is assigned automatically/i),
-    ).toBeInTheDocument()
+      screen.queryByText(/year is assigned automatically/i),
+    ).not.toBeInTheDocument()
 
     const nursing = await screen.findByRole('button', { name: 'BS Nursing' })
     expect(nursing).toHaveAttribute('aria-pressed', 'false')
@@ -103,9 +106,7 @@ describe('NewSubmissionPage catalog UX', () => {
       screen.queryByRole('button', { name: 'Remove keyword alpha' }),
     ).not.toBeInTheDocument()
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Submit for review' }),
-    )
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
     await waitFor(() => {
       const posts = vi
         .mocked(fetch)
@@ -116,11 +117,79 @@ describe('NewSubmissionPage catalog UX', () => {
     const post = vi
       .mocked(fetch)
       .mock.calls.map(([, init]) => init)
-      .find(
-        (init) =>
-          init?.method === 'POST' && init.body instanceof FormData,
-      )
+      .find((init) => init?.method === 'POST' && init.body instanceof FormData)
     const parts = (post?.body as FormData).getAll('keywords[]')
     expect(parts).toEqual(['Alpha', 'Beta'])
+  })
+
+  it('requires explicit confirmation for a possible duplicate title', async () => {
+    renderPage()
+    let submissionCalls = 0
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      if (init?.method !== 'POST')
+        return new Response(JSON.stringify(catalog), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      submissionCalls += 1
+      if (submissionCalls === 1)
+        return new Response(
+          JSON.stringify({
+            error: 'possible_duplicate',
+            message: 'A pending or accepted paper already uses this title.',
+            publicMatches: [
+              {
+                recordId: '11111111-1111-4111-8111-111111111111',
+                title: 'Existing title',
+                year: '2026',
+              },
+            ],
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } },
+        )
+      return new Response(
+        JSON.stringify({ id: 'submission-1', status: 'PENDING' }),
+        {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        },
+      )
+    })
+    fireEvent.change(screen.getByLabelText('Title'), {
+      target: { value: 'Existing title' },
+    })
+    fireEvent.change(screen.getByLabelText(/Document/), {
+      target: {
+        files: [new File(['paper'], 'paper.pdf', { type: 'application/pdf' })],
+      },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+    expect(
+      await screen.findByText('Possible duplicate title'),
+    ).toBeInTheDocument()
+    expect(await screen.findByText('Existing title')).toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Submit as a different paper' }),
+    )
+    expect(await screen.findByText('Submission received')).toBeInTheDocument()
+    const postBodies = vi
+      .mocked(fetch)
+      .mock.calls.filter(([, init]) => init?.method === 'POST')
+      .map(([, init]) => init?.body as FormData)
+    expect(postBodies[0].get('duplicateAcknowledged')).toBeNull()
+    expect(postBodies[1].get('duplicateAcknowledged')).toBe('true')
+  })
+
+  it('shows the drag-and-drop target and author format hint', async () => {
+    renderPage()
+    expect(
+      await screen.findByText(/drag and drop your file here/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Choose file' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/one author per line/i)).toBeInTheDocument()
+    expect(screen.getByText(/dela cruz/i)).toBeInTheDocument()
   })
 })

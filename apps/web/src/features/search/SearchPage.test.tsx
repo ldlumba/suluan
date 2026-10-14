@@ -50,8 +50,46 @@ const semanticItem = {
 
 describe('keyword search', () => {
   beforeEach(() => vi.clearAllMocks())
+  it('sends title scope and keeps title mode when submitting', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+    })
+    renderPage('USER', '/search?q=farmer&mode=title')
+    expect(
+      screen.getByRole('heading', { name: 'Title search' }),
+    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringContaining('scope=title'),
+        'test-token',
+      ),
+    )
+    fireEvent.change(screen.getByLabelText('Words in the paper title'), {
+      target: { value: 'solar' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/q=solar.*scope=title/),
+        'test-token',
+      ),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Keyword' }))
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        '/api/search/records?q=solar&page=1&sort=relevance',
+        'test-token',
+      ),
+    )
+  })
   it('does not expose the retired manual indexing action', async () => {
-    vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+    })
     renderPage('ADMIN')
     await waitFor(() => expect(apiFetch).toHaveBeenCalled())
     expect(
@@ -93,7 +131,11 @@ describe('keyword search', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
   it('clears the query into newest-first browse mode', async () => {
-    vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+    })
     renderPage('USER', '/search?q=solar+power')
     await waitFor(() => expect(apiFetch).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
@@ -103,9 +145,9 @@ describe('keyword search', () => {
         'test-token',
       ),
     )
-    expect(screen.getByLabelText('Keywords, study title, or author')).toHaveValue(
-      '',
-    )
+    expect(
+      screen.getByLabelText('Keywords, study title, or author'),
+    ).toHaveValue('')
   })
   it('shows school and course beneath authors and year', async () => {
     vi.mocked(apiFetch).mockResolvedValue({
@@ -207,6 +249,7 @@ describe('semantic search', () => {
           page: 1,
           hasMore: false,
           semanticStatus: 'ready',
+          retrievalMode: 'hybrid',
         } as never
       }
       return { items: [], page: 1, hasMore: false } as never
@@ -216,8 +259,13 @@ describe('semantic search', () => {
     expect(
       screen.getByRole('heading', { name: 'Semantic search' }),
     ).toBeInTheDocument()
-    expect(screen.getByText(/embedded papers by meaning/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/meaning and exact terms together/i),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/not enabled yet/i)).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Related by meaning' }),
+    ).toBeInTheDocument()
     expect(apiFetch).toHaveBeenCalledWith(
       '/api/search/semantic?q=humidity&page=1',
       'test-token',
@@ -230,7 +278,7 @@ describe('semantic search', () => {
     expect(screen.queryByText('Full text searchable')).not.toBeInTheDocument()
   })
 
-  it('explains when no semantic result clears the relevance floor', async () => {
+  it('explains when neither semantic nor keyword retrieval finds a match', async () => {
     vi.mocked(apiFetch).mockResolvedValue({
       items: [],
       page: 1,
@@ -239,12 +287,66 @@ describe('semantic search', () => {
     } as never)
     renderPage('ADMIN', '/search?q=maritime+law&mode=semantic')
 
-    expect(await screen.findByText(/No close match/)).toHaveTextContent(
-      'switch to Keyword search for exact terms',
-    )
+    expect(
+      await screen.findByText(/No meaning-based or keyword matches/),
+    ).toHaveTextContent('Try another description')
     expect(
       screen.queryByText(/No matching accepted papers/),
     ).not.toBeInTheDocument()
+  })
+
+  it('labels exploratory semantic and keyword-only results separately', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [
+        { ...semanticItem, id: 'broad', matchType: 'exploratory' },
+        {
+          ...semanticItem,
+          id: 'keyword',
+          title: 'Exact farmer keyword study',
+          matchType: 'keyword',
+        },
+      ],
+      page: 1,
+      hasMore: false,
+      semanticStatus: 'ready',
+      retrievalMode: 'hybrid',
+    } as never)
+    renderPage('ADMIN', '/search?q=farmers&mode=semantic')
+
+    expect(
+      await screen.findByRole('heading', { name: 'Possibly related papers' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Keyword matches' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Broader meaning match')).toBeInTheDocument()
+    expect(screen.getByText('Keyword match')).toBeInTheDocument()
+  })
+
+  it('explains lexical fallback without presenting it as semantic evidence', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [
+        {
+          ...semanticItem,
+          id: 'keyword-fallback',
+          title: 'Farmers livelihood study',
+          matchType: 'keyword',
+        },
+      ],
+      page: 1,
+      hasMore: false,
+      semanticStatus: 'ready',
+      retrievalMode: 'keyword_fallback',
+    } as never)
+    renderPage('ADMIN', '/search?q=farmers&mode=semantic')
+
+    expect(
+      await screen.findByText(/No confident meaning-based matches/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Keyword matches' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Meaning match')).not.toBeInTheDocument()
   })
 
   it('falls back to keyword results when the daily limit is reached', async () => {
@@ -292,15 +394,23 @@ describe('semantic search', () => {
   })
 
   it('does not expose manual embedding controls', async () => {
-    vi.mocked(apiFetch).mockResolvedValue({ items: [], page: 1, hasMore: false })
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+    })
     renderPage('USER', '/search?q=humidity&mode=semantic')
     await waitFor(() => expect(apiFetch).toHaveBeenCalled())
     expect(
-      screen.queryByRole('button', { name: /embed papers for semantic search/i }),
+      screen.queryByRole('button', {
+        name: /embed papers for semantic search/i,
+      }),
     ).not.toBeInTheDocument()
 
     expect(
-      screen.queryByRole('button', { name: /embed papers for semantic search/i }),
+      screen.queryByRole('button', {
+        name: /embed papers for semantic search/i,
+      }),
     ).not.toBeInTheDocument()
   })
 
@@ -315,13 +425,18 @@ describe('semantic search', () => {
         <MemoryRouter initialEntries={['/search?q=humidity&mode=semantic']}>
           <Routes>
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/search/semantic-access" element={<SemanticAccessPage />} />
+            <Route
+              path="/search/semantic-access"
+              element={<SemanticAccessPage />}
+            />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     )
     expect(
-      await screen.findByRole('heading', { name: 'Sign in to search by meaning' }),
+      await screen.findByRole('heading', {
+        name: 'Sign in to use semantic search',
+      }),
     ).toBeInTheDocument()
     expect(apiFetch).not.toHaveBeenCalled()
   })

@@ -10,6 +10,9 @@ import { SearchPage } from '@/features/search/SearchPage'
 import { MySubmissionsPage } from '@/features/submissions/MySubmissionsPage'
 import { PaperPage } from '@/features/search/PaperPage'
 import { SemanticAccessPage } from '@/features/search/SemanticAccessPage'
+import { AssistantPage } from '@/features/assistant/AssistantPage'
+import { AdminCatalogPage } from '@/features/admin/AdminCatalogPage'
+import { AdminUsersPage } from '@/features/admin/AdminUsersPage'
 
 const graphPage = lazy(() =>
   import('@/features/graph/GraphPage').then((module) => ({
@@ -35,6 +38,7 @@ export const routes = [
       // Search is public discovery: no ProtectedRoute wrapper.
       { path: '/search', element: <SearchPage /> },
       { path: '/search/semantic-access', element: <SemanticAccessPage /> },
+      { path: '/assistant', element: <AssistantPage /> },
       { path: '/records/:id', element: <PaperPage /> },
       {
         path: '/graph',
@@ -73,6 +77,22 @@ export const routes = [
         element: (
           <ProtectedRoute>
             <ReviewQueuePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/admin/users',
+        element: (
+          <ProtectedRoute>
+            <AdminUsersPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/admin/catalog',
+        element: (
+          <ProtectedRoute>
+            <AdminCatalogPage />
           </ProtectedRoute>
         ),
       },

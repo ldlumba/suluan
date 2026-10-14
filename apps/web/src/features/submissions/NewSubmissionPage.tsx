@@ -1,10 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Link } from 'react-router'
-import { CheckCircle2, FileText, UploadCloud } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { CheckCircle2, FileUp, UploadCloud, X } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -41,6 +41,10 @@ const FRIENDLY_ERRORS: Record<string, string> = {
     'File storage is temporarily unavailable. Please try again in a moment.',
   unknown_school: 'The selected school is no longer available.',
   unknown_course: 'The selected course is no longer available.',
+  course_inactive:
+    'The selected course is no longer open for new submissions. Choose another course.',
+  duplicate_pending:
+    'You already have a paper with this title awaiting review. Check My submissions before sending it again.',
   course_school_mismatch:
     'The selected course does not belong to the selected school.',
 }
@@ -50,10 +54,14 @@ export function NewSubmissionPage() {
   const [phase, setPhase] = useState<Phase>('editing')
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
-  // One idempotency key per form attempt: retries reuse it, a fresh form mints one.
-  const [idempotencyKey, setIdempotencyKey] = useState(() =>
-    crypto.randomUUID(),
-  )
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
+  const [publicMatches, setPublicMatches] = useState<
+    { recordId: string; title: string; year: string | null }[]
+  >([])
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  // One idempotency key per form attempt: retries reuse it.
+  const [idempotencyKey] = useState(() => crypto.randomUUID())
 
   const form = useForm<SubmissionFormInput>({
     resolver: zodResolver(submissionFormSchema),
@@ -67,6 +75,7 @@ export function NewSubmissionPage() {
   })
   const selectedSchoolId = useWatch({ control: form.control, name: 'schoolId' })
   const selectedCourseId = useWatch({ control: form.control, name: 'courseId' })
+  const selectedFile = useWatch({ control: form.control, name: 'file' })
 
   const schoolsQuery = useQuery({
     queryKey: ['schools'],
@@ -122,25 +131,24 @@ export function NewSubmissionPage() {
           by email.
         </p>
         <div className="mt-7">
-          <Button
-            variant="outline"
-            onClick={() => {
-              form.reset()
-              setIdempotencyKey(crypto.randomUUID())
-              setSubmissionId(null)
-              setSubmitError(null)
-              setPhase('editing')
-            }}
+          <Link
+            to="/submissions"
+            className={buttonVariants({ variant: 'outline' })}
           >
-            Submit another paper
-          </Button>
+            View my submissions
+          </Link>
         </div>
       </div>
     )
   }
 
-  async function onSubmit(values: SubmissionFormInput) {
+  async function onSubmit(
+    values: SubmissionFormInput,
+    acknowledgeDuplicate = false,
+  ) {
     setSubmitError(null)
+    setDuplicateWarning(null)
+    setPublicMatches([])
     setPhase('uploading')
     try {
       const token = await getIdToken()
@@ -157,6 +165,7 @@ export function NewSubmissionPage() {
       if (values.authors) form.append('authors', values.authors)
       if (values.schoolId) form.append('schoolId', values.schoolId)
       if (values.courseId) form.append('courseId', values.courseId)
+      if (acknowledgeDuplicate) form.append('duplicateAcknowledged', 'true')
       for (const term of values.keywords ?? []) form.append('keywords[]', term)
 
       const created = await apiFetch<{ id: string; status: string }>(
@@ -168,7 +177,22 @@ export function NewSubmissionPage() {
       setPhase('success')
     } catch (err) {
       setPhase('editing')
-      if (err instanceof ApiError && err.code && FRIENDLY_ERRORS[err.code]) {
+      if (err instanceof ApiError && err.code === 'possible_duplicate') {
+        setDuplicateWarning(err.message)
+        const matches =
+          (err.details.publicMatches as
+            | { recordId: string; title: string; year: string | null }[]
+            | undefined) ?? []
+        setPublicMatches(
+          Array.isArray(matches)
+            ? matches.filter((m) => m && typeof m.recordId === 'string')
+            : [],
+        )
+      } else if (
+        err instanceof ApiError &&
+        err.code &&
+        FRIENDLY_ERRORS[err.code]
+      ) {
         setSubmitError(FRIENDLY_ERRORS[err.code])
       } else if (err instanceof ApiError) {
         setSubmitError(err.message)
@@ -199,10 +223,21 @@ export function NewSubmissionPage() {
             </p>
           </div>
         </div>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form
+          onSubmit={form.handleSubmit((values) => onSubmit(values))}
+          className="space-y-4"
+        >
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
-            <Input id="title" {...form.register('title')} />
+            <Input
+              id="title"
+              {...form.register('title', {
+                onChange: () => {
+                  setDuplicateWarning(null)
+                  setPublicMatches([])
+                },
+              })}
+            />
             {form.formState.errors.title && (
               <p role="alert" className="text-sm text-destructive">
                 {form.formState.errors.title.message}
@@ -214,9 +249,13 @@ export function NewSubmissionPage() {
             <Label htmlFor="authors">Authors</Label>
             <Textarea
               id="authors"
-              placeholder="One author per line"
+              placeholder={'Dela Cruz, Juan A.\nSantos, Maria C.'}
               {...form.register('authors')}
             />
+            <p className="text-xs leading-5 text-[var(--ink-muted)]">
+              One author per line. Ex. Dela Cruz, Juan A. — family name first,
+              then given name and middle initial.
+            </p>
           </div>
 
           <Controller
@@ -305,16 +344,80 @@ export function NewSubmissionPage() {
 
           <div className="space-y-2">
             <Label htmlFor="file">Document (PDF or DOCX, up to 30 MB)</Label>
-            <Input
-              id="file"
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={(e) =>
-                form.setValue('file', e.target.files?.[0] as File, {
-                  shouldValidate: true,
-                })
-              }
-            />
+            <div
+              onDragOver={(e) => {
+                e.preventDefault()
+                setIsDragging(true)
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setIsDragging(false)
+                const dropped = e.dataTransfer.files?.[0]
+                if (dropped)
+                  form.setValue('file', dropped, { shouldValidate: true })
+              }}
+              className={`flex min-h-36 flex-col items-center justify-center gap-3 rounded-[8.4px] border-2 border-dashed p-6 text-center transition-colors ${
+                isDragging
+                  ? 'border-[var(--signal-blue)] bg-[var(--secondary)]'
+                  : 'border-[var(--border)] bg-white'
+              }`}
+            >
+              <FileUp
+                className="size-8 text-[var(--primary)]"
+                aria-hidden="true"
+              />
+              <div>
+                <p className="font-semibold">
+                  Drag and drop your file here, or choose a file
+                </p>
+                <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
+                  PDF or DOCX only, up to 30 MB. The file stays private until
+                  REO accepts it.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Choose file
+                </Button>
+                {selectedFile instanceof File && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      form.setValue('file' as never, undefined as never, {
+                        shouldValidate: true,
+                      })
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                  >
+                    <X className="size-4" aria-hidden="true" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+              {selectedFile instanceof File && (
+                <p className="text-sm font-medium">
+                  {selectedFile.name} {(selectedFile.size / 1024).toFixed(1)} KB
+                </p>
+              )}
+              <Input
+                ref={fileInputRef}
+                id="file"
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="sr-only"
+                onChange={(e) => {
+                  const picked = e.target.files?.[0]
+                  if (picked)
+                    form.setValue('file', picked, { shouldValidate: true })
+                }}
+              />
+            </div>
             {form.formState.errors.file && (
               <p role="alert" className="text-sm text-destructive">
                 {form.formState.errors.file.message as string}
@@ -328,7 +431,76 @@ export function NewSubmissionPage() {
             </p>
           )}
 
-          <Button type="submit" disabled={phase === 'uploading'}>
+          {duplicateWarning && (
+            <div
+              role="alert"
+              className="border border-[var(--archive-gold)] bg-[var(--secondary)] p-4"
+            >
+              <p className="font-semibold">Possible duplicate title</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
+                {duplicateWarning} A rejected submission does not block a
+                corrected resubmission.
+              </p>
+              {publicMatches.length > 0 && (
+                <div className="mt-3 border-t border-[var(--border)] pt-3">
+                  <p className="text-sm font-semibold">
+                    Already-published match
+                    {publicMatches.length > 1 ? 'es' : ''}:
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {publicMatches.map((match) => (
+                      <li key={match.recordId} className="text-sm leading-6">
+                        <Link
+                          to={`/records/${match.recordId}`}
+                          className="font-medium underline underline-offset-4"
+                        >
+                          {match.title}
+                        </Link>
+                        {match.year && (
+                          <span className="text-[var(--ink-muted)]">
+                            {' '}
+                            · {match.year}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {publicMatches.length === 0 && (
+                <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
+                  No public repository copy is shown. Other pending submissions
+                  stay private, so compare your title carefully before
+                  confirming.
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDuplicateWarning(null)
+                    setPublicMatches([])
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void form.handleSubmit((values) => onSubmit(values, true))()
+                  }
+                >
+                  Submit as a different paper
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            disabled={phase === 'uploading' || duplicateWarning !== null}
+          >
             {phase === 'uploading' ? 'Uploading…' : 'Submit for review'}
           </Button>
           {submissionId && (
@@ -340,16 +512,11 @@ export function NewSubmissionPage() {
       </section>
 
       <aside className="border-t-2 border-[var(--archive-gold)] bg-white p-5 lg:sticky lg:top-6 sm:p-6">
-        <div className="flex items-start gap-3 border-b border-[var(--border)] pb-4">
-          <FileText
-            className="mt-0.5 size-5 text-[var(--primary)]"
-            aria-hidden="true"
-          />
+        <div className="border-b border-[var(--border)] pb-4">
           <div>
             <h2 className="font-semibold">Schools and courses</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-              Select a course here to fill both catalog fields. The paper year
-              is assigned automatically when REO accepts it.
+              Select a course here to fill both catalog fields.
             </p>
           </div>
         </div>

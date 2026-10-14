@@ -2,6 +2,7 @@ import { ArrowDownToLine, ArrowLeft, Network, ShieldCheck } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { CiteSection } from '@/features/citations/CiteSection'
 import { apiDownload, apiFetch, ApiError } from '@/lib/api'
 import { useAuth } from '@/features/auth/useAuth'
 
@@ -9,6 +10,15 @@ interface Paper {
   id: string
   title: string
   authors: string | null
+  authorList: string[]
+  publication: {
+    doi: string
+    venue: string | null
+    volume: string | null
+    issue: string | null
+    pages: string | null
+    year: string | null
+  } | null
   schoolName: string | null
   courseName: string | null
   year: string | null
@@ -156,6 +166,14 @@ export function PaperPage() {
           </Link>
         </aside>
       </div>
+      <CiteSection
+        record={{
+          title: paper.data.title,
+          authors: paper.data.authorList,
+          year: paper.data.year,
+        }}
+        publication={paper.data.publication}
+      />
     </article>
   )
 }

@@ -31,7 +31,15 @@ const fileSchema = z
   }, 'The file name does not match its document type.')
 
 export const submissionFormSchema = z.object({
-  title: z.string().trim().min(1, 'Title is required.').max(500),
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Title is required.')
+    .max(500)
+    .refine(
+      (title) => /[\p{L}\p{N}]/u.test(title.normalize('NFKC')),
+      'Title must include a letter or number.',
+    ),
   authors: z.string().trim().max(2000).optional(),
   // Empty string = "no selection"; mapped to undefined before sending.
   schoolId: z.string().optional(),

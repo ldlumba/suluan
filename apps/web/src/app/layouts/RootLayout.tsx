@@ -1,6 +1,7 @@
 import {
   ArrowUpRight,
   BookOpen,
+  Bot,
   BriefcaseBusiness,
   ChevronDown,
   LibraryBig,
@@ -135,6 +136,9 @@ export function RootLayout() {
             <NavLink to="/graph" className={navClass}>
               <Network className="size-4" aria-hidden="true" /> Graph
             </NavLink>
+            <NavLink to="/assistant" className={navClass}>
+              <Bot className="size-4" aria-hidden="true" /> Assistant
+            </NavLink>
             <div ref={workspaceRef} className="relative">
               <Button
                 ref={workspaceButtonRef}
@@ -177,6 +181,19 @@ export function RootLayout() {
                         onClick={closeWorkspace}
                       >
                         Analytics
+                      </WorkspaceLink>
+                    </>
+                  )}
+                  {profile?.role === 'ADMIN' && (
+                    <>
+                      <WorkspaceLink to="/admin/users" onClick={closeWorkspace}>
+                        Account roles
+                      </WorkspaceLink>
+                      <WorkspaceLink
+                        to="/admin/catalog"
+                        onClick={closeWorkspace}
+                      >
+                        Course availability
                       </WorkspaceLink>
                     </>
                   )}
@@ -242,6 +259,9 @@ export function RootLayout() {
               <MobileLink to="/graph" icon={<Network />} onClick={closeMenu}>
                 Research graph
               </MobileLink>
+              <MobileLink to="/assistant" icon={<Bot />} onClick={closeMenu}>
+                Research assistant
+              </MobileLink>
               <MobileLink to="/submit" icon={<BookOpen />} onClick={closeMenu}>
                 Submit research
               </MobileLink>
@@ -254,6 +274,16 @@ export function RootLayout() {
                 <MobileLink to="/review" onClick={closeMenu}>
                   Review queue
                 </MobileLink>
+              )}
+              {profile?.role === 'ADMIN' && (
+                <>
+                  <MobileLink to="/admin/users" onClick={closeMenu}>
+                    Account roles
+                  </MobileLink>
+                  <MobileLink to="/admin/catalog" onClick={closeMenu}>
+                    Course availability
+                  </MobileLink>
+                </>
               )}
               {manager && (
                 <MobileLink to="/graph/analytics" onClick={closeMenu}>

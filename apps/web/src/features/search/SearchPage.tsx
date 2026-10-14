@@ -32,6 +32,7 @@ interface SearchItem {
   snippet: string | null
   fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
   visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
+  matchType?: 'semantic' | 'exploratory' | 'keyword'
 }
 
 const SORT_OPTIONS = [
@@ -65,6 +66,7 @@ interface SemanticResult extends KeywordResult {
     | 'unavailable'
     | 'authentication_required'
   reason?: string
+  retrievalMode?: 'semantic' | 'hybrid' | 'keyword_fallback'
 }
 
 const SEMANTIC_NOTICE: Record<string, string> = {
@@ -75,7 +77,7 @@ const SEMANTIC_NOTICE: Record<string, string> = {
     'The embedding provider is unavailable. Showing keyword results instead.',
   unavailable:
     'Semantic search is temporarily unavailable. Showing keyword results instead.',
-  empty_query: 'Enter a description to search semantically.',
+  empty_query: 'Enter a description to use semantic search.',
   authentication_required:
     'Sign in with your UA account to use semantic search. Showing keyword results instead.',
 }
@@ -136,7 +138,12 @@ export function SearchPage() {
   const rawPage = Number(params.get('page') ?? 1)
   const page =
     Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 1000 ? rawPage : 1
-  const mode = params.get('mode') === 'semantic' ? 'semantic' : 'keyword'
+  const mode =
+    params.get('mode') === 'semantic'
+      ? 'semantic'
+      : params.get('mode') === 'title'
+        ? 'title'
+        : 'keyword'
   const requestedSort = params.get('sort')
   const sort: SearchSort = isSearchSort(requestedSort)
     ? requestedSort
@@ -146,9 +153,10 @@ export function SearchPage() {
   // Exact author-keyword filter (ranking-neutral). Threaded through every
   // navigation so paging and sorting never silently drop it.
   const keywordFilter = params.get('keyword') ?? ''
-  const keepKeyword: Record<string, string> = keywordFilter
-    ? { keyword: keywordFilter }
-    : {}
+  const keepKeyword: Record<string, string> = {
+    ...(keywordFilter ? { keyword: keywordFilter } : {}),
+    ...(mode === 'title' ? { mode: 'title', scope: 'title' } : {}),
+  }
   const manager =
     profile?.role === 'ADMIN' || profile?.role === 'REPOSITORY_MANAGER'
   const form = useForm<z.infer<typeof formSchema>>({
@@ -186,10 +194,11 @@ export function SearchPage() {
       page,
       sort,
       keywordFilter,
+      mode,
     ],
     // Enabled in keyword mode, and also once semantic has reported a downgrade:
     // the fallback query can only start AFTER the semantic answer arrives.
-    enabled: (mode === 'keyword' || semanticUnavailable) && q.length <= 200,
+    enabled: (mode !== 'semantic' || semanticUnavailable) && q.length <= 200,
     retry: false,
     queryFn: async () =>
       apiFetch<KeywordResult>(
@@ -205,8 +214,51 @@ export function SearchPage() {
   const items = results.data?.items ?? []
   const notice =
     mode === 'semantic' && semantic.data
-      ? SEMANTIC_NOTICE[semantic.data.semanticStatus]
+      ? (SEMANTIC_NOTICE[semantic.data.semanticStatus] ??
+        (semantic.data.retrievalMode === 'keyword_fallback'
+          ? 'No confident meaning-based matches were found. Showing papers that contain your search terms.'
+          : undefined))
       : undefined
+  const resultGroups =
+    mode !== 'semantic'
+      ? [{ key: 'all', title: '', description: '', items }]
+      : semanticUnavailable
+        ? items.length > 0
+          ? [
+              {
+                key: 'keyword',
+                title: 'Keyword matches',
+                description:
+                  'Semantic search could not run, so these results come from exact-term evidence.',
+                items,
+              },
+            ]
+          : []
+        : [
+            {
+              key: 'semantic',
+              title: 'Related by meaning',
+              description:
+                'Confident meaning-based matches, strengthened by exact-term evidence when available.',
+              items: items.filter(
+                (item) => !item.matchType || item.matchType === 'semantic',
+              ),
+            },
+            {
+              key: 'exploratory',
+              title: 'Possibly related papers',
+              description:
+                'Broader meaning-based connections to explore. These are less certain than the results above.',
+              items: items.filter((item) => item.matchType === 'exploratory'),
+            },
+            {
+              key: 'keyword',
+              title: 'Keyword matches',
+              description:
+                'These papers contain your search terms; they are not presented as meaning-based matches.',
+              items: items.filter((item) => item.matchType === 'keyword'),
+            },
+          ].filter((group) => group.items.length > 0)
 
   if (loading) return <p>Checking permissions…</p>
 
@@ -230,12 +282,16 @@ export function SearchPage() {
             <h1 className="display-heading text-4xl font-semibold">
               {mode === 'semantic'
                 ? 'Semantic search'
-                : 'Find accepted research'}
+                : mode === 'title'
+                  ? 'Title search'
+                  : 'Keyword search'}
             </h1>
             <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-muted)]">
               {mode === 'semantic'
-                ? 'Search accepted, embedded papers by meaning. Availability and limits are reported after a query runs.'
-                : 'Search accepted papers by title, author, year, course, keywords, and prepared full text.'}
+                ? 'Explore accepted research through meaning and exact terms together. Results clearly distinguish confident, broader, and keyword-only connections.'
+                : mode === 'title'
+                  ? 'Find accepted papers using words in their titles only.'
+                  : 'Search accepted papers by title, author, year, course, keywords, and prepared full text.'}
             </p>
           </div>
         </div>
@@ -252,7 +308,9 @@ export function SearchPage() {
           )}
         >
           <Label className="text-base font-semibold" htmlFor="search-query">
-            Keywords, study title, or author
+            {mode === 'title'
+              ? 'Words in the paper title'
+              : 'Keywords, study title, or author'}
           </Label>
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
@@ -271,7 +329,11 @@ export function SearchPage() {
                   aria-label="Clear search"
                   onClick={() => {
                     form.setValue('q', '')
-                    setParams({ page: '1', sort: 'newest' })
+                    setParams({
+                      page: '1',
+                      sort: 'newest',
+                      ...(mode === 'title' ? { mode: 'title' } : {}),
+                    })
                   }}
                 >
                   <X className="size-4" aria-hidden="true" />
@@ -293,15 +355,24 @@ export function SearchPage() {
           )}
           <p className="text-sm leading-6 text-[var(--ink-muted)]">
             {mode === 'semantic'
-              ? 'Describe the research you are looking for in your own words.'
-              : 'Try a topic, study title, or author. Leave blank to browse accepted papers; quoted phrases are supported.'}
+              ? 'Describe the research you need in your own words. Semantic search also recognizes exact terms in matching papers.'
+              : mode === 'title'
+                ? 'Matches whole words, ignoring case: farmer does not match farmers. Use quotes for phrases, or leave blank to browse.'
+                : 'Try a topic, study title, or author. Leave blank to browse accepted papers; quoted phrases are supported.'}
           </p>
-          <div className="flex gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-1">
             <Button
               type="button"
               size="sm"
               variant={mode === 'keyword' ? 'default' : 'outline'}
-              onClick={() => setParams({ q, page: '1', sort, ...keepKeyword })}
+              onClick={() =>
+                setParams({
+                  q,
+                  page: '1',
+                  sort,
+                  ...(keywordFilter ? { keyword: keywordFilter } : {}),
+                })
+              }
             >
               Keyword
             </Button>
@@ -320,8 +391,16 @@ export function SearchPage() {
             >
               Semantic
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={mode === 'title' ? 'default' : 'outline'}
+              onClick={() => setParams({ q, page: '1', mode: 'title' })}
+            >
+              Title
+            </Button>
           </div>
-          {mode === 'keyword' && (
+          {mode !== 'semantic' && (
             <div className="flex flex-wrap items-end gap-4 border-t border-[var(--border)] pt-5">
               <div className="space-y-2">
                 <Label htmlFor="search-sort">Sort papers</Label>
@@ -354,8 +433,19 @@ export function SearchPage() {
                 onApply={(next) =>
                   setParams(
                     next
-                      ? { q, page: '1', sort, keyword: next }
-                      : { q, page: '1', sort },
+                      ? {
+                          q,
+                          page: '1',
+                          sort,
+                          ...(mode === 'title' ? { mode: 'title' } : {}),
+                          keyword: next,
+                        }
+                      : {
+                          q,
+                          page: '1',
+                          sort,
+                          ...(mode === 'title' ? { mode: 'title' } : {}),
+                        },
                   )
                 }
               />
@@ -387,109 +477,134 @@ export function SearchPage() {
             {items.length === 0 && (
               <p className="border-t border-[var(--border)] pt-5 text-[var(--ink-muted)]">
                 {mode === 'semantic'
-                  ? 'No close match. Try fewer or more general words, or switch to Keyword search for exact terms.'
-                  : 'No matching accepted papers. Full-text matches become available after extraction and search preparation.'}
+                  ? 'No meaning-based or keyword matches were found. Try another description or use fewer words.'
+                  : mode === 'title'
+                    ? 'No matching paper titles. Try another word or switch to Keyword search to search inside papers.'
+                    : 'No matching accepted papers. Full-text matches become available after extraction and search preparation.'}
               </p>
             )}
-            <ul className="space-y-4">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="space-y-3 border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6"
-                >
-                  <h2 className="display-heading text-2xl font-semibold leading-tight">
-                    {manager || item.visibility !== 'RESTRICTED' ? (
-                      <Link
-                        className="transition-colors hover:text-[var(--signal-blue)] hover:underline underline-offset-4"
-                        to={`/records/${encodeURIComponent(item.id)}`}
-                      >
-                        {item.title}
-                      </Link>
-                    ) : (
-                      item.title
-                    )}
-                  </h2>
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    {mode === 'keyword' && (
-                      <>
-                        {item.fullTextStatus === 'READY'
-                          ? 'Full text searchable'
-                          : item.fullTextStatus === 'FAILED'
-                            ? 'Full-text processing failed — metadata only'
-                            : 'Full text pending — metadata only'}
-                        {' · '}
-                      </>
-                    )}
-                    {item.visibility === 'PUBLIC'
-                      ? 'Public'
-                      : item.visibility === 'UA_ONLY'
-                        ? 'University access only'
-                        : 'Repository managers only'}
-                  </p>
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    {item.authors || 'Authors not listed'} ·{' '}
-                    {item.year || 'Year not listed'}
-                  </p>
-                  {(item.schoolName || item.courseName) && (
-                    <p className="text-sm text-[var(--ink-muted)]">
-                      {item.schoolName || 'School not listed'} ·{' '}
-                      {item.courseName || 'Course not listed'}
+            {resultGroups.map((group) => (
+              <section key={group.key} className="space-y-4">
+                {mode === 'semantic' && (
+                  <div className="border-t border-[var(--border)] pt-5">
+                    <h2 className="display-heading text-2xl font-semibold">
+                      {group.title}
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-muted)]">
+                      {group.description}
                     </p>
-                  )}
-                  {(item.keywords ?? []).length > 0 && (
-                    <>
-                      <span className="sr-only">
-                        Keywords: {(item.keywords ?? []).join('; ')}
-                      </span>
-                      <div
-                        className="flex flex-wrap gap-2"
-                        aria-label={`Keywords: ${(item.keywords ?? []).join('; ')}`}
-                      >
-                        {(item.keywords ?? []).map((keyword) => (
-                          <span
-                            key={keyword}
-                            className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {/* Extracted text is untrusted: React text rendering only, never HTML. */}
-                  {item.fullTextStatus === 'READY' && item.snippet && (
-                    <p className="whitespace-pre-wrap break-words border-l-2 border-[var(--border)] pl-4 text-sm leading-6 text-[var(--ink-muted)]">
-                      {item.snippet}
-                    </p>
-                  )}
-                  {manager || item.visibility !== 'RESTRICTED' ? (
-                    <Link
-                      className={buttonVariants({
-                        variant: 'outline',
-                        size: 'sm',
-                      })}
-                      to={`/records/${encodeURIComponent(item.id)}`}
+                  </div>
+                )}
+                <ul className="space-y-4">
+                  {group.items.map((item) => (
+                    <li
+                      key={item.id}
+                      className="space-y-3 border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6"
                     >
-                      Read paper details
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-[var(--ink-muted)]">
-                      Details unavailable for your access level
-                    </span>
-                  )}
-                  <Link
-                    className={buttonVariants({
-                      variant: 'outline',
-                      size: 'sm',
-                    })}
-                    to={`/graph?record=${encodeURIComponent(item.id)}`}
-                  >
-                    <Network className="size-4" aria-hidden="true" />
-                    View relationships
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                      {mode === 'semantic' && (
+                        <p className="eyebrow text-[var(--impact)]">
+                          {group.key === 'semantic'
+                            ? 'Meaning match'
+                            : group.key === 'exploratory'
+                              ? 'Broader meaning match'
+                              : 'Keyword match'}
+                        </p>
+                      )}
+                      <h2 className="display-heading text-2xl font-semibold leading-tight">
+                        {manager || item.visibility !== 'RESTRICTED' ? (
+                          <Link
+                            className="transition-colors hover:text-[var(--signal-blue)] hover:underline underline-offset-4"
+                            to={`/records/${encodeURIComponent(item.id)}`}
+                          >
+                            {item.title}
+                          </Link>
+                        ) : (
+                          item.title
+                        )}
+                      </h2>
+                      <p className="text-sm text-[var(--ink-muted)]">
+                        {mode === 'keyword' && (
+                          <>
+                            {item.fullTextStatus === 'READY'
+                              ? 'Full text searchable'
+                              : item.fullTextStatus === 'FAILED'
+                                ? 'Full-text processing failed — metadata only'
+                                : 'Full text pending — metadata only'}
+                            {' · '}
+                          </>
+                        )}
+                        {item.visibility === 'PUBLIC'
+                          ? 'Public'
+                          : item.visibility === 'UA_ONLY'
+                            ? 'University access only'
+                            : 'Repository managers only'}
+                      </p>
+                      <p className="text-sm text-[var(--ink-muted)]">
+                        {item.authors || 'Authors not listed'} ·{' '}
+                        {item.year || 'Year not listed'}
+                      </p>
+                      {(item.schoolName || item.courseName) && (
+                        <p className="text-sm text-[var(--ink-muted)]">
+                          {item.schoolName || 'School not listed'} ·{' '}
+                          {item.courseName || 'Course not listed'}
+                        </p>
+                      )}
+                      {(item.keywords ?? []).length > 0 && (
+                        <>
+                          <span className="sr-only">
+                            Keywords: {(item.keywords ?? []).join('; ')}
+                          </span>
+                          <div
+                            className="flex flex-wrap gap-2"
+                            aria-label={`Keywords: ${(item.keywords ?? []).join('; ')}`}
+                          >
+                            {(item.keywords ?? []).map((keyword) => (
+                              <span
+                                key={keyword}
+                                className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {/* Extracted text is untrusted: React text rendering only, never HTML. */}
+                      {item.fullTextStatus === 'READY' && item.snippet && (
+                        <p className="whitespace-pre-wrap break-words border-l-2 border-[var(--border)] pl-4 text-sm leading-6 text-[var(--ink-muted)]">
+                          {item.snippet}
+                        </p>
+                      )}
+                      {manager || item.visibility !== 'RESTRICTED' ? (
+                        <Link
+                          className={buttonVariants({
+                            variant: 'outline',
+                            size: 'sm',
+                          })}
+                          to={`/records/${encodeURIComponent(item.id)}`}
+                        >
+                          Read paper details
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-[var(--ink-muted)]">
+                          Details unavailable for your access level
+                        </span>
+                      )}
+                      <Link
+                        className={buttonVariants({
+                          variant: 'outline',
+                          size: 'sm',
+                        })}
+                        to={`/graph?record=${encodeURIComponent(item.id)}`}
+                      >
+                        <Network className="size-4" aria-hidden="true" />
+                        View relationships
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
             <div className="flex items-center gap-3 border-t border-[var(--border)] pt-5">
               <Button
                 variant="outline"
