@@ -2,13 +2,18 @@
 
 ## What this is
 
-Semantic search finds papers by meaning rather than keywords. A visitor types
-"how does humidity affect solar output" and gets back a thesis about
-photovoltaic efficiency in humid climates, even though those words never appear
-together.
+Semantic Search combines semantic retrieval with the repository's dependable
+keyword index. A visitor can describe an idea in ordinary language while exact
+terms in titles, metadata, and prepared full text can broaden the result set.
+Keyword-only search remains available as a separate public mode and as the
+fallback when semantic transport or quota is unavailable.
 
-Keyword search still exists and is still the fallback. Semantic mode is a second
-option on the same `/search` page.
+**Production policy approved, provisioning pending (2026-10-14).** Production
+is authenticated-UA-only, limited to 10 semantic queries/profile/UTC day and
+500 aggregate/day in a dedicated quota pool. It uses the independently
+validated `0.36` ceiling only; the staging-only exploratory band through `0.40`
+is excluded. Exhaustion or provider unavailability returns explicitly labeled
+keyword matches without an automatic paid retry.
 
 ## How it works
 
@@ -22,14 +27,43 @@ option on the same `/search` page.
    normalized and stored in `document_embeddings`, one row per chunk.
 4. **Search** — your question is embedded as a `RETRIEVAL_QUERY` and compared
    against every stored vector using cosine distance. Chunks of the same paper
-   are grouped, so a paper appears once with its closest chunk as the snippet.
-   A defensive `0.7` cosine-distance guardrail omits results above it, but it is
-   not calibrated as a relevance boundary and currently filters no observed
-   development results.
+   are grouped. In the authenticated staging canary, the approved
+   length-penalized record scorer uses `0.36` as the confident semantic band and
+   a staging-only `0.40` discovery ceiling for honestly labeled exploratory
+   results. Record-level reciprocal-rank fusion combines up to 100 semantic and
+   100 keyword candidates. If semantic retrieval abstains but exact-term evidence
+   exists, those papers remain available as explicitly labeled keyword matches;
+   they are never presented as semantic evidence. Normalized duplicate titles
+   appear once.
 
-Step 3 is **manager-only** and remains an operator action while semantic search
-is gated. Step 4 is public and open to signed-out visitors when semantic search
-is configured and approved.
+Staging document embedding is an automated, bounded Cloud Run job. The current
+search canary remains authenticated-UA-only; signed-out visitors are redirected
+before any paid query work and retain public keyword search.
+
+## Confidence-banded hybrid revision — 2026-10-13
+
+The owner approved replacing the strict semantic query gate after live checks
+showed `study about farmers` returning three useful papers while `farmers`
+returned none. `SEMANTIC_MAX_SCORE=0.36` now controls the confident label instead
+of suppressing every other kind of evidence. Staging additionally sets
+`SEMANTIC_DISCOVERY_MAX_SCORE=0.40`; results in `(0.36, 0.40]` are labeled
+**Possibly related papers**. If none survive the discovery ceiling, keyword
+results are returned under **Keyword matches** with an explicit explanation that
+no confident meaning-based match was found.
+
+The earlier saved-artifact result—27/27 launch targets and 5/5 clean-negative
+abstentions—described the stricter gate and does not validate the new exploratory
+band. The `0.40` value is therefore staging-only pending a fresh broad-query
+holdout covering one-word queries, inflections, natural questions, ambiguous
+topics, multi-result discovery, and clean negatives. The model remains
+`gemini-embedding-001`; no re-embedding or production/anonymous authorization is
+implied.
+
+Staging Worker `4494b8cf-a43a-410e-85c0-eff677f0eac5` deployed this policy.
+Remote bindings were verified as `0.36` confident, `0.40` discovery,
+`log_length_penalized_min`, hybrid mode, and authenticated-only regional query
+transport. A signed-out `farmers` request returned `authentication_required`;
+authenticated result review remains pending.
 
 ## What you need
 
@@ -61,7 +95,8 @@ there is no SDK that might reject it.
    services/processing/.venv/Scripts/python.exe services/processing/semantic_prepare.py
    ```
 4. Click **Semantic**, search for a topic in your own words rather than a title.
-   You should get relevant papers even without matching keywords.
+   You should get meaning-based papers plus useful exact-term matches when the
+   semantic relevance gate passes.
 5. Search for both covered and clearly unrelated topics. Record the returned
    paper order and distances; do not treat the current `0.7` guardrail as proof
    of relevance. Switch to **Keyword** and confirm word-based matching still

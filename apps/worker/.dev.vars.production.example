@@ -1,0 +1,18 @@
+# Production server-side settings. Set these with Wrangler/dashboard secrets;
+# never copy real values into this file or Git.
+DATABASE_URL=
+FIREBASE_PROJECT_ID=suluan-production
+PROCESSING_SERVICE_AUDIENCE=https://suluan-api-production.ctrlfinder.workers.dev
+PROCESSING_SERVICE_ACCOUNT=suluan-processing-production@suluan-production.iam.gserviceaccount.com
+QUERY_EMBEDDING_URL=
+QUERY_SERVICE_ACCOUNT=suluan-query-production@suluan-production.iam.gserviceaccount.com
+QUERY_SERVICE_AUDIENCE=https://suluan-api-production.ctrlfinder.workers.dev
+ASSISTANT_SERVICE_URL=
+ASSISTANT_SERVICE_ACCOUNT=suluan-assistant-production@suluan-production.iam.gserviceaccount.com
+ASSISTANT_SERVICE_AUDIENCE=https://suluan-api-production.ctrlfinder.workers.dev
+REO_MAILBOX=
+DOI_CONTACT_EMAIL=
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+GMAIL_REFRESH_TOKEN=
+GMAIL_SENDER=

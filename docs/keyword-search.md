@@ -19,6 +19,14 @@ incident/recovery escape hatch, but is not needed for normal operation.
 
 ## Scope
 
+Title search uses `/api/search/records?scope=title` (UI `mode=title`). It matches
+case-insensitive whole title tokens with PostgreSQL's `simple` text search,
+without stemming: `farmer` does not match `farmers`. Multiple words and quoted
+phrases use the existing web-search syntax. Authors, other metadata, and paper
+contents cannot produce a title match; snippets are omitted. Blank title search
+browses visible accepted records. Visibility, deduplication, sorting, and
+pagination use the same policy as keyword search. No embedding call is needed.
+
 Staging corpus audit on 2026-10-10 found 36 normalized exact-title pairs among
 182 accepted records. Every pair agreed on authors, school, course, and year;
 18 pairs also shared the extraction source SHA-256. These are separate accepted

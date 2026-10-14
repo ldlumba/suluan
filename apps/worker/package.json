@@ -9,6 +9,8 @@
     "deploy": "wrangler deploy --dry-run",
     "deploy:staging": "wrangler deploy -c wrangler.staging.toml",
     "deploy:staging:dry-run": "wrangler deploy -c wrangler.staging.toml --dry-run",
+    "deploy:production": "wrangler deploy -c wrangler.production.toml --keep-vars",
+    "deploy:production:dry-run": "wrangler deploy -c wrangler.production.toml --dry-run",
     "authorize:gmail": "node scripts/gmail-authorize.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

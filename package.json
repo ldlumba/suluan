@@ -14,6 +14,8 @@
     "dev:worker:remote": "npm run dev:remote -w @suluan/worker",
     "deploy:worker:staging": "npm run deploy:staging -w @suluan/worker",
     "deploy:worker:staging:dry-run": "npm run deploy:staging:dry-run -w @suluan/worker",
+    "deploy:worker:production": "npm run deploy:production -w @suluan/worker",
+    "deploy:worker:production:dry-run": "npm run deploy:production:dry-run -w @suluan/worker",
     "build": "npm run build -w web",
     "preview": "npm run preview -w web",
     "lint": "npm run lint --workspaces --if-present",
@@ -25,6 +27,7 @@
     "db:migrate": "npm run migrate -w @suluan/db",
     "db:check": "npm run check:db -w @suluan/db",
     "db:promote-admin": "npm run promote-admin -w @suluan/db",
+    "db:bootstrap-admin:production": "npm run bootstrap-admin:production -w @suluan/db --",
     "db:seed:dev": "npm run seed:dev -w @suluan/db",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

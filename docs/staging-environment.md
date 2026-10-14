@@ -518,3 +518,21 @@ cards. Final evidence was 13 requests/74 inputs and zero active claims.
   when the third is RESTRICTED).
 - Results are computed live with a top-20 cap. No aggregate, pair, graph, or
   analytics rows were persisted.
+
+### Duplicate-title and course-availability safeguards — 2026-10-13
+
+- Migration 0015 applied to staging Neon from the pooled staging credentials
+  via direct endpoint; `db:check` passed and reapply was a no-op. All 185
+  staging submissions backfilled `normalized_title`; 24/24 courses active.
+- Worker `7a5320f2-f472-42fe-b1d7-a52b64faa8de` deployed with `--keep-vars`.
+  Anonymous checks: `/api/health` 200, `/api/admin/catalog` 401,
+  `/api/search/semantic?q=farmers` 200 with `authentication_required` and no
+  quota spent, keyword `farmers` returns PUBLIC results, `/api/schools` 401
+  anonymous. Staging CORS allows only `http://localhost:5174`.
+- Staging UI served locally via `npm run dev:staging` on port 5174 against
+  `https://suluan-api-staging.ctrlfinder.workers.dev`.
+- Follow-up Worker `250ea206-96d4-4b0d-aa94-13c9a4919e43` (2026-10-13, no
+  migration): `possible_duplicate` returns up to 3 PUBLIC-effective record
+  matches; the manager queue names up to 5 matching submissions. Anonymous
+  re-verified: health 200, admin catalog 401, semantic
+  `authentication_required`, review queue 401.

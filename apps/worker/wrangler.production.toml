@@ -1,0 +1,48 @@
+name = "suluan-api-production"
+main = "src/index.ts"
+compatibility_date = "2026-09-30"
+
+# Production remains on Workers Free initially. The five-minute sweep bounds
+# recovery latency within the Free queue's 24-hour retention window.
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+ALLOWED_DOMAINS = "ua.edu.ph"
+ALLOWED_ORIGINS = "https://suluan-repository.pages.dev"
+
+# Corpus/document embedding remains conservative and independent of query use.
+EMBEDDING_DAILY_REQUEST_LIMIT = "20"
+EMBEDDING_DAILY_INPUT_LIMIT = "2000"
+
+# Owner-approved production launch policy, 2026-10-14.
+SEMANTIC_DAILY_REQUEST_LIMIT = "500"
+SEMANTIC_USER_DAILY_REQUEST_LIMIT = "10"
+SEMANTIC_SEARCH_MODE = "hybrid"
+SEMANTIC_SCORING_MODE = "log_length_penalized_min"
+SEMANTIC_MAX_SCORE = "0.36"
+# Production does not launch the unvalidated staging-only exploratory band.
+SEMANTIC_DISCOVERY_MAX_SCORE = "0.36"
+SEMANTIC_AUTHENTICATED_ONLY = "true"
+
+ASSISTANT_ACCESS_MODE = "all_authenticated"
+ASSISTANT_RETRIEVAL_DAILY_REQUEST_LIMIT = "300"
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "suluan-production"
+
+[[queues.producers]]
+binding = "NOTIFICATIONS"
+queue = "suluan-notifications-production"
+
+[[queues.consumers]]
+queue = "suluan-notifications-production"
+max_batch_size = 5
+max_retries = 3
+dead_letter_queue = "suluan-notifications-production-dlq"
+
+[[queues.consumers]]
+queue = "suluan-notifications-production-dlq"
+max_batch_size = 5
+max_retries = 3
