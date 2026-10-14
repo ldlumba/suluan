@@ -7,9 +7,10 @@
  * printed, logged, written to disk, or passed as CLI arguments (which would
  * land in shell history). Safe to re-run when swapping the sender mailbox.
  *
- * Usage: npm run authorize:gmail -w @suluan/worker
+ * Usage: npm run authorize:gmail -w @suluan/worker [-- --production]
  * Prompts (hidden input): OAuth client ID, client secret, sender address,
- * REO recipient address. Nothing sensitive is echoed.
+ * REO recipient address. Nothing sensitive is echoed. Pass --production to
+ * store secrets against wrangler.production.toml instead of staging.
  */
 import { execFile, spawn } from 'node:child_process'
 import { createServer } from 'node:http'
@@ -20,6 +21,12 @@ import path from 'node:path'
 const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send'
 const OAUTH_SCOPES = ['openid', 'email', GMAIL_SEND_SCOPE]
 const STAGING_CONFIG = 'wrangler.staging.toml'
+const PRODUCTION_CONFIG = 'wrangler.production.toml'
+const useProduction = process.argv.includes('--production')
+const WORKER_CONFIG = useProduction ? PRODUCTION_CONFIG : STAGING_CONFIG
+const DEPLOY_HINT = useProduction
+  ? 'npm run deploy:worker:production'
+  : 'npm run deploy:worker:staging'
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
 const workerDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
@@ -112,7 +119,7 @@ async function wranglerSecretPut(name, value, cwd) {
     // `wrangler` name the same way as Unix executables.
     const child = spawn(
       process.execPath,
-      [wranglerCli, 'secret', 'put', name, '-c', STAGING_CONFIG],
+      [wranglerCli, 'secret', 'put', name, '-c', WORKER_CONFIG],
       {
         cwd,
         stdio: ['pipe', 'inherit', 'inherit'],
@@ -289,5 +296,5 @@ await wranglerSecretPut('GMAIL_REFRESH_TOKEN', tokens.refresh_token, workerDir)
 await wranglerSecretPut('GMAIL_SENDER', sender, workerDir)
 await wranglerSecretPut('REO_MAILBOX', reoMailbox, workerDir)
 
-console.log('\nDone. Redeploy the staging Worker so the new secrets take effect:')
-console.log('  npm run deploy:worker:staging')
+console.log(`\nDone. Redeploy the ${useProduction ? 'production' : 'staging'} Worker so the new secrets take effect:`)
+console.log(`  ${DEPLOY_HINT}`)
