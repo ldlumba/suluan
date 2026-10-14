@@ -2,7 +2,51 @@
 
 ## Status
 
-**OWNER-APPROVED, PROVISIONING PENDING (2026-10-14).**
+**PROVISIONING IN PROGRESS (2026-10-14).** Core production resources are
+created and verified below; Cloud Run services, schedulers, budget alert,
+Gmail sender, corpus import, Gemini/model activation, and app publishing
+remain. No staging/development resource, credential, or row has been reused.
+
+### Provisioning evidence — 2026-10-14
+
+- Google/Firebase project `suluan-production` (number `804189788259`) with
+  owner billing linked; run/artifact-registry/cloud-build/secret-manager/
+  scheduler/firebase/identity-toolkit/generativelanguage APIs enabled.
+  Artifact Registry `asia-southeast1` repository `suluan`; service accounts
+  `suluan-processing-production`, `suluan-query-production`,
+  `suluan-assistant-production`, `suluan-scheduler-production` (least
+  privilege, no project roles granted yet beyond Cloud Run execution).
+- Firebase web app `1:804189788259:web:b0cb99dfe4ebd88def4056`; Google
+  sign-in enabled; authorized domains `localhost`,
+  `suluan-production.firebaseapp.com`, `suluan-production.web.app`,
+  `suluan-repository.pages.dev`. OAuth brand `SULUAN` (External,
+  Testing) with owner support email; test users are the two owner
+  accounts only. Publishing to production is a pre-broad-launch gate.
+- Neon project `suluan-production` (`lively-glitter-84818346`), AWS
+  Singapore, default branch `production`. Migrations 0000–0016 applied
+  from empty with the direct endpoint; `db:check` passed (catalog 4/24,
+  role counter synchronized); reapply was a no-op. Credentials live only
+  in ignored local storage and Worker secrets, never in Git.
+- Cloudflare: private R2 `suluan-production`,
+  `suluan-notifications-production` + DLQ, Pages project
+  `suluan-repository` deployed from `main` with SPA fallback.
+  Worker `suluan-api-production` version
+  `17cf264f-a763-41bb-b177-0555b394d5a` with the committed production
+  bindings plus secrets `DATABASE_URL` (pooled), `FIREBASE_PROJECT_ID`,
+  `PROCESSING_SERVICE_AUDIENCE`, `PROCESSING_SERVICE_ACCOUNT`; no Gemini
+  or Gmail secret is attached. Verified: `/api/health` ok, anonymous
+  keyword search empty, anonymous semantic
+  `authentication_required`, anonymous Assistant limits 401, and
+  successful cross-origin calls from the deployed Pages origin.
+- Cloud Run images pinned in production Artifact Registry: processing
+  `sha256:0383ef16…`, query-service `sha256:79aa459f…`, assistant
+  `sha256:f30aea3a…`. Bounded Job `suluan-processing-production`
+  (1 task, parallelism 1, 0 retries, 15-minute timeout, 1 CPU/512Mi,
+  `SULUAN_MAX_JOBS=5`, dedicated service account) completed an
+  empty-queue execution with `no claimable jobs`, proving workload
+  identity and the claim path. No scheduler is bound yet; extraction runs
+  manually during the governed import. Query/assistant services are not
+  created until the Gemini key and stable-model decision land.
 
 SULUAN will launch as a real production service temporarily owned, operated,
 and billed by the project owner. Institutional handover remains required. The
