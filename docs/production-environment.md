@@ -51,7 +51,21 @@ remain. No staging/development resource, credential, or row has been reused.
   governed import. Query/assistant services are not
   created until the Gemini key and stable-model decision land.
 
-### Gmail activation evidence — 2026-10-14
+### AI services evidence — 2026-10-14 (wiring pending corpus completion)
+
+- Owner decision 2026-10-14: production Assistant keeps the staging
+  model `gemini-3-flash-preview` (parity over migration); no model
+  change is approved by this. The production structured-output/citation
+  canary is still required before broad access.
+- Services `suluan-query-production` and `suluan-assistant-production`
+  (`asia-southeast1`, pinned digests `sha256:79aa459f…` /
+  `sha256:f30aea3a…`, dedicated service accounts, max 1 instance,
+  public ingress with ticket-based service auth exactly like staging,
+  `GEMINI_API_KEY` from Secret Manager `gemini-api-key`) both report
+  `/health` up. Worker URL wiring (`QUERY_EMBEDDING_URL`,
+  `ASSISTANT_SERVICE_URL` + pinned identities) lands only after the
+  corpus is fully extracted, indexed, and embedded; until then both
+  paths stay disabled/fallback by configuration, not by code branch.
 
 - Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
   production Desktop OAuth client (send-only scope); secrets
