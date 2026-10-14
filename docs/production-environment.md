@@ -44,9 +44,29 @@ remain. No staging/development resource, credential, or row has been reused.
   (1 task, parallelism 1, 0 retries, 15-minute timeout, 1 CPU/512Mi,
   `SULUAN_MAX_JOBS=5`, dedicated service account) completed an
   empty-queue execution with `no claimable jobs`, proving workload
-  identity and the claim path. No scheduler is bound yet; extraction runs
-  manually during the governed import. Query/assistant services are not
+  identity and the claim path. The bounded 15-minute scheduler
+  (`suluan-processing-production-trigger`, least-privilege invoker-only
+  scheduler identity) is bound and a forced run completed with
+  `no claimable jobs`, so acceptances extract automatically during the
+  governed import. Query/assistant services are not
   created until the Gemini key and stable-model decision land.
+
+### Gmail activation evidence — 2026-10-14
+
+- Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
+  production Desktop OAuth client (send-only scope); secrets
+  `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/SENDER` plus `REO_MAILBOX` are
+  stored against the production Worker only. A first live drill failed
+  closed with bare `HTTP 403` because the Gmail API was not enabled on
+  the new project; the nested-error fix (committed) exposed the reason,
+  the API was enabled, and automatic retries delivered both mails
+  exactly once (`SENT` with Gmail message IDs, no duplicates).
+- Generated fixture `[GMAIL PROOF]` completed the real browser-to-API
+  path (multipart upload → R2 → atomic intake/outbox → queue consumer →
+  Gmail) and was then REJECTED with exact remarks, so the production
+  repository still holds zero records. The mailbox received the REO
+  submission notice with downloadable PDF attachment and the submitter
+  rejection notice with exact remarks (owner-confirmed 2026-10-14).
 
 SULUAN will launch as a real production service temporarily owned, operated,
 and billed by the project owner. Institutional handover remains required. The
