@@ -143,12 +143,18 @@ async function readJsonBody(res: Response): Promise<Record<string, unknown>> {
 
 async function readErrorDetail(res: Response): Promise<string> {
   const data = await readJsonBody(res)
+  const nested =
+    typeof data.error === 'object' && data.error !== null
+      ? (data.error as Record<string, unknown>).message
+      : undefined
   const message =
     typeof data.message === 'string'
       ? data.message
       : typeof data.error === 'string'
         ? data.error
-        : ''
+        : typeof nested === 'string'
+          ? nested
+          : ''
   return message ? `: ${message.slice(0, 200)}` : ''
 }
 

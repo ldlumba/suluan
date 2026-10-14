@@ -179,6 +179,28 @@ describe('gmailEmailAdapter', () => {
     ).rejects.toThrow(/HTTP 429/)
   })
 
+  it('surfaces the nested Gmail API error message', async () => {
+    const fetchFn = vi.fn(async (url: string) => {
+      if (url.includes('oauth2.googleapis.com')) {
+        return okJson({ access_token: 'access-123' })
+      }
+      return okJson(
+        {
+          error: {
+            code: 403,
+            message: 'Insufficient Permission',
+            status: 'PERMISSION_DENIED',
+          },
+        },
+        403,
+      )
+    })
+    const adapter = gmailEmailAdapter(CONFIG, fetchFn as typeof fetch)
+    await expect(
+      adapter.send({ to: 'a@b.c', subject: 's', body: 'b' }),
+    ).rejects.toThrow(/HTTP 403: Insufficient Permission/)
+  })
+
   it('rejects a send response without a message id', async () => {
     const fetchFn = vi.fn(async (url: string) => {
       if (url.includes('oauth2.googleapis.com')) {
