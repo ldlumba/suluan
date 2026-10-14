@@ -11,8 +11,11 @@ crons = ["*/5 * * * *"]
 ALLOWED_DOMAINS = "ua.edu.ph"
 ALLOWED_ORIGINS = "https://suluan-repository.pages.dev"
 
-# Corpus/document embedding remains conservative and independent of query use.
-EMBEDDING_DAILY_REQUEST_LIMIT = "20"
+# Corpus/document embedding is temporarily raised for the governed backfill
+# (owner-approved 2026-10-15): 160 requests/day keeps ~140 paper-bounded
+# claims inside two UTC days while the UNCHANGED 2,000-input cap continues
+# to bound paid work. Revert to 20 immediately after 100% chunk coverage.
+EMBEDDING_DAILY_REQUEST_LIMIT = "160"
 EMBEDDING_DAILY_INPUT_LIMIT = "2000"
 
 # Owner-approved production launch policy, 2026-10-14.
