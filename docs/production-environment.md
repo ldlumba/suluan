@@ -97,6 +97,16 @@ remain. No staging/development resource, credential, or row has been reused.
   extracts acceptances automatically and the 5-minute sweep indexes
   them for keyword search.
 
+### Extraction completion evidence — 2026-10-15
+
+- All 139 accepted papers individually reviewed; 139 repository records
+  (all PUBLIC) with 139 processing jobs. Thirty bounded manual
+  executions plus the 15-minute scheduler reached 138 `EXTRACTED` with
+  one transient `DOWNLOAD_FAILED`; the governed manager retry
+  re-queued it and one more execution completed it. Final: 139/139
+  `EXTRACTED`, zero failures, 139 keyword snapshots, 4,107 chunks. No
+  bulk-acceptance mechanism was introduced.
+
 SULUAN will launch as a real production service temporarily owned, operated,
 and billed by the project owner. Institutional handover remains required. The
 production environment must not reuse development or staging data resources,
