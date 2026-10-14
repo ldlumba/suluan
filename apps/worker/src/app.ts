@@ -24,11 +24,13 @@ import {
 } from './uploads'
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
 import { prepareSubmissionKeywords } from './keywords'
+import { normalizeTitle } from './titles'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { serviceEmbedRoutes } from './embed_claims'
 import { searchRoutes } from './search'
 import { CHUNKER_VERSION } from './chunking'
 import { graphRoutes } from './graph'
+import { assistantRoutes } from './assistant-routes'
 import {
   cacheControlFor,
   effectiveVisibility,
@@ -178,10 +180,8 @@ export function createApp(
   }
 
   /**
-   * Documentation-only grouping (Stage 7 clarification): ADMIN and
-   * REPOSITORY_MANAGER are enforcement-identical — every manager-gated
-   * route accepts both, and no ADMIN-only operation exists. The role
-   * hierarchy stays nominal until such an operation is approved.
+   * ADMIN and REPOSITORY_MANAGER remain equivalent for repository operations.
+   * Account roles and course availability are the narrow ADMIN-only boundary.
    */
   const MANAGERS: Role[] = ['REPOSITORY_MANAGER', 'ADMIN']
 
@@ -226,32 +226,91 @@ export function createApp(
     serviceEmbedRoutes(requireProcessingService),
   )
   // Dedicated query service identity cannot access document processing routes.
-  app.post('/api/internal/query-tickets/redeem', bodyLimit({ maxSize: 256 }), async (c) => {
-    c.header('Cache-Control', 'private, no-store')
-    const audience = c.env.QUERY_SERVICE_AUDIENCE
-    const account = c.env.QUERY_SERVICE_ACCOUNT
-    const header = c.req.header('authorization')
-    if (!audience || !account) return c.json({ error: 'unconfigured' }, 503)
-    if (!header?.startsWith('Bearer ')) return c.json({ error: 'unauthorized' }, 401)
-    try {
-      await verifyServiceToken(header.slice(7), serviceVerifier, audience, account)
-    } catch {
-      return c.json({ error: 'unauthorized' }, 401)
-    }
-    if (Number(c.req.header('content-length') ?? 0) > 256) return c.json({ error: 'oversize' }, 413)
-    const parsed = z.object({ ticket: z.string().uuid() }).strict().safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return c.json({ error: 'invalid_ticket' }, 400)
-    const result = await createDb(c.env.DATABASE_URL).execute(sql`
+  app.post(
+    '/api/internal/query-tickets/redeem',
+    bodyLimit({ maxSize: 256 }),
+    async (c) => {
+      c.header('Cache-Control', 'private, no-store')
+      const audience = c.env.QUERY_SERVICE_AUDIENCE
+      const account = c.env.QUERY_SERVICE_ACCOUNT
+      const header = c.req.header('authorization')
+      if (!audience || !account) return c.json({ error: 'unconfigured' }, 503)
+      if (!header?.startsWith('Bearer '))
+        return c.json({ error: 'unauthorized' }, 401)
+      try {
+        await verifyServiceToken(
+          header.slice(7),
+          serviceVerifier,
+          audience,
+          account,
+        )
+      } catch {
+        return c.json({ error: 'unauthorized' }, 401)
+      }
+      if (Number(c.req.header('content-length') ?? 0) > 256)
+        return c.json({ error: 'oversize' }, 413)
+      const parsed = z
+        .object({ ticket: z.string().uuid() })
+        .strict()
+        .safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return c.json({ error: 'invalid_ticket' }, 400)
+      const result = await createDb(c.env.DATABASE_URL).execute(sql`
       update embedding_claims set used_at = now()
       where claim_token = ${parsed.data.ticket} and kind = 'query'
         and payload->>'transport' = 'interactive-v1'
         and used_at is null and expires_at > now()
       returning payload->>'sha256' as sha256
     `)
-    if (!result.rows.length) return c.json({ error: 'stale_ticket' }, 409)
-    return c.json({ sha256: result.rows[0].sha256 })
-  })
+      if (!result.rows.length) return c.json({ error: 'stale_ticket' }, 409)
+      return c.json({ sha256: result.rows[0].sha256 })
+    },
+  )
   app.use('/api/processing/*', requireAuth)
+  app.route('/api/assistant', assistantRoutes(requireAuth))
+  app.post(
+    '/api/internal/assistant-tickets/redeem',
+    bodyLimit({ maxSize: 256 }),
+    async (c) => {
+      c.header('Cache-Control', 'private, no-store')
+      const audience = c.env.ASSISTANT_SERVICE_AUDIENCE
+      const account = c.env.ASSISTANT_SERVICE_ACCOUNT
+      if (!c.env.ASSISTANT_SERVICE_URL || !audience || !account)
+        return c.json({ error: 'unconfigured' }, 503)
+      const header = c.req.header('authorization')
+      if (!header?.startsWith('Bearer '))
+        return c.json({ error: 'unauthorized' }, 401)
+      try {
+        await verifyServiceToken(
+          header.slice(7),
+          serviceVerifier,
+          audience,
+          account,
+        )
+      } catch {
+        return c.json({ error: 'unauthorized' }, 401)
+      }
+      const body = z
+        .object({
+          ticket: z.string().uuid(),
+          stage: z.enum(['embed', 'generate']),
+        })
+        .strict()
+        .safeParse(await c.req.json().catch(() => null))
+      if (!body.success) return c.json({ error: 'invalid_ticket' }, 400)
+      const embed = body.data.stage === 'embed'
+      const ticket = embed ? sql`embed_ticket` : sql`generate_ticket`
+      const used = embed ? sql`embed_used_at` : sql`generate_used_at`
+      const hash = embed ? sql`embed_hash` : sql`generate_hash`
+      const rows = await createDb(c.env.DATABASE_URL).execute(sql`
+      update assistant_requests set ${used} = now()
+      where ${ticket} = ${body.data.ticket} and ${used} is null and ${hash} is not null
+        and status = 'reserved' and expires_at > now()
+      returning ${hash} as sha256
+    `)
+      if (!rows.rows.length) return c.json({ error: 'stale_ticket' }, 409)
+      return c.json({ sha256: rows.rows[0].sha256 })
+    },
+  )
   app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))
   // Search reads are public; preparation stays manager-only.
   app.route(
@@ -278,6 +337,17 @@ export function createApp(
       const rows = await db.execute(sql`
       select r.id, r.title, r.year::text as year,
         coalesce(authors.names, s.authors) as authors,
+        r.doi, r.venue, r.volume, r.issue, r.pages,
+        r.pub_year::text as "pubYear",
+        coalesce(
+          author_list.names,
+          (select array_agg(trimmed order by ord)
+           from (select trim(line) as trimmed, ord
+             from unnest(regexp_split_to_array(s.authors, E'\r?\n'))
+               with ordinality as u(line, ord)) t
+           where trimmed <> ''),
+          '{}'::text[]
+        ) as "authorList",
         school.name as "schoolName", course.name as "courseName",
         ${effectiveVisibilityLevel('r')} as visibility,
         case
@@ -301,6 +371,10 @@ export function createApp(
         from record_authors a where a.record_id = r.id
       ) authors on true
       left join lateral (
+        select array_agg(a.name order by a.position, a.id) as names
+        from record_authors a where a.record_id = r.id
+      ) author_list on true
+      left join lateral (
         select array_agg(k.display_name order by rk.position, k.id) as terms
         from research_keywords rk join keywords k on k.id = rk.keyword_id
         where rk.record_id = r.id
@@ -315,7 +389,21 @@ export function createApp(
         return c.json({ error: 'record_not_found' }, 404)
       }
       c.header('Cache-Control', cacheControlFor(viewer, authAttempted, 30))
-      return c.json(rows.rows[0])
+      const row = rows.rows[0] as {
+        doi: string | null
+        venue: string | null
+        volume: string | null
+        issue: string | null
+        pages: string | null
+        pubYear: string | null
+      } & Record<string, unknown>
+      const { doi, venue, volume, issue, pages, pubYear, ...rest } = row
+      return c.json({
+        ...rest,
+        publication: doi
+          ? { doi, venue, volume, issue, pages, year: pubYear }
+          : null,
+      })
     },
   )
 
@@ -367,6 +455,197 @@ export function createApp(
     c.json({ status: 'ok', scope: 'admin' }),
   )
 
+  app.get('/api/admin/users', requireAuth, requireRole('ADMIN'), async (c) => {
+    const rows = await createDb(c.env.DATABASE_URL).execute(sql`
+        select id, email, display_name as "displayName", role,
+          created_at as "createdAt", updated_at as "updatedAt"
+        from profiles
+        order by case role when 'ADMIN' then 0
+          when 'REPOSITORY_MANAGER' then 1 else 2 end,
+          lower(coalesce(email, '')), id
+        limit 500
+      `)
+    return c.json(rows.rows)
+  })
+
+  app.patch(
+    '/api/admin/users/:id/role',
+    requireAuth,
+    requireRole('ADMIN'),
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    zValidator(
+      'json',
+      z
+        .object({
+          role: z.enum(['USER', 'REPOSITORY_MANAGER', 'ADMIN']),
+          expectedUpdatedAt: z
+            .string()
+            .min(1)
+            .max(100)
+            .refine((value) => Number.isFinite(Date.parse(value)), {
+              message: 'Use a valid timestamp.',
+            }),
+        })
+        .strict(),
+    ),
+    async (c) => {
+      const db = createDb(c.env.DATABASE_URL)
+      const id = c.req.valid('param').id
+      const body = c.req.valid('json')
+      const rows = await db.execute(sql`
+        with target as materialized (
+          select id, role as old_role from profiles
+          where id = ${id}
+            and updated_at = ${body.expectedUpdatedAt}::timestamptz
+          for update
+        ), guard as (
+          update role_management_state rms
+          set admin_count = rms.admin_count + case
+                when target.old_role = 'ADMIN' and ${body.role} <> 'ADMIN' then -1
+                when target.old_role <> 'ADMIN' and ${body.role} = 'ADMIN' then 1
+                else 0 end,
+              updated_at = now()
+          from target
+          where rms.singleton = true
+            and target.old_role <> ${body.role}
+            and rms.admin_count + case
+                when target.old_role = 'ADMIN' and ${body.role} <> 'ADMIN' then -1
+                when target.old_role <> 'ADMIN' and ${body.role} = 'ADMIN' then 1
+                else 0 end >= 1
+          returning rms.admin_count
+        ), changed as (
+          update profiles p set role = ${body.role}::role, updated_at = now()
+          from target, guard
+          where p.id = target.id and p.role = target.old_role
+          returning p.id, p.email, p.display_name as "displayName", p.role,
+            p.created_at as "createdAt", p.updated_at as "updatedAt",
+            target.old_role
+        ), audited as (
+          insert into audit_events
+            (actor_id, action, entity_type, entity_id, context)
+          select ${c.get('profile').id}, 'role.changed', 'profile', id::text,
+            jsonb_build_object('oldRole', old_role, 'newRole', role)
+          from changed
+        )
+        select id, email, "displayName", role, "createdAt", "updatedAt"
+        from changed
+      `)
+      if (rows.rows.length) return c.json(rows.rows[0])
+
+      const current = await db.query.profiles.findFirst({
+        where: eq(profiles.id, id),
+      })
+      if (!current) return c.json({ error: 'profile_not_found' }, 404)
+      if (current.updatedAt.toISOString() !== body.expectedUpdatedAt) {
+        return c.json(
+          {
+            error: 'stale_role_edit',
+            message:
+              'This account changed after the page loaded. Refresh before trying again.',
+          },
+          409,
+        )
+      }
+      if (current.role === body.role) {
+        return c.json(
+          { error: 'role_unchanged', message: 'Choose a different role.' },
+          400,
+        )
+      }
+      if (current.role === 'ADMIN' && body.role !== 'ADMIN') {
+        return c.json(
+          {
+            error: 'last_admin_required',
+            message:
+              'Add another administrator before changing the final administrator account.',
+          },
+          409,
+        )
+      }
+      return c.json(
+        {
+          error: 'role_state_conflict',
+          message:
+            'The role-management state is unavailable or out of sync. Run db:check before retrying.',
+        },
+        409,
+      )
+    },
+  )
+
+  app.get(
+    '/api/admin/catalog',
+    requireAuth,
+    requireRole('ADMIN'),
+    async (c) => {
+      const rows = await createDb(c.env.DATABASE_URL).execute(sql`
+        select s.id as "schoolId", s.name as "schoolName", c.id, c.name,
+          c.active, c.updated_at as "updatedAt"
+        from schools s join courses c on c.school_id = s.id
+        order by s.name, c.name
+      `)
+      return c.json(rows.rows)
+    },
+  )
+
+  app.patch(
+    '/api/admin/courses/:id',
+    requireAuth,
+    requireRole('ADMIN'),
+    zValidator('param', z.object({ id: z.string().uuid() })),
+    zValidator(
+      'json',
+      z
+        .object({
+          active: z.boolean(),
+          expectedUpdatedAt: z
+            .string()
+            .min(1)
+            .max(100)
+            .refine((value) => Number.isFinite(Date.parse(value)), {
+              message: 'Use a valid timestamp.',
+            }),
+        })
+        .strict(),
+    ),
+    async (c) => {
+      const db = createDb(c.env.DATABASE_URL)
+      const body = c.req.valid('json')
+      const id = c.req.valid('param').id
+      const rows = await db.execute(sql`
+        with changed as (
+          update courses set active = ${body.active}, updated_at = now()
+          where id = ${id}
+            and updated_at = ${body.expectedUpdatedAt}::timestamptz
+          returning id, active, updated_at
+        ), audit as (
+          insert into audit_events
+            (actor_id, action, entity_type, entity_id, context)
+          select ${c.get('profile').id},
+            case when active then 'course.activated' else 'course.deactivated' end,
+            'course', id::text,
+            jsonb_build_object('active', active)
+          from changed
+        )
+        select id, active, updated_at as "updatedAt" from changed
+      `)
+      if (rows.rows.length) return c.json(rows.rows[0])
+      const found = await db.query.courses.findFirst({
+        where: eq(courses.id, id),
+      })
+      return found
+        ? c.json(
+            {
+              error: 'stale_course_edit',
+              message:
+                'This course changed after the page loaded. Refresh before trying again.',
+            },
+            409,
+          )
+        : c.json({ error: 'course_not_found' }, 404)
+    },
+  )
+
   // Migration-owned institutional school/course catalog for the submission
   // form. Read-only in the browser; server validation remains authoritative.
   app.get('/api/schools', requireAuth, async (c) => {
@@ -380,6 +659,7 @@ export function createApp(
         id: s.id,
         name: s.name,
         courses: s.courses
+          .filter((course) => course.active)
           .map((course) => ({ id: course.id, name: course.name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       })),
@@ -438,11 +718,13 @@ export function createApp(
       authors: text('authors'),
       schoolId: text('schoolId'),
       courseId: text('courseId'),
+      duplicateAcknowledged: text('duplicateAcknowledged'),
     })
     if (!fields.success) {
       return c.json({ error: 'invalid_fields' }, 400)
     }
     const meta = fields.data
+    const normalizedTitle = normalizeTitle(meta.title)
 
     // Author keywords arrive as repeated `keywords[]` parts (one term per
     // part, matching the chip UI). The `[]` suffix matters: Hono's default
@@ -478,9 +760,60 @@ export function createApp(
         where: eq(courses.id, meta.courseId),
       })
       if (!course) return c.json({ error: 'unknown_course' }, 400)
+      if (!course.active) return c.json({ error: 'course_inactive' }, 409)
       if (meta.schoolId && course.schoolId !== meta.schoolId) {
         return c.json({ error: 'course_school_mismatch' }, 400)
       }
+    }
+
+    const duplicates = await db.execute(sql`
+      select
+        exists(
+          select 1 from submissions
+          where normalized_title = ${normalizedTitle}
+            and submitter_id = ${profile.id}
+            and status = 'PENDING'
+        ) as "ownPending",
+        exists(
+          select 1 from submissions
+          where normalized_title = ${normalizedTitle}
+            and status in ('PENDING', 'ACCEPTED')
+        ) as "possibleDuplicate"
+    `)
+    const duplicateState = duplicates.rows[0] as {
+      ownPending: boolean
+      possibleDuplicate: boolean
+    }
+    if (duplicateState.ownPending) {
+      return c.json(
+        {
+          error: 'duplicate_pending',
+          message:
+            'You already have a submission with this title awaiting review. Check My submissions before sending it again.',
+        },
+        409,
+      )
+    }
+    if (duplicateState.possibleDuplicate && !meta.duplicateAcknowledged) {
+      // Safe disclosure: only already-public repository records are named.
+      // Other pending submissions stay hidden to avoid intake leakage.
+      const publicMatches = await db.execute(sql`
+        select r.id as "recordId", r.title, r.year::text as year
+        from submissions s join research_records r on r.submission_id = s.id
+        where s.normalized_title = ${normalizedTitle}
+          and s.status = 'ACCEPTED'
+          and ${effectiveVisibility('PUBLIC', 'r').rowVisible}
+        order by r.created_at desc limit 3
+      `)
+      return c.json(
+        {
+          error: 'possible_duplicate',
+          message:
+            'A pending or accepted paper already uses this title. Review the title, or confirm that this is a different paper.',
+          publicMatches: publicMatches.rows,
+        },
+        409,
+      )
     }
 
     const key = buildIntakeKey(validated.fileName)
@@ -499,6 +832,7 @@ export function createApp(
           submitterId: profile.id,
           idempotencyKey: meta.idempotencyKey,
           title: meta.title,
+          normalizedTitle,
           authors: meta.authors,
           schoolId: meta.schoolId,
           courseId: meta.courseId,
@@ -524,11 +858,32 @@ export function createApp(
         if (winner && winner.submitterId === profile.id) {
           return { submissionId: winner.id, outboxId: null as string | null }
         }
-        return null
+        const duplicate = await db.query.submissions.findFirst({
+          where: sql`${submissions.submitterId} = ${profile.id}
+            and ${submissions.normalizedTitle} = ${normalizedTitle}
+            and ${submissions.status} = 'PENDING'`,
+        })
+        return duplicate
+          ? {
+              submissionId: duplicate.id,
+              outboxId: null as string | null,
+              duplicate: true as const,
+            }
+          : null
       }
     })()
     if (!created) {
       return c.json({ error: 'idempotency_conflict' }, 409)
+    }
+    if ('duplicate' in created) {
+      return c.json(
+        {
+          error: 'duplicate_pending',
+          message:
+            'You already have a submission with this title awaiting review. Check My submissions before sending it again.',
+        },
+        409,
+      )
     }
 
     // Best-effort enqueue: the outbox row is the durable record, so a
@@ -565,18 +920,75 @@ export function createApp(
         orderBy: (s, { asc }) => [asc(s.createdAt)],
         limit: 50,
       })
+      const duplicateDetails = rows.length
+        ? await db.execute(sql`
+            select s.normalized_title as "normalizedTitle", s.id, s.title,
+              s.status, s.created_at as "createdAt", p.email as "submitterEmail"
+            from submissions s left join profiles p on p.id = s.submitter_id
+            where s.status in ('PENDING', 'ACCEPTED')
+              and s.normalized_title in (${sql.join(
+                rows.map((row) => sql`${row.normalizedTitle}`),
+                sql`, `,
+              )})
+            order by s.created_at desc limit 200
+          `)
+        : { rows: [] }
+      const grouped = new Map(
+        (
+          duplicateDetails.rows as {
+            normalizedTitle: string
+            id: string
+            title: string
+            status: string
+            createdAt: string
+            submitterEmail: string | null
+          }[]
+        ).reduce(
+          (acc, row) => {
+            const list = acc.get(row.normalizedTitle) ?? []
+            list.push(row)
+            acc.set(row.normalizedTitle, list)
+            return acc
+          },
+          new Map<
+            string,
+            {
+              normalizedTitle: string
+              id: string
+              title: string
+              status: string
+              createdAt: string
+              submitterEmail: string | null
+            }[]
+          >(),
+        ),
+      )
       return c.json(
-        rows.map((s) => ({
-          id: s.id,
-          title: s.title,
-          authors: s.authors,
-          createdAt: s.createdAt,
-          submitterEmail: s.submitter.email,
-          files: s.files,
-          keywords: s.submissionKeywords
-            .sort((a, b) => a.position - b.position)
-            .map((k) => k.term),
-        })),
+        rows.map((s) => {
+          const matches = (grouped.get(s.normalizedTitle) ?? [])
+            .filter((m) => m.id !== s.id)
+            .slice(0, 5)
+            .map((m) => ({
+              id: m.id,
+              title: m.title,
+              status: m.status,
+              createdAt: m.createdAt,
+              submitterEmail: m.submitterEmail,
+            }))
+          return {
+            id: s.id,
+            title: s.title,
+            authors: s.authors,
+            createdAt: s.createdAt,
+            submitterEmail: s.submitter.email,
+            files: s.files,
+            keywords: s.submissionKeywords
+              .sort((a, b) => a.position - b.position)
+              .map((k) => k.term),
+            possibleDuplicate: matches.length > 0,
+            duplicateOf: matches,
+          }
+        }),
       )
     },
   )

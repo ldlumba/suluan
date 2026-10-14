@@ -375,6 +375,42 @@ needsDb('review workflow', () => {
     expect(found?.submitterEmail).toBe('author@ua.edu.ph')
   })
 
+  it('names the matching submission inside the manager-only queue', async () => {
+    const title = `Queue duplicate ${crypto.randomUUID()}`
+    const first = await submit(title)
+    const secondForm = new FormData()
+    secondForm.append(
+      'file',
+      new File(['x'.repeat(10)], 'paper.pdf', { type: 'application/pdf' }),
+    )
+    secondForm.append('idempotencyKey', crypto.randomUUID())
+    secondForm.append('title', title.toLowerCase())
+    secondForm.append('duplicateAcknowledged', 'true')
+    const secondRes = await t.app.request(
+      '/api/submissions',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${managerToken}` },
+        body: secondForm,
+      },
+      t.testEnv(),
+    )
+    expect(secondRes.status).toBe(201)
+    submissionIds.push(((await secondRes.json()) as { id: string }).id)
+    const res = await get('/api/review/queue', managerToken)
+    expect(res.status).toBe(200)
+    const queue = (await res.json()) as {
+      id: string
+      possibleDuplicate: boolean
+      duplicateOf: { id: string; status: string }[]
+    }[]
+    const firstRow = queue.find((s) => s.id === first.id)
+    expect(firstRow?.possibleDuplicate).toBe(true)
+    expect(firstRow?.duplicateOf.map((m) => m.id)).toContain(
+      submissionIds[submissionIds.length - 1],
+    )
+  })
+
   it('requires remarks before a decision', async () => {
     const { id } = await submit('Needs remarks')
     const res = await post('/api/decisions', managerToken, {
@@ -521,6 +557,8 @@ needsDb('review workflow', () => {
       })
       .from(courses)
       .innerJoin(schools, eq(schools.id, courses.schoolId))
+      .where(eq(courses.active, true))
+      .orderBy(courses.createdAt, courses.id)
       .limit(1)
     const { id } = await submit('Traditional review', 'Author One', catalog)
     const [event] = await db
@@ -806,12 +844,14 @@ needsDb('review workflow', () => {
     const queue = (await (
       await get('/api/review/queue', managerToken)
     ).json()) as { id: string; keywords: string[] }[]
-    expect(
-      queue.find((item) => item.id === id)?.keywords,
-    ).toEqual(['Queue Alpha', 'Queue Beta'])
+    expect(queue.find((item) => item.id === id)?.keywords).toEqual([
+      'Queue Alpha',
+      'Queue Beta',
+    ])
   })
 
-  it('keeps concurrent deliveries from dispatching an active claim twice', async () => {    const { id } = await submit('Concurrent notification')
+  it('keeps concurrent deliveries from dispatching an active claim twice', async () => {
+    const { id } = await submit('Concurrent notification')
     const db = testDb()
     const [event] = await db
       .select()

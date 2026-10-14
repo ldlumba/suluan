@@ -7,6 +7,7 @@ const connectionString = requireDatabaseUrl()
 const expectedTables = [
   // identity
   'profiles',
+  'role_management_state',
   'schools',
   'courses',
   // intake
@@ -31,6 +32,9 @@ const expectedTables = [
   'document_embeddings',
   'embedding_usage',
   'embedding_claims',
+  'assistant_sessions',
+  'assistant_requests',
+  'assistant_usage',
 ]
 
 /** Drizzle bookkeeping lives in its own schema in current drizzle-orm. */
@@ -187,6 +191,44 @@ try {
       'FAIL institutional catalog must contain 4 schools / 24 courses',
     )
     failures.push('institutional catalog')
+  }
+
+  const { rows: safeguards } = await client.query(
+    `select
+      exists(select 1 from information_schema.columns
+        where table_name = 'courses' and column_name = 'active'
+          and is_nullable = 'NO') as course_active,
+      exists(select 1 from information_schema.columns
+        where table_name = 'submissions' and column_name = 'normalized_title'
+          and is_nullable = 'NO') as normalized_title,
+      exists(select 1 from pg_indexes
+        where indexname = 'submissions_one_pending_title_per_submitter'
+          and indexdef like '%UNIQUE%') as pending_title_guard`,
+  )
+  if (
+    safeguards[0]?.course_active &&
+    safeguards[0]?.normalized_title &&
+    safeguards[0]?.pending_title_guard
+  ) {
+    console.log('ok   duplicate-title and course-availability safeguards')
+  } else {
+    console.log('FAIL duplicate-title or course-availability safeguard missing')
+    failures.push('intake/catalog safeguards')
+  }
+
+  const { rows: roleState } = await client.query(
+    `select rms.admin_count,
+      (select count(*)::int from profiles where role = 'ADMIN') as actual
+     from role_management_state rms where singleton = true`,
+  )
+  if (
+    roleState.length === 1 &&
+    Number(roleState[0].admin_count) === Number(roleState[0].actual)
+  ) {
+    console.log('ok   role-management admin counter is synchronized')
+  } else {
+    console.log('FAIL role-management admin counter is missing or out of sync')
+    failures.push('role-management admin counter')
   }
 } finally {
   await client.end()

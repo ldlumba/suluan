@@ -21,9 +21,14 @@ import {
   toVectorLiteral,
 } from './embeddings'
 import { normalizeKeyword } from './keywords'
-import { consumeQuota, consumeQueryQuota, embeddingLimits } from './quota'
-import { reciprocalRankFusion } from './ranking'
-import { semanticMaxScore } from './semantic-policy'
+import {
+  consumeQuota,
+  consumeQueryQuota,
+  embeddingLimits,
+  queryQuotaPolicy,
+} from './quota'
+import { confidenceBandedHybridFusion } from './ranking'
+import { semanticDiscoveryMaxScore, semanticMaxScore } from './semantic-policy'
 import { queryServiceUrl, regionalQueryVector } from './query-transport'
 
 const querySchema = z.object({
@@ -31,6 +36,7 @@ const querySchema = z.object({
   page: z.coerce.number().int().min(1).max(1000).default(1),
 })
 const keywordQuerySchema = querySchema.extend({
+  scope: z.enum(['all', 'title']).default('all'),
   sort: z
     .enum(['relevance', 'title', 'newest', 'oldest', 'course'])
     .default('relevance'),
@@ -210,7 +216,7 @@ export async function semanticSearchByVector(
     order by ranked.distance asc, r.id
       limit ${limit + 1} offset ${(page - 1) * limit}
     `)
-    return {
+  return {
     items: rows.rows.slice(0, limit),
     page,
     hasMore: rows.rows.length > limit,
@@ -320,7 +326,7 @@ export function searchRoutes(
     optionalAuth,
     zValidator('query', keywordQuerySchema),
     async (c) => {
-      const { q, page, sort, keyword } = c.req.valid('query')
+      const { q, page, sort, keyword, scope } = c.req.valid('query')
       const db = createDb(c.env.DATABASE_URL)
       const profile = c.get('profile')
       const viewer = viewerRoleFor(profile?.role ?? null)
@@ -338,10 +344,10 @@ export function searchRoutes(
             case when i.id is not null then 'READY'
               when j.status = 'FAILED' then 'FAILED' else 'PENDING' end as full_text_status,
             ${visibilityCase()} as visibility,
-            to_tsvector('simple', r.title || ' '
+            to_tsvector('simple', case when ${scope} = 'title' then r.title else r.title || ' '
               || coalesce(authors.names, s.authors, '') || ' '
               || coalesce(school.name, '') || ' ' || coalesce(course.name, '')
-              || ' ' || r.year::text) as metadata
+              || ' ' || r.year::text end) as metadata
           from research_records r join submissions s on s.id = r.submission_id
           left join schools school on school.id = s.school_id
           left join courses course on course.id = s.course_id
@@ -374,7 +380,7 @@ export function searchRoutes(
           left join lateral (
             select regexp_replace(btrim(d.content), '[[:space:]]+', ' ', 'g') as content,
               ts_rank_cd(d.search_vector, query.terms) as rank
-            from document_chunks d where d.index_id = e.index_id
+            from document_chunks d where ${scope} <> 'title' and d.index_id = e.index_id
               and (${q} = '' or d.search_vector @@ query.terms)
             order by rank desc, d.ordinal limit 1
           ) best on true
@@ -488,11 +494,16 @@ export function searchRoutes(
       }
       if (c.env.SEMANTIC_AUTHENTICATED_ONLY === 'true' && !profile) {
         return c.json({
-          items: [], page, hasMore: false,
+          items: [],
+          page,
+          hasMore: false,
           semanticStatus: 'authentication_required' as const,
         })
       }
-      if (!c.env.QUERY_EMBEDDING_URL && !isSemanticEnabled(c.env.GEMINI_API_KEY)) {
+      if (
+        !c.env.QUERY_EMBEDDING_URL &&
+        !isSemanticEnabled(c.env.GEMINI_API_KEY)
+      ) {
         return c.json({
           items: [],
           page,
@@ -501,8 +512,13 @@ export function searchRoutes(
         })
       }
       let maxScore: number
+      let discoveryMaxScore: number
       try {
         maxScore = semanticMaxScore(c.env.SEMANTIC_MAX_SCORE)
+        discoveryMaxScore = semanticDiscoveryMaxScore(
+          c.env.SEMANTIC_DISCOVERY_MAX_SCORE,
+          maxScore,
+        )
         if (c.env.QUERY_EMBEDDING_URL) {
           queryServiceUrl(c.env.QUERY_EMBEDDING_URL)
           if (!c.env.QUERY_SERVICE_ACCOUNT || !c.env.QUERY_SERVICE_AUDIENCE) {
@@ -510,7 +526,12 @@ export function searchRoutes(
           }
         }
       } catch {
-        return c.json({ items: [], page, hasMore: false, semanticStatus: 'unavailable' as const })
+        return c.json({
+          items: [],
+          page,
+          hasMore: false,
+          semanticStatus: 'unavailable' as const,
+        })
       }
       const quota = await consumeQueryQuota(
         db,
@@ -518,9 +539,13 @@ export function searchRoutes(
           viewer,
           profileId: profile?.id ?? null,
         },
-        embeddingLimits(
-          c.env.EMBEDDING_DAILY_REQUEST_LIMIT,
-          c.env.EMBEDDING_DAILY_INPUT_LIMIT,
+        queryQuotaPolicy(
+          c.env.SEMANTIC_DAILY_REQUEST_LIMIT,
+          c.env.SEMANTIC_USER_DAILY_REQUEST_LIMIT,
+          embeddingLimits(
+            c.env.EMBEDDING_DAILY_REQUEST_LIMIT,
+            c.env.EMBEDDING_DAILY_INPUT_LIMIT,
+          ),
         ),
       )
       if (!quota.allowed) {
@@ -541,10 +566,10 @@ export function searchRoutes(
           vector = await regionalQueryVector(db, c.env.QUERY_EMBEDDING_URL, q)
         } else {
           ;[vector] = await embedTexts(
-          c.env.GEMINI_API_KEY as string,
-          [q],
-          'RETRIEVAL_QUERY',
-        )
+            c.env.GEMINI_API_KEY as string,
+            [q],
+            'RETRIEVAL_QUERY',
+          )
         }
       } catch (err) {
         return c.json({
@@ -574,7 +599,7 @@ export function searchRoutes(
           1,
           HYBRID_CANDIDATE_LIMIT,
           c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
-          maxScore,
+          discoveryMaxScore,
         )
         const keyword = await keywordCandidatesByQuery(
           db,
@@ -582,32 +607,41 @@ export function searchRoutes(
           q,
           HYBRID_CANDIDATE_LIMIT,
         )
-        const fused = reciprocalRankFusion([
-          semantic.items as { id: string }[],
-          // A lexical match must not bypass a configured semantic abstention policy.
-          c.env.SEMANTIC_MAX_SCORE === undefined
-            ? keyword
-            : keyword.filter((item) => semantic.items.some((candidate) => candidate.id === item.id)),
-        ])
+        // The strict score now defines the confident label, not a universal
+        // gate. The separately bounded discovery score permits honestly
+        // labeled exploratory semantic results, while lexical-only evidence is
+        // returned as keyword fallback rather than misrepresented as semantic.
+        const fused = confidenceBandedHybridFusion(
+          semantic.items as { id: string; title: string; distance: number }[],
+          keyword as { id: string; title: string }[],
+          maxScore,
+        )
         const offset = (page - 1) * PAGE_SIZE
+        const hasSemantic = semantic.items.length > 0
+        const hasKeyword = keyword.length > 0
         return c.json({
           items: fused.slice(offset, offset + PAGE_SIZE),
           page,
           hasMore: fused.length > offset + PAGE_SIZE,
           semanticStatus: 'ready' as const,
-          retrievalMode: 'hybrid' as const,
+          retrievalMode:
+            !hasSemantic && hasKeyword
+              ? ('keyword_fallback' as const)
+              : hasKeyword
+                ? ('hybrid' as const)
+                : ('semantic' as const),
         })
       }
 
-       const result = await semanticSearchByVector(
-         db,
-         viewer,
-         vector,
-         page,
-         PAGE_SIZE,
-         c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
-         maxScore,
-       )
+      const result = await semanticSearchByVector(
+        db,
+        viewer,
+        vector,
+        page,
+        PAGE_SIZE,
+        c.env.SEMANTIC_SCORING_MODE ?? 'top_k_mean',
+        maxScore,
+      )
       return c.json({
         ...result,
         semanticStatus: 'ready' as const,

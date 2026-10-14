@@ -120,6 +120,8 @@ needsDb('viewer-safe graph route', () => {
       .select({ schoolId: schools.id, courseId: courses.id })
       .from(courses)
       .innerJoin(schools, eq(schools.id, courses.schoolId))
+      .where(eq(courses.active, true))
+      .orderBy(courses.createdAt, courses.id)
       .limit(1)
     ;({ schoolId, courseId } = catalog)
   })

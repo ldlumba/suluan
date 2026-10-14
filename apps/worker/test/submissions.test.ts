@@ -63,7 +63,11 @@ needsDb('submission intake', () => {
     return form
   }
 
-  async function submit(token: string, file: File | null, fields: Record<string, string> = {}) {
+  async function submit(
+    token: string,
+    file: File | null,
+    fields: Record<string, string> = {},
+  ) {
     return t.app.request(
       '/api/submissions',
       {
@@ -125,6 +129,20 @@ needsDb('submission intake', () => {
     expect(await res.json()).toMatchObject({ error: 'empty_file' })
   })
 
+  it('rejects a title with no letters or numbers before storage', async () => {
+    const token = await userToken(
+      'uid-title-symbols',
+      'title-symbols@ua.edu.ph',
+    )
+    const objectsBefore = t.r2objects.size
+    const res = await submit(token, pdfFile('paper.pdf', 100), {
+      title: '— · !!!',
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid_fields' })
+    expect(t.r2objects.size).toBe(objectsBefore)
+  })
+
   it('creates a PENDING submission with R2 bytes, file, audit, outbox, and queue message', async () => {
     const token = await userToken('uid-happy', 'happy@ua.edu.ph')
     const before = t.sentMessages.length
@@ -162,6 +180,77 @@ needsDb('submission intake', () => {
     })
   })
 
+  it('blocks the same submitter from adding the same pending title twice', async () => {
+    const token = await userToken('uid-dupe-own', 'dupe-own@ua.edu.ph')
+    const title = 'Farmers’ Health: A Study'
+    const first = await submit(token, pdfFile('first.pdf', 100), { title })
+    expect(first.status).toBe(201)
+    const created = (await first.json()) as { id: string }
+    submissionIds.push(created.id)
+    const objectsBefore = t.r2objects.size
+
+    const duplicate = await submit(token, pdfFile('second.pdf', 100), {
+      title: ' farmers health — a study ',
+    })
+    expect(duplicate.status).toBe(409)
+    expect(await duplicate.json()).toMatchObject({
+      error: 'duplicate_pending',
+    })
+    expect(t.r2objects.size).toBe(objectsBefore)
+  })
+
+  it('warns about another paper with the same title and permits explicit confirmation', async () => {
+    const firstToken = await userToken('uid-dupe-a', 'dupe-a@ua.edu.ph')
+    const secondToken = await userToken('uid-dupe-b', 'dupe-b@ua.edu.ph')
+    const title = `Shared title ${crypto.randomUUID()}`
+    const first = await submit(firstToken, pdfFile('first.pdf', 100), { title })
+    expect(first.status).toBe(201)
+    submissionIds.push(((await first.json()) as { id: string }).id)
+    const objectsBefore = t.r2objects.size
+
+    const warning = await submit(secondToken, pdfFile('second.pdf', 100), {
+      title: title.toUpperCase(),
+    })
+    expect(warning.status).toBe(409)
+    const warningBody = (await warning.json()) as {
+      error: string
+      publicMatches: unknown
+    }
+    expect(warningBody).toMatchObject({
+      error: 'possible_duplicate',
+    })
+    // Safe disclosure: pending-only matches name nothing public.
+    expect(Array.isArray(warningBody.publicMatches)).toBe(true)
+    expect(warningBody.publicMatches).toHaveLength(0)
+    expect(JSON.stringify(warningBody)).not.toContain('dupe-a@ua.edu.ph')
+    expect(t.r2objects.size).toBe(objectsBefore)
+
+    const confirmed = await submit(secondToken, pdfFile('second.pdf', 100), {
+      title: title.toUpperCase(),
+      duplicateAcknowledged: 'true',
+    })
+    expect(confirmed.status).toBe(201)
+    submissionIds.push(((await confirmed.json()) as { id: string }).id)
+  })
+
+  it('allows a corrected resubmission after rejection', async () => {
+    const token = await userToken('uid-resubmit', 'resubmit@ua.edu.ph')
+    const title = `Corrected paper ${crypto.randomUUID()}`
+    const first = await submit(token, pdfFile('first.pdf', 100), { title })
+    const created = (await first.json()) as { id: string }
+    submissionIds.push(created.id)
+    await testDb()
+      .update(submissions)
+      .set({ status: 'REJECTED' })
+      .where(eq(submissions.id, created.id))
+
+    const corrected = await submit(token, pdfFile('corrected.pdf', 100), {
+      title,
+    })
+    expect(corrected.status).toBe(201)
+    submissionIds.push(((await corrected.json()) as { id: string }).id)
+  })
+
   it('replays idempotent submissions without storing another object', async () => {
     const token = await userToken('uid-replay', 'replay@ua.edu.ph')
     const idempotencyKey = crypto.randomUUID()
@@ -169,6 +258,7 @@ needsDb('submission intake', () => {
 
     const first = await submit(token, pdfFile('paper.pdf', 100), {
       idempotencyKey,
+      title: `Replay ${crypto.randomUUID()}`,
     })
     expect(first.status).toBe(201)
     const firstBody = (await first.json()) as { id: string }

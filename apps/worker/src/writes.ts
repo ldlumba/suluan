@@ -14,6 +14,7 @@ export interface NewSubmissionInput {
   submitterId: string
   idempotencyKey: string
   title: string
+  normalizedTitle: string
   authors?: string
   schoolId?: string
   courseId?: string
@@ -45,10 +46,10 @@ export async function createSubmissionAtomic(
     WITH new_submission AS (
       INSERT INTO submissions
         (submitter_id, status, idempotency_key, title, authors, school_id,
-         course_id)
+         course_id, normalized_title)
       VALUES (${input.submitterId}, 'PENDING', ${input.idempotencyKey},
         ${input.title}, ${input.authors ?? null}, ${input.schoolId ?? null},
-        ${input.courseId ?? null})
+        ${input.courseId ?? null}, ${input.normalizedTitle})
       RETURNING id
     ),
     new_file AS (

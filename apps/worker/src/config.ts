@@ -66,24 +66,44 @@ export interface Env {
    */
   EMBEDDING_DAILY_REQUEST_LIMIT?: string
   EMBEDDING_DAILY_INPUT_LIMIT?: string
-  /** Retrieval mode; hybrid remains opt-in until the independent gate passes. */
+  /** Production interactive semantic quotas; unset preserves the staging pool. */
+  SEMANTIC_DAILY_REQUEST_LIMIT?: string
+  SEMANTIC_USER_DAILY_REQUEST_LIMIT?: string
+  /** Retrieval mode; staging uses guarded hybrid after owner approval 2026-10-13. */
   SEMANTIC_SEARCH_MODE?: 'semantic' | 'hybrid'
   /** Candidate record scorer; the length penalty remains evaluation-only by default. */
   SEMANTIC_SCORING_MODE?: 'top_k_mean' | 'log_length_penalized_min'
   /** Optional evaluated score ceiling. Invalid configuration fails closed. */
   SEMANTIC_MAX_SCORE?: string
+  /** Optional staging discovery band; results beyond MAX_SCORE are labeled exploratory. */
+  SEMANTIC_DISCOVERY_MAX_SCORE?: string
   /** Regional query-only service; enabling remains gated on launch review. */
   QUERY_EMBEDDING_URL?: string
   QUERY_SERVICE_ACCOUNT?: string
   QUERY_SERVICE_AUDIENCE?: string
   /** First rollout is UA-authenticated only; public semantic limits remain TBD. */
   SEMANTIC_AUTHENTICATED_ONLY?: 'true'
+  /** Separate regional read-only assistant; unset means disabled. */
+  ASSISTANT_SERVICE_URL?: string
+  ASSISTANT_SERVICE_ACCOUNT?: string
+  ASSISTANT_SERVICE_AUDIENCE?: string
+  /** Pilot is fail-safe default; production may authorize every verified UA profile. */
+  ASSISTANT_ACCESS_MODE?: 'pilot' | 'all_authenticated'
+  /** Owner-confirmed eligible adult pilot emails. Missing/empty denies all. */
+  ASSISTANT_PILOT_EMAILS?: string
+  /** Separate production retrieval pool; unset keeps the shared staging pool. */
+  ASSISTANT_RETRIEVAL_DAILY_REQUEST_LIMIT?: string
   /** Exact audience requested from the Cloud Run metadata identity endpoint. */
   PROCESSING_SERVICE_AUDIENCE?: string
   /** Exact dedicated Cloud Run Job service-account email. */
   PROCESSING_SERVICE_ACCOUNT?: string
   /** Test/dev REO recipient. Unset until the mailbox decision lands. */
   REO_MAILBOX?: string
+  /**
+   * Contact email sent to Crossref (polite pool User-Agent/mailto). Falls
+   * back to REO_MAILBOX when unset; DOI enrichment never requires it.
+   */
+  DOI_CONTACT_EMAIL?: string
   /**
    * Gmail sender (owner-approved 2026-10-05, temporary UA mailbox).
    * Server-side only, via `wrangler secret put` — never commit, never expose

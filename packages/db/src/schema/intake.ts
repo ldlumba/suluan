@@ -5,8 +5,10 @@ import {
   text,
   timestamp,
   uuid,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { courses, profiles, schools } from './identity'
 import { submissionKeywords } from './keywords'
 
@@ -26,38 +28,50 @@ export const submissionStatus = pgEnum('submission_status', [
  * Exact required metadata fields are TBD — nullable columns below are
  * intentionally permissive until the form contract is locked.
  */
-export const submissions = pgTable('submissions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  submitterId: uuid('submitter_id')
-    .notNull()
-    .references(() => profiles.id),
-  /**
-   * Authoritative review state, owned by the submission itself. A PENDING
-   * submission has no decisions row yet; ACCEPTED/REJECTED mirror the
-   * recorded decision. Never derive this client-side.
-   */
-  status: submissionStatus('status').notNull().default('PENDING'),
-  /**
-   * Client-generated UUID per submission attempt. Retried finalizations
-   * with the same key return the existing submission instead of creating
-   * a duplicate.
-   */
-  idempotencyKey: text('idempotency_key').notNull().unique(),
-  title: text('title').notNull(),
-  authors: text('authors'),
-  schoolId: uuid('school_id').references(() => schools.id),
-  courseId: uuid('course_id').references(() => courses.id),
-  /** @deprecated New submissions derive repository year at acceptance. */
-  year: text('year'),
-  /** @deprecated Retained for migration safety; new submissions do not write it. */
-  researchType: text('research_type'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-})
+export const submissions = pgTable(
+  'submissions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    submitterId: uuid('submitter_id')
+      .notNull()
+      .references(() => profiles.id),
+    /**
+     * Authoritative review state, owned by the submission itself. A PENDING
+     * submission has no decisions row yet; ACCEPTED/REJECTED mirror the
+     * recorded decision. Never derive this client-side.
+     */
+    status: submissionStatus('status').notNull().default('PENDING'),
+    /**
+     * Client-generated UUID per submission attempt. Retried finalizations
+     * with the same key return the existing submission instead of creating
+     * a duplicate.
+     */
+    idempotencyKey: text('idempotency_key').notNull().unique(),
+    title: text('title').notNull(),
+    /** Canonical comparison key; display title remains untouched. */
+    normalizedTitle: text('normalized_title').notNull(),
+    authors: text('authors'),
+    schoolId: uuid('school_id').references(() => schools.id),
+    courseId: uuid('course_id').references(() => courses.id),
+    /** @deprecated New submissions derive repository year at acceptance. */
+    year: text('year'),
+    /** @deprecated Retained for migration safety; new submissions do not write it. */
+    researchType: text('research_type'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // Prevent accidental same-user double submission while preserving valid
+    // resubmission after rejection and independently authored same-title work.
+    uniqueIndex('submissions_one_pending_title_per_submitter')
+      .on(table.submitterId, table.normalizedTitle)
+      .where(sql`${table.status} = 'PENDING'`),
+  ],
+)
 
 /**
  * File rows reference the single authoritative R2 object key.

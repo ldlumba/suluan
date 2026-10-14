@@ -51,6 +51,8 @@ needsDb('restricted keyword discovery', () => {
       })
       .from(courses)
       .innerJoin(schools, eq(schools.id, courses.schoolId))
+      .where(eq(courses.active, true))
+      .orderBy(courses.createdAt, courses.id)
       .limit(1)
     ;({ courseId, courseName, schoolId, schoolName } = catalog)
   })
@@ -93,6 +95,7 @@ needsDb('restricted keyword discovery', () => {
     form.append('schoolId', schoolId)
     form.append('courseId', courseId)
     form.append('idempotencyKey', crypto.randomUUID())
+    form.append('duplicateAcknowledged', 'true')
     for (const term of keywords) form.append('keywords[]', term)
     const res = await t.app.request(
       '/api/submissions',
@@ -178,165 +181,222 @@ needsDb('restricted keyword discovery', () => {
       alpha.recordId,
       zulu.recordId,
     ])
-    expect((await request('/api/search/records?sort=invalid', manager)).status).toBe(
-      400,
-    )
+    expect(
+      (await request('/api/search/records?sort=invalid', manager)).status,
+    ).toBe(400)
   })
-  dbIt('presents normalized duplicate titles once before pagination', async () => {
+  dbIt('matches whole title words only and preserves visibility', async () => {
     const stamp = crypto.randomUUID().replaceAll('-', '')
-    const keyword = `Duplicate ${stamp}`
+    const exact = await fixture(
+      'ACCEPTED',
+      false,
+      `Farmer ${stamp}`,
+      `Writer ${stamp}`,
+    )
+    await fixture('ACCEPTED', false, `Farmers ${stamp}`, `Writer ${stamp}`)
+    await fixture('ACCEPTED', true, `Other ${stamp}`, `Farmer ${stamp}`)
     await fixture(
       'ACCEPTED',
       false,
-      `Duplicate  Paper ${stamp}`,
-      `Earlier Author ${stamp}`,
-      [keyword],
+      `Hidden Farmer ${stamp}`,
+      'Author',
+      [],
+      'RESTRICTED',
     )
-    const latest = await fixture(
-      'ACCEPTED',
+    await fixture(
+      'PENDING',
       false,
-      `duplicate paper ${stamp}`,
-      `Latest Author ${stamp}`,
-      [keyword],
+      `Pending Farmer ${stamp}`,
+      `Writer ${stamp}`,
     )
-
-    const queried = (await (
-      await request(`/api/search/records?q=${stamp}&sort=title`, manager)
-    ).json()) as { items: { id: string }[] }
-    expect(queried.items.map((item) => item.id)).toEqual([latest.recordId])
-
-    const blankBrowse = (await (
-      await request(
-        `/api/search/records?q=&sort=newest&keyword=${encodeURIComponent(keyword)}`,
-        manager,
-      )
-    ).json()) as { items: { id: string }[]; hasMore: boolean }
-    expect(blankBrowse.items.map((item) => item.id)).toEqual([latest.recordId])
-    expect(blankBrowse.hasMore).toBe(false)
-  })
-  dbIt('indexes idempotently, matches full text and metadata, and excludes pending/rejected/queued records', async () => {
-    const accepted = await fixture('ACCEPTED')
-    const queued = await fixture('ACCEPTED', false)
-    await fixture('PENDING')
-    await fixture('REJECTED')
-    const prepared = await Promise.all(
-      [1, 2].map(() =>
-        request('/api/search/index', manager, { recordId: accepted.recordId }),
-      ),
-    )
-    for (const response of prepared) expect(response.status).toBe(200)
-    const counts = await Promise.all(
-      prepared.map((r) => r.json() as Promise<{ indexed: number }>),
-    )
-    expect(counts.reduce((n, r) => n + r.indexed, 0)).toBe(1)
-    expect(
-      await (
-        await request('/api/search/index', manager, {
-          recordId: queued.recordId,
-        })
-      ).json(),
-    ).toMatchObject({ indexed: 0 })
-    // Full-text-only terms match just the extracted record; title/author
-    // metadata matches both the READY record and the still-queued one.
-    const fullText = await request(
-      `/api/search/records?q=${encodeURIComponent(`photovoltaic ${tag}`)}`,
-      manager,
-    )
-    expect(fullText.status).toBe(200)
-    expect(fullText.headers.get('cache-control')).toContain('no-store')
-    const fullTextBody = (await fullText.json()) as {
-      items: { id: string; fullTextStatus: string; snippet: string | null }[]
-    }
-    expect(fullTextBody.items.map((x) => x.id)).toEqual([accepted.recordId])
-    expect(fullTextBody.items[0].fullTextStatus).toBe('READY')
-    expect(fullTextBody.items[0].snippet).not.toMatch(/\s{2,}/)
-    expect(fullTextBody.items[0].snippet).toMatch(/…$/)
-    expect(fullTextBody.items[0].snippet!.length).toBeLessThanOrEqual(401)
-    const browseBody = (await (
-      await request('/api/search/records?q=&sort=newest', manager)
-    ).json()) as { items: { id: string; snippet: string | null }[] }
-    expect(
-      browseBody.items.find((item) => item.id === accepted.recordId)?.snippet,
-    ).toBeNull()
-    for (const query of [`Study ${tag}`, `Author ${tag}`]) {
+    for (const token of [null, user]) {
       const response = await request(
-        `/api/search/records?q=${encodeURIComponent(query)}`,
-        manager,
+        `/api/search/records?scope=title&q=FARMER+${stamp}`,
+        token,
       )
       expect(response.status).toBe(200)
       const body = (await response.json()) as {
-        items: {
-          id: string
-          fullTextStatus: string
-          snippet: string | null
-          schoolName: string | null
-          courseName: string | null
-        }[]
+        items: { id: string; snippet: string | null }[]
       }
-      // Both records match by metadata; their relative order is rank detail.
-      expect(body.items.map((x) => x.id).sort()).toEqual(
+      expect(body.items.map((item) => item.id)).toEqual([exact.recordId])
+      expect(body.items[0].snippet).toBeNull()
+    }
+    expect(
+      (await request('/api/search/records?scope=invalid', null)).status,
+    ).toBe(400)
+    const contentOnly = await request(
+      `/api/search/records?scope=title&q=photovoltaic+${tag}`,
+      manager,
+    )
+    expect(((await contentOnly.json()) as { items: unknown[] }).items).toEqual(
+      [],
+    )
+  })
+  dbIt(
+    'presents normalized duplicate titles once before pagination',
+    async () => {
+      const stamp = crypto.randomUUID().replaceAll('-', '')
+      const keyword = `Duplicate ${stamp}`
+      await fixture(
+        'ACCEPTED',
+        false,
+        `Duplicate  Paper ${stamp}`,
+        `Earlier Author ${stamp}`,
+        [keyword],
+      )
+      const latest = await fixture(
+        'ACCEPTED',
+        false,
+        `duplicate paper ${stamp}`,
+        `Latest Author ${stamp}`,
+        [keyword],
+      )
+
+      const queried = (await (
+        await request(`/api/search/records?q=${stamp}&sort=title`, manager)
+      ).json()) as { items: { id: string }[] }
+      expect(queried.items.map((item) => item.id)).toEqual([latest.recordId])
+
+      const blankBrowse = (await (
+        await request(
+          `/api/search/records?q=&sort=newest&keyword=${encodeURIComponent(keyword)}`,
+          manager,
+        )
+      ).json()) as { items: { id: string }[]; hasMore: boolean }
+      expect(blankBrowse.items.map((item) => item.id)).toEqual([
+        latest.recordId,
+      ])
+      expect(blankBrowse.hasMore).toBe(false)
+    },
+  )
+  dbIt(
+    'indexes idempotently, matches full text and metadata, and excludes pending/rejected/queued records',
+    async () => {
+      const accepted = await fixture('ACCEPTED')
+      const queued = await fixture('ACCEPTED', false)
+      await fixture('PENDING')
+      await fixture('REJECTED')
+      const prepared = await Promise.all(
+        [1, 2].map(() =>
+          request('/api/search/index', manager, {
+            recordId: accepted.recordId,
+          }),
+        ),
+      )
+      for (const response of prepared) expect(response.status).toBe(200)
+      const counts = await Promise.all(
+        prepared.map((r) => r.json() as Promise<{ indexed: number }>),
+      )
+      expect(counts.reduce((n, r) => n + r.indexed, 0)).toBe(1)
+      expect(
+        await (
+          await request('/api/search/index', manager, {
+            recordId: queued.recordId,
+          })
+        ).json(),
+      ).toMatchObject({ indexed: 0 })
+      // Full-text-only terms match just the extracted record; title/author
+      // metadata matches both the READY record and the still-queued one.
+      const fullText = await request(
+        `/api/search/records?q=${encodeURIComponent(`photovoltaic ${tag}`)}`,
+        manager,
+      )
+      expect(fullText.status).toBe(200)
+      expect(fullText.headers.get('cache-control')).toContain('no-store')
+      const fullTextBody = (await fullText.json()) as {
+        items: { id: string; fullTextStatus: string; snippet: string | null }[]
+      }
+      expect(fullTextBody.items.map((x) => x.id)).toEqual([accepted.recordId])
+      expect(fullTextBody.items[0].fullTextStatus).toBe('READY')
+      expect(fullTextBody.items[0].snippet).not.toMatch(/\s{2,}/)
+      expect(fullTextBody.items[0].snippet).toMatch(/…$/)
+      expect(fullTextBody.items[0].snippet!.length).toBeLessThanOrEqual(401)
+      const browseBody = (await (
+        await request('/api/search/records?q=&sort=newest', manager)
+      ).json()) as { items: { id: string; snippet: string | null }[] }
+      expect(
+        browseBody.items.find((item) => item.id === accepted.recordId)?.snippet,
+      ).toBeNull()
+      for (const query of [`Study ${tag}`, `Author ${tag}`]) {
+        const response = await request(
+          `/api/search/records?q=${encodeURIComponent(query)}`,
+          manager,
+        )
+        expect(response.status).toBe(200)
+        const body = (await response.json()) as {
+          items: {
+            id: string
+            fullTextStatus: string
+            snippet: string | null
+            schoolName: string | null
+            courseName: string | null
+          }[]
+        }
+        // Both records match by metadata; their relative order is rank detail.
+        expect(body.items.map((x) => x.id).sort()).toEqual(
+          [accepted.recordId, queued.recordId].sort(),
+        )
+        const pending = body.items.find((x) => x.id === queued.recordId)!
+        expect(pending.fullTextStatus).toBe('PENDING')
+        expect(pending.snippet).toBeNull()
+        expect(pending.schoolName).toBe(schoolName)
+        expect(pending.courseName).toBe(courseName)
+      }
+      // Failed extraction keeps the accepted record visible by metadata only:
+      // labeled FAILED, no snippet, excluded from full-text ranking.
+      const db = testDb()
+      await db
+        .update(processingJobs)
+        .set({ status: 'FAILED' })
+        .where(eq(processingJobs.recordId, accepted.recordId!))
+      const failedBody = (await (
+        await request(`/api/search/records?q=${tag}`, manager)
+      ).json()) as {
+        items: { id: string; fullTextStatus: string; snippet: string | null }[]
+      }
+      // Both the failed record and the still-queued record match by metadata.
+      expect(failedBody.items.map((x) => x.id).sort()).toEqual(
         [accepted.recordId, queued.recordId].sort(),
       )
-      const pending = body.items.find((x) => x.id === queued.recordId)!
-      expect(pending.fullTextStatus).toBe('PENDING')
-      expect(pending.snippet).toBeNull()
-      expect(pending.schoolName).toBe(schoolName)
-      expect(pending.courseName).toBe(courseName)
-    }
-    // Failed extraction keeps the accepted record visible by metadata only:
-    // labeled FAILED, no snippet, excluded from full-text ranking.
-    const db = testDb()
-    await db
-      .update(processingJobs)
-      .set({ status: 'FAILED' })
-      .where(eq(processingJobs.recordId, accepted.recordId!))
-    const failedBody = (await (
-      await request(`/api/search/records?q=${tag}`, manager)
-    ).json()) as {
-      items: { id: string; fullTextStatus: string; snippet: string | null }[]
-    }
-    // Both the failed record and the still-queued record match by metadata.
-    expect(failedBody.items.map((x) => x.id).sort()).toEqual(
-      [accepted.recordId, queued.recordId].sort(),
-    )
-    const failedItem = failedBody.items.find(
-      (x) => x.id === accepted.recordId,
-    )!
-    expect(failedItem.fullTextStatus).toBe('FAILED')
-    expect(failedItem.snippet).toBeNull()
-    expect(
-      failedBody.items.find((x) => x.id === queued.recordId)!.fullTextStatus,
-    ).toBe('PENDING')
-    await db
-      .update(processingJobs)
-      .set({ status: 'EXTRACTED' })
-      .where(eq(processingJobs.recordId, accepted.recordId!))
-    // Rejecting the submission hides it; the still-accepted queued record
-    // remains visible by metadata.
-    await db
-      .update(submissions)
-      .set({ status: 'REJECTED' })
-      .where(eq(submissions.id, accepted.id))
-    const rejectedBody = (await (
-      await request(`/api/search/records?q=${tag}`, manager)
-    ).json()) as { items: { id: string }[] }
-    expect(rejectedBody.items.map((x) => x.id)).toEqual([queued.recordId])
-    await db
-      .update(submissions)
-      .set({ status: 'ACCEPTED' })
-      .where(eq(submissions.id, accepted.id))
-    const chunks = await db.execute(
-      sql`select count(*)::int as n from document_chunks d join keyword_indexes i on i.id = d.index_id where i.record_id = ${accepted.recordId}`,
-    )
-    expect(chunks.rows[0].n).toBe(1)
-    expect((await request('/api/search/records?page=0', manager)).status).toBe(
-      400,
-    )
-    expect(
-      (await request(`/api/search/records?q=${'a'.repeat(201)}`, manager))
-        .status,
-    ).toBe(400)
-  })
+      const failedItem = failedBody.items.find(
+        (x) => x.id === accepted.recordId,
+      )!
+      expect(failedItem.fullTextStatus).toBe('FAILED')
+      expect(failedItem.snippet).toBeNull()
+      expect(
+        failedBody.items.find((x) => x.id === queued.recordId)!.fullTextStatus,
+      ).toBe('PENDING')
+      await db
+        .update(processingJobs)
+        .set({ status: 'EXTRACTED' })
+        .where(eq(processingJobs.recordId, accepted.recordId!))
+      // Rejecting the submission hides it; the still-accepted queued record
+      // remains visible by metadata.
+      await db
+        .update(submissions)
+        .set({ status: 'REJECTED' })
+        .where(eq(submissions.id, accepted.id))
+      const rejectedBody = (await (
+        await request(`/api/search/records?q=${tag}`, manager)
+      ).json()) as { items: { id: string }[] }
+      expect(rejectedBody.items.map((x) => x.id)).toEqual([queued.recordId])
+      await db
+        .update(submissions)
+        .set({ status: 'ACCEPTED' })
+        .where(eq(submissions.id, accepted.id))
+      const chunks = await db.execute(
+        sql`select count(*)::int as n from document_chunks d join keyword_indexes i on i.id = d.index_id where i.record_id = ${accepted.recordId}`,
+      )
+      expect(chunks.rows[0].n).toBe(1)
+      expect(
+        (await request('/api/search/records?page=0', manager)).status,
+      ).toBe(400)
+      expect(
+        (await request(`/api/search/records?q=${'a'.repeat(201)}`, manager))
+          .status,
+      ).toBe(400)
+    },
+  )
   dbIt('displays keywords and filters by exact normalized term', async () => {
     const stamp = crypto.randomUUID().replaceAll('-', '')
     const term = `Filter Kw ${stamp}`
@@ -404,9 +464,7 @@ needsDb('restricted keyword discovery', () => {
       const browse = (await (
         await request(`/api/search/records?q=${stamp}`, token)
       ).json()) as { items: { id: string }[] }
-      expect(browse.items.map((x) => x.id)).not.toContain(
-        restricted.recordId,
-      )
+      expect(browse.items.map((x) => x.id)).not.toContain(restricted.recordId)
     }
     // Managers see the restricted record WITH its keywords.
     const managed = (await (

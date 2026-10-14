@@ -14,6 +14,8 @@ import {
 } from './notifications'
 import type { Env, QueueMessageLike } from './config'
 import { indexExtractedRecords, KEYWORD_SWEEP_BATCH } from './search'
+import { expireAssistantRequests } from './assistant-routes'
+import { DOI_SWEEP_BATCH, sweepDoiEnrichment } from './doi'
 
 const app = createApp(productionVerifier)
 
@@ -116,7 +118,17 @@ export default {
       limit: KEYWORD_SWEEP_BATCH,
     })
     if (result.indexed > 0) {
-      console.log(`keyword index sweep indexed=${result.indexed} hasMore=${result.hasMore}`)
+      console.log(
+        `keyword index sweep indexed=${result.indexed} hasMore=${result.hasMore}`,
+      )
+    }
+    await expireAssistantRequests(db)
+    const doi = await sweepDoiEnrichment(db, {
+      limit: DOI_SWEEP_BATCH,
+      contactEmail: env.DOI_CONTACT_EMAIL ?? env.REO_MAILBOX,
+    })
+    if (doi.checked > 0) {
+      console.log(`doi sweep checked=${doi.checked} matched=${doi.matched}`)
     }
   },
 }

@@ -26,6 +26,10 @@ export type QuotaBucket =
   | 'auth_global'
   /** Per signed-in profile (production). */
   | 'user'
+  /** Production-only interactive Semantic Search pool. */
+  | 'semantic_global'
+  /** Production-only Assistant retrieval pool. */
+  | 'assistant_retrieval_global'
 
 export interface QuotaLimits {
   /** Maximum API requests per UTC day. */
@@ -78,6 +82,51 @@ export const QUERY_LIMITS: Record<'anonymous' | 'authenticated', QuotaLimits> =
     anonymous: { maxRequests: 20, maxInputs: 20 },
     authenticated: { maxRequests: 50, maxInputs: 50 },
   }
+
+const MAX_INTERACTIVE_REQUESTS_PER_DAY = 1000
+
+/** Parse a request-only interactive limit with a code-owned hard ceiling. */
+export function interactiveLimits(
+  raw: string | undefined,
+  fallback: number,
+): QuotaLimits {
+  const parsed = raw && /^\d+$/.test(raw) ? Number(raw) : fallback
+  const maxRequests =
+    Number.isSafeInteger(parsed) && parsed > 0
+      ? Math.min(parsed, MAX_INTERACTIVE_REQUESTS_PER_DAY)
+      : fallback
+  return { maxRequests, maxInputs: maxRequests }
+}
+
+export interface QueryQuotaPolicy {
+  globalBucket: QuotaBucket
+  global: QuotaLimits
+  authenticatedUser: QuotaLimits
+}
+
+/**
+ * Unset production values deliberately retain the legacy shared staging pool.
+ * Production gets a separate semantic bucket so corpus embedding and Assistant
+ * retrieval cannot unexpectedly consume interactive search capacity.
+ */
+export function queryQuotaPolicy(
+  rawGlobal: string | undefined,
+  rawUser: string | undefined,
+  sharedFallback: QuotaLimits = DEV_LIMITS,
+): QueryQuotaPolicy {
+  if (!rawGlobal && !rawUser) {
+    return {
+      globalBucket: 'dev_global',
+      global: sharedFallback,
+      authenticatedUser: QUERY_LIMITS.authenticated,
+    }
+  }
+  return {
+    globalBucket: 'semantic_global',
+    global: interactiveLimits(rawGlobal, 500),
+    authenticatedUser: interactiveLimits(rawUser, 10),
+  }
+}
 
 export interface QuotaResult {
   allowed: boolean
@@ -165,33 +214,36 @@ export interface QueryQuotaRequest {
 export async function consumeQueryQuota(
   db: Db,
   request: QueryQuotaRequest,
-  devLimits: QuotaLimits = DEV_LIMITS,
+  policy: QueryQuotaPolicy = queryQuotaPolicy(undefined, undefined),
 ): Promise<QuotaResult> {
-  const dev = await consumeQuota(db, 'dev_global', 'all', 1, 1, devLimits)
-  if (!dev.allowed) return dev
+  const global = await consumeQuota(
+    db,
+    policy.globalBucket,
+    'all',
+    1,
+    1,
+    policy.global,
+  )
+  if (!global.allowed) return global
 
   if (request.viewer === 'PUBLIC') {
     return consumeQuota(db, 'anon_global', 'all', 1, 1, QUERY_LIMITS.anonymous)
   }
-  if (request.viewer === 'UA_USER' && request.profileId) {
+  if (request.profileId) {
     return consumeQuota(
       db,
       'user',
       request.profileId,
       1,
       1,
-      QUERY_LIMITS.authenticated,
+      policy.authenticatedUser,
     )
   }
-  // Managers share the authenticated pool.
-  return consumeQuota(
-    db,
-    'auth_global',
-    'all',
-    1,
-    1,
-    QUERY_LIMITS.authenticated,
-  )
+  return {
+    allowed: false,
+    reason: 'authenticated profile required',
+    used: global.used,
+  }
 }
 
 export function viewerFromProfile(

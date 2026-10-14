@@ -19,6 +19,11 @@ ALLOWED_ORIGINS = "http://localhost:5174"
 # frozen run. Production and staging now use the code-owned defaults.
 EMBEDDING_DAILY_REQUEST_LIMIT = "20"
 EMBEDDING_DAILY_INPUT_LIMIT = "2000"
+# Owner-approved 2026-10-13: combine semantic and keyword evidence. The
+# 2026-10-13 discovery revision keeps 0.36 as the confident band, allows a
+# bounded exploratory band through 0.40, and labels lexical-only fallback.
+SEMANTIC_SEARCH_MODE = "hybrid"
+SEMANTIC_DISCOVERY_MAX_SCORE = "0.40"
 
 # Private staging storage. Browser access remains Worker-authorized only.
 [[r2_buckets]]

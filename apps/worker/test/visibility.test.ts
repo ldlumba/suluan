@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
-import { researchRecords, submissions } from '@suluan/db/schema'
+import { recordAuthors, researchRecords, submissions } from '@suluan/db/schema'
 import {
   deleteAuditEvents,
   deleteProfiles,
@@ -128,7 +128,9 @@ needsDb('record visibility and submitter status', () => {
     visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED',
     embargoUntil?: string,
   ): Promise<Response & { submissionId: string; status: number }> {
-    const submissionId = await submitPaper(`Vis ${visibility} ${tag}`)
+    const submissionId = await submitPaper(
+      `Vis ${visibility} ${tag} ${submissionIds.length}`,
+    )
     const res = await post('/api/decisions', manager, {
       submissionId,
       status: 'ACCEPTED',
@@ -388,11 +390,26 @@ needsDb('record visibility and submitter status', () => {
         title: string
         visibility: string
         keywords: string[]
+        authorList: string[]
       }
       expect(publicBody.id).toBe(publicPaper.recordId)
       expect(publicBody.title).toContain(tag)
       expect(publicBody.visibility).toBe('PUBLIC')
       expect(publicBody.keywords).toEqual([])
+      // Fixtures submit no authors, so the ordered list falls back to empty.
+      expect(publicBody.authorList).toEqual([])
+
+      // Ordered repository authors are exposed verbatim for citation use.
+      await testDb()
+        .insert(recordAuthors)
+        .values([
+          { recordId: publicPaper.recordId, name: 'Second, Bea', position: 1 },
+          { recordId: publicPaper.recordId, name: 'First, Ana', position: 0 },
+        ])
+      const withAuthors = (await (
+        await get(`/api/records/${publicPaper.recordId}`, null)
+      ).json()) as { authorList: string[] }
+      expect(withAuthors.authorList).toEqual(['First, Ana', 'Second, Bea'])
 
       // UA-only and restricted records use the same 404 boundary for visitors,
       // while authorized viewers receive metadata.

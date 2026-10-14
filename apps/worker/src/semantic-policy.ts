@@ -8,3 +8,19 @@ export function semanticMaxScore(raw?: string): number {
   }
   return value
 }
+
+/**
+ * Broader discovery ceiling used only for honestly labeled exploratory results.
+ * Unset preserves the strict ceiling; an invalid or narrower value fails closed.
+ */
+export function semanticDiscoveryMaxScore(
+  raw: string | undefined,
+  confidentMaxScore: number,
+): number {
+  if (raw === undefined) return confidentMaxScore
+  const value = semanticMaxScore(raw)
+  if (value < confidentMaxScore) {
+    throw new Error('Semantic discovery score must include the confident band')
+  }
+  return value
+}

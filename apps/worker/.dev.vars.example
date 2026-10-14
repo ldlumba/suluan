@@ -23,3 +23,13 @@ GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
 GMAIL_REFRESH_TOKEN=
 GMAIL_SENDER=
+# Optional research assistant. Keep unset until the target environment passes
+# its registered gate; never put the regional service's Gemini key here.
+ASSISTANT_SERVICE_URL=
+ASSISTANT_SERVICE_ACCOUNT=
+ASSISTANT_SERVICE_AUDIENCE=
+# Exact owner-confirmed eligible pilot emails, comma-separated. Empty denies all.
+ASSISTANT_PILOT_EMAILS=
+# Optional contact email for the Crossref polite pool (User-Agent/mailto).
+# Falls back to the REO mailbox when empty; DOI enrichment works either way.
+DOI_CONTACT_EMAIL=

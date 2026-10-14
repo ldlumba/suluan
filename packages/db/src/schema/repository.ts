@@ -38,6 +38,21 @@ export const researchRecords = pgTable('research_records', {
   abstract: text('abstract'),
   /** Calendar year when REO accepted the paper into the repository. */
   year: integer('year').notNull(),
+  /**
+   * Automated external-publication enrichment (owner-approved 2026-10-11):
+   * exact-title-match Crossref metadata, auto-attached without manager
+   * action. Null means no verified external publication (or not yet
+   * checked — see doiCheckedAt). Never filled by guessing.
+   */
+  doi: text('doi'),
+  venue: text('venue'),
+  volume: text('volume'),
+  issue: text('issue'),
+  pages: text('pages'),
+  /** Publication year reported by the external registry, if any. */
+  pubYear: integer('pub_year'),
+  doiSource: text('doi_source'),
+  doiCheckedAt: timestamp('doi_checked_at', { withTimezone: true }),
   /** Managers set this at review time; PUBLIC is the default. */
   visibility: recordVisibility('visibility').notNull().default('PUBLIC'),
   /**

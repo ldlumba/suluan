@@ -18,7 +18,7 @@ import {
   submissionFiles,
   submissions,
 } from '@suluan/db/schema'
-import { inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { neon } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-http'
 import { createApp } from '../src/app'
@@ -233,6 +233,13 @@ export async function insertProfile(
     .insert(profiles)
     .values({ firebaseUid: uid, email, role })
     .returning()
+  if (role === 'ADMIN') {
+    await db.execute(sql`
+      update role_management_state
+      set admin_count = admin_count + 1, updated_at = now()
+      where singleton = true
+    `)
+  }
   return profile
 }
 
@@ -269,7 +276,23 @@ export async function deleteSubmissions(db: Db, ids: string[]) {
 
 export async function deleteProfiles(db: Db, uids: string[]) {
   if (uids.length === 0) return
+  const admins = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(
+      and(
+        inArray(profiles.firebaseUid, uids),
+        eq(profiles.role, 'ADMIN'),
+      ),
+    )
   await db.delete(profiles).where(inArray(profiles.firebaseUid, uids))
+  if (admins.length) {
+    await db.execute(sql`
+      update role_management_state
+      set admin_count = admin_count - ${admins.length}, updated_at = now()
+      where singleton = true
+    `)
+  }
 }
 
 /** Remove every submission (and its reachable rows) for the given submitter uids. */
