@@ -68,6 +68,21 @@ remain. No staging/development resource, credential, or row has been reused.
   submission notice with downloadable PDF attachment and the submitter
   rejection notice with exact remarks (owner-confirmed 2026-10-14).
 
+### Corpus import evidence — 2026-10-14
+
+- Governed folder `2026 PAPERS` verified locally: 157 documents =
+  139 with manifests plus 18 intentional skips (11 no-manifest, 7
+  `[NO TITLE]`), matching the staging corpus identity.
+- Importer dry-run against the production API: 139 ready, 18 skipped,
+  0 errors, 0 warnings. Apply created 139 unique `PENDING` submissions
+  with zero new decisions or repository records (plus the earlier
+  REJECTED Gmail fixture), confirming non-leakage. Immediate replay
+  would return the same IDs per environment-scoped idempotency.
+- Individual owner review/acceptance of all 139 is now due in the
+  production review queue (50 per batch); the 15-minute scheduler
+  extracts acceptances automatically and the 5-minute sweep indexes
+  them for keyword search.
+
 SULUAN will launch as a real production service temporarily owned, operated,
 and billed by the project owner. Institutional handover remains required. The
 production environment must not reuse development or staging data resources,
