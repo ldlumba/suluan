@@ -97,6 +97,17 @@ remain. No staging/development resource, credential, or row has been reused.
   extracts acceptances automatically and the 5-minute sweep indexes
   them for keyword search.
 
+### Embedding backfill — day 1 (2026-10-15, temporary 160/2,000 ceiling)
+
+- Paced manual executions (1 claim each, ~60s apart, zero retries):
+  101 requests / 1,989 inputs consumed, 3,070/4,107 chunks embedded,
+  1,037 missing. Loop stopped on the inputs guard as designed.
+- One execution hit a transient Gemini 503 (`UNAVAILABLE`) and exited 1
+  with no automatic retry; its pre-consumed quota was not refunded and
+  later claims embedded the remaining chunks (embed-once storage
+  guarantee intact). Remainder (~1,037 inputs, ~50 requests) fits in one
+  fresh UTC day, then the ceiling reverts to 20/2,000.
+
 ### Extraction completion evidence — 2026-10-15
 
 - All 139 accepted papers individually reviewed; 139 repository records
