@@ -108,6 +108,14 @@ remain. No staging/development resource, credential, or row has been reused.
   guarantee intact). Remainder (~1,037 inputs, ~50 requests) fits in one
   fresh UTC day, then the ceiling reverts to 20/2,000.
 
+### Embedding completion evidence — 2026-10-16
+
+- Day 2 consumed 54 requests / 1,037 inputs for the final 1,037 chunks:
+  4,107 chunks / 4,107 vectors / 0 missing, all vectors 768-dim,
+  211 document claims with zero open/expired-unclosed. Temporary ceiling
+  reverted to 20/2,000 the same day (deployed). Total backfill spend:
+  155 requests / 3,026 inputs across two UTC days.
+
 ### Extraction completion evidence — 2026-10-15
 
 - All 139 accepted papers individually reviewed; 139 repository records
