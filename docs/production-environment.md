@@ -108,6 +108,21 @@ remain. No staging/development resource, credential, or row has been reused.
   guarantee intact). Remainder (~1,037 inputs, ~50 requests) fits in one
   fresh UTC day, then the ceiling reverts to 20/2,000.
 
+### Production AI canary — 2026-10-16 (owner-authenticated)
+
+- Semantic positive `study about farmers`: 200, `semanticStatus:
+  ready`, farming papers rank-1 (FARMARKET top) in 5.7s. Negative
+  `quantum entanglement photon teleportation`: 200 with zero items
+  (clean abstention, no spurious fallback).
+- Assistant `What SULUAN papers help local farmers in Pampanga?`:
+  200, `grounded_answer` in 8.6s naming real corpus papers (AgriKlima,
+  FARMARKET). Server accounting: 1/10 user + 1/300 aggregate Assistant,
+  retrieval in its own pool, semantic in `semantic_global` +
+  per-profile pool, document pool untouched.
+- Earlier tab-state hangs during probing were a wedged automation-renderer
+  session (resolved by fresh sign-in), not a deployment fault: no quota
+  was consumed by the timed-out attempts and no ticket was stranded.
+
 ### Embedding completion evidence — 2026-10-16
 
 - Day 2 consumed 54 requests / 1,037 inputs for the final 1,037 chunks:
