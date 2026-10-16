@@ -34,7 +34,7 @@ export function HomePage() {
   })
 
   return (
-    <div className="relative left-1/2 -mt-8 w-screen -translate-x-1/2 lg:-mt-12">
+    <div className="relative left-1/2 -mt-8 -mb-8 w-screen -translate-x-1/2 lg:-mt-12 lg:-mb-12">
       <section className="relative overflow-hidden bg-[var(--primary)] px-4 py-20 text-white sm:px-6 sm:py-28 lg:px-8">
         <div
           className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full border-[28px] border-[var(--highlight)]/90 sm:size-96"

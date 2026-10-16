@@ -328,16 +328,57 @@ export function RootLayout() {
         <Outlet />
       </main>
       <footer className="border-t border-[var(--border)] bg-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-[var(--ink-muted)] sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>
-            © {new Date().getFullYear()} University of the Assumption · SULUAN
-          </p>
-          <p className="text-xs">A governed home for UA research.</p>
-          <p className="text-xs">
-            <Link to="/privacy" className="underline hover:text-foreground">
-              Privacy notice
-            </Link>
-          </p>
+        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-9 text-sm text-[var(--ink-muted)] sm:px-6 md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1fr)] lg:px-8">
+          <div>
+            <p className="font-medium text-foreground">
+              © {new Date().getFullYear()} University of the Assumption · SULUAN
+            </p>
+            <p className="mt-2 text-xs">A governed home for UA research.</p>
+          </div>
+
+          <nav aria-label="Footer navigation">
+            <p className="text-xs font-semibold text-foreground">Explore</p>
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+              <Link
+                to="/search"
+                className="underline decoration-[var(--border)] underline-offset-4 hover:text-foreground"
+              >
+                Search
+              </Link>
+              <Link
+                to="/graph"
+                className="underline decoration-[var(--border)] underline-offset-4 hover:text-foreground"
+              >
+                Research graph
+              </Link>
+              <Link
+                to="/assistant"
+                className="underline decoration-[var(--border)] underline-offset-4 hover:text-foreground"
+              >
+                Research assistant
+              </Link>
+              <Link
+                to="/submit"
+                className="underline decoration-[var(--border)] underline-offset-4 hover:text-foreground"
+              >
+                Submit research
+              </Link>
+            </div>
+          </nav>
+
+          <div className="text-xs md:text-right">
+            <p className="leading-5 text-foreground">
+              Developed by Team CTRL+F: Lumba, Tayag, Dizon
+            </p>
+            <p className="mt-3">
+              <Link
+                to="/privacy"
+                className="underline decoration-[var(--border)] underline-offset-4 hover:text-foreground"
+              >
+                Privacy notice
+              </Link>
+            </p>
+          </div>
         </div>
       </footer>
     </div>

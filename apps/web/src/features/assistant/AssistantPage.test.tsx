@@ -83,6 +83,14 @@ describe('assistant UI boundaries', () => {
     )
     expect(screen.getByRole('button', { name: 'Ask assistant' })).toBeEnabled()
   })
+  it('discloses the personal and shared daily limits', async () => {
+    page()
+    await screen.findByLabelText('Your research question')
+    const disclosure = await screen.findByText('Privacy and AI limitations')
+    expect(disclosure.closest('details')).toHaveTextContent(
+      'Usage is limited to 10 messages per account and 130 shared messages across all users per UTC day.',
+    )
+  })
   it('shows non-interactive examples and sends from the chat composer with Enter', async () => {
     let finish!: (value: unknown) => void
     vi.mocked(apiFetch).mockImplementation(async (path) => {

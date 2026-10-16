@@ -27,6 +27,12 @@ describe('app routing', () => {
     expect(
       screen.getByRole('link', { name: /Explore the repository/i }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByText('Developed by Team CTRL+F: Lumba, Tayag, Dizon'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', { name: 'Footer navigation' }),
+    ).toBeInTheDocument()
   })
 
   it('renders the sign-in screen at /signin', () => {

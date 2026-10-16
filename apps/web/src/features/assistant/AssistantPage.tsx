@@ -512,6 +512,14 @@ function AssistantConversation() {
               Provider terms
             </a>
             . Failed attempts can count toward limits.
+            {limits && (
+              <>
+                {' '}
+                Usage is limited to {limits.messagesPerUserPerDay} messages per
+                account and {limits.messagesPerDay} shared messages across all
+                users per UTC day.
+              </>
+            )}
           </p>
         </details>
         <Link
