@@ -12,7 +12,7 @@
 ## SULUAN frontend architecture
 
 Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alongside the main SULUAN Architecture v1 specification. The handoff locks the approved frontend stack (React Router, Tailwind CSS, shadcn/ui, TanStack Query, React Hook Form, Zod, Lucide, Recharts, React Flow) and browser/backend boundaries; it updates only the frontend — all other Architecture v1 decisions remain in force. Apply its frontend agent rules. Future/TBD items are not authorization to implement.
-  - Assistant quotas were owner-approved 2026-10-06 and revised 2026-10-13: 10 messages/user/UTC day, 300 aggregate/day, 1,000 prompt characters, ten turns, 800 output tokens, five PUBLIC-only evidence chunks. These supersede the handoff's illustrative figures. `/api/assistant/limits` reports server policy and availability; enforcement remains server-side. The adult staging pilot remains exact-email allowlisted.
+  - Assistant quotas were owner-approved 2026-10-06, revised 2026-10-13, and the aggregate reduced 2026-10-16: 10 messages/user/UTC day, 130 aggregate/day, 1,000 prompt characters, ten turns, 800 output tokens, five PUBLIC-only evidence chunks. These supersede the handoff's illustrative figures. `/api/assistant/limits` reports server policy and availability; enforcement remains server-side. The adult staging pilot remains exact-email allowlisted.
 
 ## Project state (verify before assuming)
 

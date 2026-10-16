@@ -20,7 +20,7 @@ const config = {
   used: 0,
   limits: {
     messagesPerUserPerDay: 10,
-    messagesPerDay: 300,
+    messagesPerDay: 130,
     promptChars: 1000,
     turnsPerConversation: 10,
     maxOutputTokens: 800,

@@ -10,10 +10,10 @@ import {
 } from './visibility'
 
 /**
- * Free-tier Gemini policy approved 2026-10-06. Assistant access and evidence
+ * Provider privacy policy approved 2026-10-06. Assistant access and evidence
  * scope are separate: authenticated users may ask, but only PUBLIC evidence is
- * sent to a free-tier provider because its terms may permit submitted content
- * to improve Google's products. This is intentionally narrower than search.
+ * sent to Gemini. This remains intentionally narrower than search even though
+ * production uses the paid tier.
  */
 export const ASSISTANT_EVIDENCE_VIEWER: ViewerRole = 'PUBLIC'
 
@@ -23,7 +23,7 @@ export const ASSISTANT_EVIDENCE_VIEWER: ViewerRole = 'PUBLIC'
  */
 export const ASSISTANT_LIMITS = {
   messagesPerUserPerDay: 10,
-  messagesPerDay: 300,
+  messagesPerDay: 130,
   promptChars: 1000,
   turnsPerConversation: 10,
   maxOutputTokens: 800,

@@ -173,7 +173,7 @@ remain free; current staging traffic is far below the request ceiling.
   aggregate/day. It uses a production-only quota bucket; exhaustion falls back
   to labeled keyword evidence.
 - Any server-verified UA profile may use the Assistant after affirming that they
-  are at least 18. Limits remain 10 messages/user/day, 300 aggregate/day, a
+  are at least 18. Limits are 10 messages/user/day, 130 aggregate/day, a
   10-second cooldown, 1,000 prompt characters, 10 turns, 800 output tokens, and
   five PUBLIC-only evidence chunks.
 - Assistant retrieval has a separate 300-request/day pool. If exhausted, the
@@ -185,6 +185,11 @@ remain free; current staging traffic is far below the request ceiling.
 - Production retains the validated 0.36 confidence ceiling and, by owner
   approval on 2026-10-16, admits scores through 0.40 only as explicitly labeled
   exploratory results.
+- The owner reduced only the shared Assistant generation ceiling from 300 to
+  130 messages/UTC day on 2026-10-16 as an approximate monthly spend control.
+  The 10-message personal ceiling, 500/day Semantic Search pool, and separate
+  300/day Assistant retrieval pool are unchanged. Because provider billing is
+  token-based, this is a usage bound rather than an exact monetary hard cap.
 
 ## Data initialization
 

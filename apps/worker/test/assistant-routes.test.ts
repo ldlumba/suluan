@@ -10,6 +10,7 @@ import {
   reserveAssistant,
   validateAnswer,
 } from '../src/assistant-routes'
+import { ASSISTANT_LIMITS } from '../src/assistant'
 import {
   setupTestAuth,
   testDb,
@@ -324,7 +325,7 @@ dbDescribe('assistant authorization and reservations', () => {
       where actor_key = 'all' and day = (now() at time zone 'UTC')::date`)
     const count = Number(prior.rows[0].requests)
     try {
-      await db.execute(sql`update assistant_usage set requests = 300
+      await db.execute(sql`update assistant_usage set requests = ${ASSISTANT_LIMITS.messagesPerDay}
         where actor_key = 'all' and day = (now() at time zone 'UTC')::date`)
       await db.execute(sql`update assistant_usage set requests = 0,
         last_started_at = now() - interval '1 minute' where actor_key = ${actor}`)

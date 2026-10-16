@@ -5,8 +5,9 @@
 **Production policy approved, provisioning pending (2026-10-14).** Production
 may authorize every server-verified `ua.edu.ph` profile after an 18-or-older
 affirmation. The exact-email allowlist remains the fail-safe default and the
-active staging policy. Production keeps 10 attempts/user/UTC day and 300
-aggregate/day, but retrieval moves to a separate 300-request/day pool so
+active staging policy. Production keeps 10 attempts/user/UTC day and, by owner
+approval on 2026-10-16, 130 aggregate/day. Retrieval retains a separate
+300-request/day pool so
 document embedding and Semantic Search cannot consume Assistant capacity.
 PUBLIC-only evidence, current-index/visibility rechecks, labeled general
 guidance, no tools/actions, and no automatic paid retries remain mandatory.
@@ -40,7 +41,7 @@ confirmed an adult-only staging pilot for `ld_lumba.student@ua.edu.ph` on
 2026-10-10. This is not authorization for every UA account or production.
 
 The owner-approved 2026-10-06 model is `gemini-3-flash-preview`. Limits are server-owned: 10 attempts
-per user/UTC day, 300 aggregate/UTC day, 1,000 prompt UTF-16 code units, ten
+per user/UTC day, 130 aggregate/UTC day, 1,000 prompt UTF-16 code units, ten
 attempts/conversation, 800 output tokens, five evidence chunks. A ten-second
 per-user cooldown and one-day conversation lifetime are implementation bounds.
 Failed paid attempts are not refunded. Staging retrieval consumes the existing
