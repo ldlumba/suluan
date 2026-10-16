@@ -197,9 +197,13 @@ or provider claims. Hash/manifests remain the corpus identity boundary.
 ## Ownership and administration
 
 The project owner is the initial infrastructure, billing, deployment, and
-application administrator. A separate recovery administrator should be added
-before broad availability. First-admin bootstrap must be production-explicit
-and audited; the development promotion script must not be pointed at production.
+application administrator. On 2026-10-16, the owner promoted
+`majtayag.student@ua.edu.ph` from USER to ADMIN through the production Admin
+users page. Authoritative verification found two administrators, a synchronized
+`role_management_state.admin_count` of 2, and the expected `role.changed` audit
+event. This satisfies the separate recovery-administrator gate. First-admin
+bootstrap must be production-explicit and audited; the development promotion
+script must not be pointed at production.
 Subsequent role changes require ADMIN authorization, audit history, stale-write
 protection, and a guard against removing the last administrator.
 
