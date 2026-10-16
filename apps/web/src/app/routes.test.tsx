@@ -63,6 +63,13 @@ describe('app routing', () => {
     ).toBeInTheDocument()
   })
 
+  it('renders the privacy notice at /privacy', () => {
+    renderAt('/privacy')
+    expect(
+      screen.getByRole('heading', { name: 'Privacy notice' }),
+    ).toBeInTheDocument()
+  })
+
   it('renders the not-found screen for unknown routes', () => {
     renderAt('/does-not-exist')
     expect(

@@ -2,6 +2,7 @@ import { createElement, lazy, Suspense } from 'react'
 import { RootLayout } from './layouts/RootLayout'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { PrivacyPage } from './pages/PrivacyPage'
 import { SignInPage } from './pages/SignInPage'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { NewSubmissionPage } from '@/features/submissions/NewSubmissionPage'
@@ -35,6 +36,7 @@ export const routes = [
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/signin', element: <SignInPage /> },
+      { path: '/privacy', element: <PrivacyPage /> },
       // Search is public discovery: no ProtectedRoute wrapper.
       { path: '/search', element: <SearchPage /> },
       { path: '/search/semantic-access', element: <SemanticAccessPage /> },

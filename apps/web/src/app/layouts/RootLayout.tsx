@@ -333,6 +333,11 @@ export function RootLayout() {
             © {new Date().getFullYear()} University of the Assumption · SULUAN
           </p>
           <p className="text-xs">A governed home for UA research.</p>
+          <p className="text-xs">
+            <Link to="/privacy" className="underline hover:text-foreground">
+              Privacy notice
+            </Link>
+          </p>
         </div>
       </footer>
     </div>
