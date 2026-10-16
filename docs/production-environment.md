@@ -182,8 +182,9 @@ remain free; current staging traffic is far below the request ceiling.
 - The paid Gemini tier is required. PUBLIC-only evidence remains deliberately
   narrower than signed-in repository visibility. Users are warned not to submit
   personal, confidential, restricted, or unpublished information.
-- Production uses the validated 0.36 confidence ceiling. The staging-only 0.40
-  exploratory band is not authorized for production without fresh validation.
+- Production retains the validated 0.36 confidence ceiling and, by owner
+  approval on 2026-10-16, admits scores through 0.40 only as explicitly labeled
+  exploratory results.
 
 ## Data initialization
 
@@ -245,3 +246,14 @@ npm run db:bootstrap-admin:production -- --email owner@ua.edu.ph --expected-host
 The command refuses pooled endpoints, refuses a second bootstrap, and writes
 `role.bootstrap_admin` to `audit_events` in the same transaction. Later changes
 must use `/admin/users`; do not use `db:promote-admin` outside development.
+### Production semantic discovery revision — 2026-10-16
+
+- Owner comparison of live staging and production results approved adopting
+  staging's bounded exploratory band in production. `0.36` remains the
+  confident ceiling; scores in `(0.36, 0.40]` are shown only under the existing
+  **Possibly related papers** label. Authentication, visibility, quota,
+  regional transport, hybrid scoring, keyword-fallback provenance, and
+  no-automatic-retry safeguards are unchanged.
+- Production and staging still cannot return identical lists: production holds
+  only the governed 139-paper corpus, while staging also contains pilot and
+  duplicate records.

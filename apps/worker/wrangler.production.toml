@@ -23,8 +23,9 @@ SEMANTIC_USER_DAILY_REQUEST_LIMIT = "10"
 SEMANTIC_SEARCH_MODE = "hybrid"
 SEMANTIC_SCORING_MODE = "log_length_penalized_min"
 SEMANTIC_MAX_SCORE = "0.36"
-# Production does not launch the unvalidated staging-only exploratory band.
-SEMANTIC_DISCOVERY_MAX_SCORE = "0.36"
+# Owner-approved 2026-10-16: retain 0.36 as the confident band and admit the
+# same bounded, explicitly labeled exploratory band used in staging.
+SEMANTIC_DISCOVERY_MAX_SCORE = "0.40"
 SEMANTIC_AUTHENTICATED_ONLY = "true"
 
 ASSISTANT_ACCESS_MODE = "all_authenticated"

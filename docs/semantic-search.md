@@ -8,11 +8,12 @@ terms in titles, metadata, and prepared full text can broaden the result set.
 Keyword-only search remains available as a separate public mode and as the
 fallback when semantic transport or quota is unavailable.
 
-**Production policy approved, provisioning pending (2026-10-14).** Production
-is authenticated-UA-only, limited to 10 semantic queries/profile/UTC day and
-500 aggregate/day in a dedicated quota pool. It uses the independently
-validated `0.36` ceiling only; the staging-only exploratory band through `0.40`
-is excluded. Exhaustion or provider unavailability returns explicitly labeled
+**Production policy active (revised 2026-10-16).** Production is
+authenticated-UA-only, limited to 10 semantic queries/profile/UTC day and 500
+aggregate/day in a dedicated quota pool. The owner approved retaining `0.36`
+as the confident ceiling while adopting staging's bounded exploratory band
+through `0.40`; results in that band are explicitly labeled **Possibly related
+papers**. Exhaustion or provider unavailability returns explicitly labeled
 keyword matches without an automatic paid retry.
 
 ## How it works
@@ -28,9 +29,9 @@ keyword matches without an automatic paid retry.
 4. **Search** — your question is embedded as a `RETRIEVAL_QUERY` and compared
    against every stored vector using cosine distance. Chunks of the same paper
    are grouped. In the authenticated staging canary, the approved
-   length-penalized record scorer uses `0.36` as the confident semantic band and
-   a staging-only `0.40` discovery ceiling for honestly labeled exploratory
-   results. Record-level reciprocal-rank fusion combines up to 100 semantic and
+    length-penalized record scorer uses `0.36` as the confident semantic band and
+    a bounded `0.40` discovery ceiling for honestly labeled exploratory results
+    in staging and production. Record-level reciprocal-rank fusion combines up to 100 semantic and
    100 keyword candidates. If semantic retrieval abstains but exact-term evidence
    exists, those papers remain available as explicitly labeled keyword matches;
    they are never presented as semantic evidence. Normalized duplicate titles
@@ -52,12 +53,12 @@ results are returned under **Keyword matches** with an explicit explanation that
 no confident meaning-based match was found.
 
 The earlier saved-artifact result—27/27 launch targets and 5/5 clean-negative
-abstentions—described the stricter gate and does not validate the new exploratory
-band. The `0.40` value is therefore staging-only pending a fresh broad-query
-holdout covering one-word queries, inflections, natural questions, ambiguous
-topics, multi-result discovery, and clean negatives. The model remains
-`gemini-embedding-001`; no re-embedding or production/anonymous authorization is
-implied.
+abstentions—described the stricter gate and does not independently validate the
+exploratory band. The owner approved the same honestly labeled band for
+authenticated production discovery on 2026-10-16 after comparing live staging
+and production behavior. This is a product-policy decision, not a claim that
+the broader band passed the earlier strict abstention holdout. The model remains
+`gemini-embedding-001`; no re-embedding or anonymous authorization is implied.
 
 Staging Worker `4494b8cf-a43a-410e-85c0-eff677f0eac5` deployed this policy.
 Remote bindings were verified as `0.36` confident, `0.40` discovery,
