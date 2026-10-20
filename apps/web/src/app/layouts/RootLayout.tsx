@@ -200,17 +200,9 @@ export function RootLayout() {
                     </>
                   )}
                   {profile?.role === 'ADMIN' && (
-                    <>
-                      <WorkspaceLink to="/admin/users" onClick={closeWorkspace}>
-                        Account roles
-                      </WorkspaceLink>
-                      <WorkspaceLink
-                        to="/admin/catalog"
-                        onClick={closeWorkspace}
-                      >
-                        Course availability
-                      </WorkspaceLink>
-                    </>
+                    <WorkspaceLink to="/admin/catalog" onClick={closeWorkspace}>
+                      Course availability
+                    </WorkspaceLink>
                   )}
                 </div>
               )}
@@ -221,11 +213,21 @@ export function RootLayout() {
                 <span className="hidden max-w-48 truncate text-xs text-white/60 xl:inline">
                   {user.email}
                 </span>
-                {profile && (
-                  <span className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 text-[0.72rem] font-bold tracking-[0.08em] text-[var(--highlight)]">
-                    {profile.role}
-                  </span>
-                )}
+                {profile &&
+                  (profile.role === 'ADMIN' ? (
+                    <Link
+                      to="/admin/users"
+                      aria-label="Administrator — open account roles"
+                      title="Open account roles"
+                      className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 text-[0.72rem] font-bold tracking-[0.08em] text-[var(--highlight)] transition-colors hover:bg-[var(--highlight)] hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--highlight)]"
+                    >
+                      ADMIN
+                    </Link>
+                  ) : (
+                    <span className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 text-[0.72rem] font-bold tracking-[0.08em] text-[var(--highlight)]">
+                      {profile.role}
+                    </span>
+                  ))}
                 <Button
                   variant="outline"
                   size="sm"
@@ -291,14 +293,9 @@ export function RootLayout() {
                 </MobileLink>
               )}
               {profile?.role === 'ADMIN' && (
-                <>
-                  <MobileLink to="/admin/users" onClick={closeMenu}>
-                    Account roles
-                  </MobileLink>
-                  <MobileLink to="/admin/catalog" onClick={closeMenu}>
-                    Course availability
-                  </MobileLink>
-                </>
+                <MobileLink to="/admin/catalog" onClick={closeMenu}>
+                  Course availability
+                </MobileLink>
               )}
               {manager && (
                 <MobileLink to="/graph/analytics" onClick={closeMenu}>
@@ -308,11 +305,22 @@ export function RootLayout() {
               {user && (
                 <div className="flex items-center justify-between border-t border-white/10 px-3 pt-3 text-xs text-white/60">
                   <span>{user.email}</span>
-                  {profile && (
-                    <span className="font-bold tracking-[0.08em] text-[var(--highlight)]">
-                      {profile.role}
-                    </span>
-                  )}
+                  {profile &&
+                    (profile.role === 'ADMIN' ? (
+                      <Link
+                        to="/admin/users"
+                        onClick={closeMenu}
+                        aria-label="Administrator — open account roles"
+                        title="Open account roles"
+                        className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 font-bold tracking-[0.08em] text-[var(--highlight)] hover:bg-[var(--highlight)] hover:text-[var(--foreground)]"
+                      >
+                        ADMIN
+                      </Link>
+                    ) : (
+                      <span className="font-bold tracking-[0.08em] text-[var(--highlight)]">
+                        {profile.role}
+                      </span>
+                    ))}
                 </div>
               )}
               {user && (

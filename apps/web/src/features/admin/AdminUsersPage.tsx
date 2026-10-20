@@ -136,17 +136,32 @@ export function AdminUsersPage() {
         </Button>
       </header>
 
-      <div className="flex items-start gap-3 rounded-[8px] border border-border bg-white p-4 text-sm leading-6 text-[var(--ink-muted)]">
+      <section
+        aria-labelledby="administrator-only-heading"
+        className="grid gap-4 border-y border-border py-6 sm:grid-cols-[auto_1fr]"
+      >
         <ShieldCheck
-          className="mt-0.5 size-5 shrink-0 text-[var(--primary)]"
+          className="mt-0.5 size-5 text-[var(--primary)]"
           aria-hidden="true"
         />
-        <p>
-          Repository managers can review submissions and operate repository
-          workflows. Administrators can additionally manage roles and course
-          availability.
-        </p>
-      </div>
+        <div>
+          <h2
+            id="administrator-only-heading"
+            className="font-semibold text-foreground"
+          >
+            Administrator-only permissions
+          </h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-[var(--ink-muted)] marker:text-[var(--primary)]">
+            <li>
+              View verified UA accounts and assign User, Repository manager, or
+              Administrator roles.
+            </li>
+            <li>
+              Activate or deactivate courses available for new submissions.
+            </li>
+          </ul>
+        </div>
+      </section>
 
       {accounts.isPending && <p role="status">Loading accounts…</p>}
       {accounts.isError && (

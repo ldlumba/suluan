@@ -1,0 +1,50 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useAuth } from '@/features/auth/useAuth'
+import { apiFetch } from '@/lib/api'
+import { AdminUsersPage } from './AdminUsersPage'
+
+vi.mock('@/features/auth/useAuth', () => ({ useAuth: vi.fn() }))
+vi.mock('@/lib/api', async (original) => ({
+  ...(await original<object>()),
+  apiFetch: vi.fn(),
+}))
+
+describe('account role administration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAuth).mockReturnValue({
+      user: { email: 'admin@ua.edu.ph' },
+      profile: { id: 'admin-1', role: 'ADMIN' },
+      loading: false,
+      getIdToken: async () => 'token',
+    } as never)
+    vi.mocked(apiFetch).mockResolvedValue([])
+  })
+
+  it('lists the implemented permissions exclusive to administrators', async () => {
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <AdminUsersPage />
+      </QueryClientProvider>,
+    )
+
+    expect(
+      screen.getByRole('heading', { name: 'Administrator-only permissions' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/assign User, Repository manager, or Administrator/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/activate or deactivate courses/i),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByText('No verified UA accounts have signed in yet.'),
+    ).toBeInTheDocument()
+  })
+})
