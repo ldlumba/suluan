@@ -8,14 +8,8 @@ import {
   type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ArrowUpRight, Network, Search } from 'lucide-react'
+import { ArrowUpRight, Search } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
@@ -173,26 +167,33 @@ export function GraphPage() {
   const papers = graph.data?.nodes.filter((node) => node.type === 'paper') ?? []
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Network className="size-5" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold">Research relationships</h1>
+    <section className="space-y-8">
+      <header className="grid gap-6 border-b border-[var(--border)] pb-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end">
+        <div>
+          <p className="eyebrow text-[var(--impact)]">Knowledge graph</p>
+          <h1 className="display-heading mt-3 text-4xl font-semibold sm:text-5xl">
+            Research relationships
+          </h1>
         </div>
-        <CardDescription>
+        <p className="border-l-2 border-[var(--archive-gold)] pl-5 text-sm leading-6 text-[var(--ink-muted)]">
           Explore accepted papers through author-provided keywords and
           repository metadata. The graph respects the same access rules as
           search and downloads.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!recordId && (
-          <section className="space-y-8" aria-labelledby="graph-start-heading">
-            <div className="rounded-[25px] bg-[var(--primary)] p-6 text-white sm:p-8">
+        </p>
+      </header>
+
+      {!recordId && (
+        <div className="space-y-12" aria-labelledby="graph-start-heading">
+          <section className="relative overflow-hidden bg-[var(--primary)] p-7 text-white sm:p-10">
+            <div
+              className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full border-[22px] border-[var(--highlight)]/90"
+              aria-hidden="true"
+            />
+            <div className="relative max-w-3xl">
               <p className="eyebrow">Explore the collection differently</p>
               <h2
                 id="graph-start-heading"
-                className="display-heading mt-3 max-w-2xl text-3xl font-semibold sm:text-4xl"
+                className="display-heading mt-3 max-w-2xl text-3xl font-semibold leading-tight sm:text-4xl"
               >
                 Start with a paper, then follow its connections.
               </h2>
@@ -210,164 +211,173 @@ export function GraphPage() {
                 <ArrowUpRight className="size-4" aria-hidden="true" />
               </Link>
             </div>
-
-            <div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="eyebrow text-[var(--impact)]">
-                    Recent research
-                  </p>
-                  <h2 className="display-heading mt-2 text-2xl font-semibold">
-                    Choose a starting point
-                  </h2>
-                </div>
-                <Link
-                  className="text-sm font-semibold text-[var(--primary)] hover:text-[var(--accent)] hover:underline"
-                  to="/search?sort=newest"
-                >
-                  View all papers <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-
-              {recent.isPending && (
-                <p role="status" className="mt-6 text-sm text-muted-foreground">
-                  Loading recent papers…
-                </p>
-              )}
-              {recent.isError && (
-                <p role="alert" className="mt-6 text-sm text-muted-foreground">
-                  Recent papers could not be loaded. Use search to find a paper
-                  to explore.
-                </p>
-              )}
-              {recent.data && recent.data.items.length === 0 && (
-                <div className="mt-6 border-t border-[var(--border)] pt-6">
-                  <p className="font-medium">
-                    No published papers are available yet.
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Once accepted research is published, it will appear here as
-                    a graph entry point.
-                  </p>
-                </div>
-              )}
-              {recent.data && recent.data.items.length > 0 && (
-                <ul className="mt-6 grid gap-3 md:grid-cols-2">
-                  {recent.data.items.slice(0, 6).map((paper) => (
-                    <li key={paper.id}>
-                      <Link
-                        className="group flex h-full flex-col justify-between border-t-2 border-[var(--border)] bg-white p-5 transition-colors hover:border-[var(--accent)] hover:bg-[var(--secondary)]"
-                        to={`/graph?record=${encodeURIComponent(paper.id)}`}
-                      >
-                        <span>
-                          <span className="block font-semibold leading-6 text-foreground group-hover:text-[var(--primary)]">
-                            {paper.title}
-                          </span>
-                          <span className="mt-2 block text-sm text-muted-foreground">
-                            {paper.authors || 'Authors not listed'}
-                          </span>
-                        </span>
-                        <span className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                          <span>
-                            {[paper.year, paper.courseName || paper.schoolName]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </span>
-                          <span className="inline-flex items-center gap-1 font-semibold text-[var(--primary)]">
-                            Explore{' '}
-                            <ArrowUpRight
-                              className="size-3.5"
-                              aria-hidden="true"
-                            />
-                          </span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           </section>
-        )}
-        {graph.isPending && recordId && (
-          <p role="status">Loading relationships…</p>
-        )}
-        {graph.isError && (
-          <p role="alert">
-            {graph.error instanceof ApiError
-              ? graph.error.message
-              : 'Could not load research relationships.'}
-          </p>
-        )}
-        {graph.data && (
-          <>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {(Object.keys(COLORS) as GraphNodeType[]).map((type) => (
-                <span key={type} className="flex items-center gap-1 capitalize">
-                  <span
-                    className="inline-block size-2 rounded-full"
-                    style={{ backgroundColor: COLORS[type] }}
-                  />
-                  {type}
-                </span>
-              ))}
+
+          <section aria-labelledby="recent-research-heading">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="eyebrow text-[var(--impact)]">Recent research</p>
+                <h2
+                  id="recent-research-heading"
+                  className="display-heading mt-2 text-2xl font-semibold"
+                >
+                  Choose a starting point
+                </h2>
+              </div>
+              <Link
+                className="text-sm font-semibold text-[var(--primary)] underline-offset-4 hover:underline"
+                to="/search?sort=newest"
+              >
+                View all papers <span aria-hidden="true">→</span>
+              </Link>
             </div>
-            {graph.data.truncated && (
-              <p role="status" className="text-sm text-muted-foreground">
-                This neighborhood reached a safety limit. Refocus on a related
-                paper to continue.
+
+            {recent.isPending && (
+              <p role="status" className="mt-6 text-sm text-muted-foreground">
+                Loading recent papers…
               </p>
             )}
-            <div
-              className="h-[36rem] overflow-hidden rounded-lg border bg-muted/20"
-              aria-label="Interactive research relationship graph"
-            >
-              <ReactFlow
-                nodes={flowNodes(graph.data.nodes)}
-                edges={flowEdges(graph.data.edges)}
-                fitView
-                minZoom={0.2}
-                maxZoom={1.8}
-                onNodeClick={(_, node) => {
-                  const item = node.data.graphNode as GraphNode
-                  if (item.type === 'paper' && item.recordId)
-                    navigate(
-                      `/graph?record=${encodeURIComponent(item.recordId)}`,
-                    )
-                  if (item.type === 'keyword' && item.normalizedName)
-                    navigate(
-                      `/search?keyword=${encodeURIComponent(item.normalizedName)}`,
-                    )
-                }}
-              >
-                <Background />
-                <Controls />
-              </ReactFlow>
-            </div>
-            <section aria-labelledby="related-papers-heading">
-              <h2 id="related-papers-heading" className="font-semibold">
-                Papers in this neighborhood
-              </h2>
-              <ul className="mt-2 space-y-1 text-sm">
-                {papers.map((paper) => (
+            {recent.isError && (
+              <p role="alert" className="mt-6 text-sm text-muted-foreground">
+                Recent papers could not be loaded. Use search to find a paper to
+                explore.
+              </p>
+            )}
+            {recent.data && recent.data.items.length === 0 && (
+              <div className="mt-6 border-t border-[var(--border)] pt-6">
+                <p className="font-medium">
+                  No published papers are available yet.
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Once accepted research is published, it will appear here as a
+                  graph entry point.
+                </p>
+              </div>
+            )}
+            {recent.data && recent.data.items.length > 0 && (
+              <ul className="mt-6 grid gap-x-8 md:grid-cols-2">
+                {recent.data.items.slice(0, 6).map((paper, index) => (
                   <li key={paper.id}>
-                    {paper.center ? (
-                      <strong>{paper.label}</strong>
-                    ) : (
-                      <Link
-                        className="underline"
-                        to={`/graph?record=${encodeURIComponent(paper.recordId ?? '')}`}
-                      >
-                        {paper.label}
-                      </Link>
-                    )}
+                    <Link
+                      className="group flex h-full min-h-48 flex-col justify-between border-t-2 border-[var(--border)] py-6 transition-colors hover:border-[var(--accent)]"
+                      to={`/graph?record=${encodeURIComponent(paper.id)}`}
+                    >
+                      <span>
+                        <span className="font-mono text-xs text-[var(--ink-muted)]">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <span className="display-heading mt-4 block text-xl font-semibold leading-snug text-foreground transition-colors group-hover:text-[var(--primary)]">
+                          {paper.title}
+                        </span>
+                        <span className="mt-3 block text-sm text-muted-foreground">
+                          {paper.authors || 'Authors not listed'}
+                        </span>
+                      </span>
+                      <span className="mt-5 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                        <span>
+                          {[paper.year, paper.courseName || paper.schoolName]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-[var(--primary)]">
+                          Explore{' '}
+                          <ArrowUpRight
+                            className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
-            </section>
-          </>
-        )}
-      </CardContent>
-    </Card>
+            )}
+          </section>
+        </div>
+      )}
+
+      {graph.isPending && recordId && (
+        <p role="status">Loading relationships…</p>
+      )}
+      {graph.isError && (
+        <p role="alert" className="border-l-2 border-destructive pl-4">
+          {graph.error instanceof ApiError
+            ? graph.error.message
+            : 'Could not load research relationships.'}
+        </p>
+      )}
+      {graph.data && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-x-5 gap-y-2 border-b border-[var(--border)] pb-4 text-xs text-muted-foreground">
+            {(Object.keys(COLORS) as GraphNodeType[]).map((type) => (
+              <span key={type} className="flex items-center gap-1.5 capitalize">
+                <span
+                  className="inline-block size-2 rounded-full"
+                  style={{ backgroundColor: COLORS[type] }}
+                />
+                {type}
+              </span>
+            ))}
+          </div>
+          {graph.data.truncated && (
+            <p role="status" className="text-sm text-muted-foreground">
+              This neighborhood reached a safety limit. Refocus on a related
+              paper to continue.
+            </p>
+          )}
+          <div
+            className="h-[36rem] overflow-hidden border border-[var(--border)] bg-white"
+            aria-label="Interactive research relationship graph"
+          >
+            <ReactFlow
+              nodes={flowNodes(graph.data.nodes)}
+              edges={flowEdges(graph.data.edges)}
+              fitView
+              minZoom={0.2}
+              maxZoom={1.8}
+              onNodeClick={(_, node) => {
+                const item = node.data.graphNode as GraphNode
+                if (item.type === 'paper' && item.recordId)
+                  navigate(`/graph?record=${encodeURIComponent(item.recordId)}`)
+                if (item.type === 'keyword' && item.normalizedName)
+                  navigate(
+                    `/search?keyword=${encodeURIComponent(item.normalizedName)}`,
+                  )
+              }}
+            >
+              <Background />
+              <Controls />
+            </ReactFlow>
+          </div>
+          <section
+            aria-labelledby="related-papers-heading"
+            className="grid gap-4 border-t border-[var(--border)] pt-6 md:grid-cols-[15rem_1fr]"
+          >
+            <h2
+              id="related-papers-heading"
+              className="display-heading text-xl font-semibold"
+            >
+              Papers in this neighborhood
+            </h2>
+            <ul className="divide-y divide-[var(--border)] text-sm">
+              {papers.map((paper) => (
+                <li key={paper.id} className="py-3 first:pt-0">
+                  {paper.center ? (
+                    <strong>{paper.label}</strong>
+                  ) : (
+                    <Link
+                      className="font-medium text-[var(--primary)] underline-offset-4 hover:underline"
+                      to={`/graph?record=${encodeURIComponent(paper.recordId ?? '')}`}
+                    >
+                      {paper.label}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      )}
+    </section>
   )
 }

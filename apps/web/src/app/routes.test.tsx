@@ -33,6 +33,12 @@ describe('app routing', () => {
     expect(
       screen.getByRole('navigation', { name: 'Footer navigation' }),
     ).toBeInTheDocument()
+    expect(
+      document.querySelector('header img[src="/brand/suluan-mark-white.png"]'),
+    ).toBeInTheDocument()
+    expect(
+      document.querySelector('img[src="/brand/ua-seal.png"]'),
+    ).toBeInTheDocument()
   })
 
   it('renders the sign-in screen at /signin', () => {

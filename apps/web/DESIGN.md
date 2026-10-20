@@ -10,7 +10,7 @@ colors:
   white: "#ffffff"
   ink: "#070707"
   slate-muted: "#52606a"
-  ink-muted: "#6e7a84"
+  ink-muted: "#66737d"
   hairline: "#dfe3e6"
   soft-gray: "#f5f5f5"
 typography:
@@ -112,7 +112,7 @@ The palette pairs UA's deep navy with a warm paper ground and a deliberately sca
 - **White** (#ffffff): Cards, footer surfaces, and high-contrast content areas.
 - **Ink** (#070707): Primary text and high-contrast labels.
 - **Slate Muted** (#52606a): Supporting copy on working surfaces.
-- **Ink Muted** (#6e7a84): Secondary metadata and footer copy.
+- **Ink Muted** (#66737d): Secondary metadata and footer copy with AA contrast on warm paper and white.
 - **Hairline** (#dfe3e6): Inputs, dividers, and quiet structure.
 - **Soft Gray** (#f5f5f5): Secondary bands and muted controls.
 

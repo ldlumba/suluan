@@ -4,7 +4,6 @@ import {
   Bot,
   BriefcaseBusiness,
   ChevronDown,
-  LibraryBig,
   LogOut,
   Menu,
   Network,
@@ -13,13 +12,14 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/useAuth'
 
 export function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
+  const location = useLocation()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuRef = useRef<HTMLElement>(null)
   const workspaceRef = useRef<HTMLDivElement>(null)
@@ -104,8 +104,19 @@ export function RootLayout() {
       >
         Skip to main content
       </a>
-      <div className="bg-[var(--primary)] px-4 py-2 text-center text-[0.7rem] font-medium tracking-wide text-white/75 sm:px-6 sm:text-right">
-        University of the Assumption · Research and Extension Office
+      <div className="bg-[var(--primary)] px-4 py-1.5 text-white/75 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 text-center text-[0.7rem] font-medium tracking-wide sm:justify-end sm:text-right">
+          <img
+            src="/brand/ua-seal.png"
+            alt=""
+            className="size-6 shrink-0 object-contain"
+            width="24"
+            height="24"
+          />
+          <span>
+            University of the Assumption · Research and Extension Office
+          </span>
+        </div>
       </div>
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--primary)] text-white shadow-[0_1px_0_rgba(0,0,0,0.08)]">
         <div className="mx-auto flex min-h-[4.5rem] w-full max-w-7xl items-center gap-8 px-4 sm:px-6 lg:px-8">
@@ -114,9 +125,13 @@ export function RootLayout() {
             className="group flex min-w-0 items-center gap-3"
             onClick={closeMenu}
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-[6px] bg-[var(--highlight)] text-[var(--primary)] transition-transform group-hover:-rotate-3">
-              <LibraryBig className="size-5" aria-hidden="true" />
-            </span>
+            <img
+              src="/brand/suluan-mark-white.png"
+              alt=""
+              className="size-11 shrink-0 object-contain transition-transform duration-200 group-hover:-translate-y-0.5"
+              width="44"
+              height="44"
+            />
             <span className="min-w-0">
               <span className="block text-lg font-bold tracking-[0.12em]">
                 SULUAN
@@ -325,15 +340,40 @@ export function RootLayout() {
         id="main-content"
         className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-12"
       >
-        <Outlet />
+        <div key={location.pathname} className="page-enter">
+          <Outlet />
+        </div>
       </main>
       <footer className="border-t border-[var(--border)] bg-white">
-        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-9 text-sm text-[var(--ink-muted)] sm:px-6 md:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1fr)] lg:px-8">
-          <div>
-            <p className="font-medium text-foreground">
-              © {new Date().getFullYear()} University of the Assumption · SULUAN
-            </p>
-            <p className="mt-2 text-xs">A governed home for UA research.</p>
+        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-9 text-sm text-muted-foreground sm:px-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1fr)] lg:px-8">
+          <div className="flex items-start gap-4">
+            <div
+              className="flex shrink-0 items-center gap-2"
+              aria-hidden="true"
+            >
+              <img
+                src="/brand/ua-seal.png"
+                alt=""
+                className="size-12 object-contain"
+                width="48"
+                height="48"
+              />
+              <span className="h-9 w-px bg-[var(--border)]" />
+              <img
+                src="/brand/suluan-mark-navy.png"
+                alt=""
+                className="size-12 object-contain"
+                width="48"
+                height="48"
+              />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">
+                © {new Date().getFullYear()} University of the Assumption ·
+                SULUAN
+              </p>
+              <p className="mt-2 text-xs">A governed home for UA research.</p>
+            </div>
           </div>
 
           <nav aria-label="Footer navigation">
@@ -366,7 +406,7 @@ export function RootLayout() {
             </div>
           </nav>
 
-          <div className="text-xs md:text-right">
+          <div className="text-xs lg:text-right">
             <p className="leading-5 text-foreground">
               Developed by Team CTRL+F: Lumba, Tayag, Dizon
             </p>

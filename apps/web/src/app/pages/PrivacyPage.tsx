@@ -8,25 +8,33 @@ import { Link } from 'react-router'
  */
 export function PrivacyPage() {
   return (
-    <section className="mx-auto max-w-3xl space-y-6">
-      <header className="border-b border-border pb-4">
-        <h1 className="display-heading text-3xl font-semibold sm:text-4xl">
-          Privacy notice
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          How SULUAN handles your information. Last updated October 2026.
+    <section className="mx-auto max-w-4xl space-y-10">
+      <header className="grid gap-5 border-b border-border pb-8 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div>
+          <p className="eyebrow text-[var(--impact)]">Public information</p>
+          <h1 className="display-heading mt-3 text-4xl font-semibold sm:text-5xl">
+            Privacy notice
+          </h1>
+        </div>
+        <p className="max-w-xs text-sm leading-6 text-muted-foreground sm:text-right">
+          How SULUAN handles your information.
+          <br /> Last updated October 2026.
         </p>
       </header>
 
-      <div className="space-y-5 text-sm leading-7 text-[var(--ink-muted)]">
-        <section aria-labelledby="privacy-identity">
+      <div className="text-sm leading-7 text-[var(--ink-muted)]">
+        <section
+          aria-labelledby="privacy-identity"
+          className="grid gap-3 border-b border-[var(--border)] py-7 first:pt-0 md:grid-cols-[2rem_15rem_1fr] md:gap-6"
+        >
+          <span className="font-mono text-xs text-[var(--ink-muted)]">01</span>
           <h2
             id="privacy-identity"
             className="text-lg font-semibold text-foreground"
           >
             Sign-in and your account
           </h2>
-          <p className="mt-2">
+          <p>
             SULUAN signs you in with your Google account through Firebase
             Authentication. Google shares your name, email address, and profile
             photo with the application. SULUAN stores your verified University
@@ -39,14 +47,18 @@ export function PrivacyPage() {
           </p>
         </section>
 
-        <section aria-labelledby="privacy-submissions">
+        <section
+          aria-labelledby="privacy-submissions"
+          className="grid gap-3 border-b border-[var(--border)] py-7 md:grid-cols-[2rem_15rem_1fr] md:gap-6"
+        >
+          <span className="font-mono text-xs text-[var(--ink-muted)]">02</span>
           <h2
             id="privacy-submissions"
             className="text-lg font-semibold text-foreground"
           >
             Submissions and reviews
           </h2>
-          <p className="mt-2">
+          <p>
             Papers you submit — title, authors, school, course, keywords, and
             the uploaded file — are retained for Research and Extension Office
             review, including rejected submissions, which stay in a review-only
@@ -57,11 +69,15 @@ export function PrivacyPage() {
           </p>
         </section>
 
-        <section aria-labelledby="privacy-ai">
+        <section
+          aria-labelledby="privacy-ai"
+          className="grid gap-3 border-b border-[var(--border)] py-7 md:grid-cols-[2rem_15rem_1fr] md:gap-6"
+        >
+          <span className="font-mono text-xs text-[var(--ink-muted)]">03</span>
           <h2 id="privacy-ai" className="text-lg font-semibold text-foreground">
             Search, semantic discovery, and the research assistant
           </h2>
-          <p className="mt-2">
+          <p>
             Keyword search runs against repository text stored in the project
             database. Meaning-based (semantic) search and the research assistant
             send your query text to Google&apos;s Gemini API through a regional
@@ -74,14 +90,18 @@ export function PrivacyPage() {
           </p>
         </section>
 
-        <section aria-labelledby="privacy-sharing">
+        <section
+          aria-labelledby="privacy-sharing"
+          className="grid gap-3 py-7 md:grid-cols-[2rem_15rem_1fr] md:gap-6"
+        >
+          <span className="font-mono text-xs text-[var(--ink-muted)]">04</span>
           <h2
             id="privacy-sharing"
             className="text-lg font-semibold text-foreground"
           >
             Sharing and contact
           </h2>
-          <p className="mt-2">
+          <p>
             SULUAN does not sell personal information and runs no advertising or
             cross-site tracking. Operational providers (hosting, database, email
             delivery, AI processing) handle data only to operate the repository.
