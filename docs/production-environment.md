@@ -153,6 +153,28 @@ remain. No staging/development resource, credential, or row has been reused.
   reverted to 20/2,000 the same day (deployed). Total backfill spend:
   155 requests / 3,026 inputs across two UTC days.
 
+### Automatic document embeddings — 2026-10-21
+
+- Owner-approved Cloud Scheduler job `suluan-embed-production-trigger` invokes
+  `suluan-embed-production` every 15 minutes (`*/15`, UTC), aligned with the
+  extraction and Worker-maintenance schedules. The existing production
+  Scheduler service account has `roles/run.invoker` on this Job only.
+- The pinned Job remains one task, parallelism one, `SULUAN_MAX_CLAIMS=1`, zero
+  task retries, 15-minute timeout, and 1 CPU/512 MiB. Each execution can reserve
+  one paper-bounded batch of at most 20 missing chunks; later executions finish
+  larger papers or a backlog.
+- Eligibility is accepted + current keyword index + missing chunk vectors. With
+  no eligible chunks, the Worker returns `204` before quota reservation, the Job
+  exits without calling Gemini, and embedding request/input usage does not
+  increase. The unchanged production document ceiling remains 20 requests and
+  2,000 inputs per UTC day. No-work executions still incur small Cloud Run,
+  Worker, and Neon check activity.
+- Forced scheduler canary execution `suluan-embed-production-4fj4t` authenticated
+  as the Scheduler service account and completed successfully with task attempt
+  zero, exit code zero, and exact output `no claimable chunks; completed=0
+  embedded=0`. Because the claim route returns before `consumeQuota` on this
+  path, the canary made no Gemini call and consumed no embedding quota.
+
 ### Extraction completion evidence — 2026-10-15
 
 - All 139 accepted papers individually reviewed; 139 repository records
