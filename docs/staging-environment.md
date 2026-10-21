@@ -2,33 +2,28 @@
 
 ## Status
 
-**DONE (2026-10-04).**
+**RETIRED (2026-10-21; historical evidence only).**
 The isolated resources, migration/recovery proof, and generated-fixture exit
 tests below passed. Staging does not reuse development Neon, R2, Worker,
 Firebase, or Cloud Run resources. Owner decision 2026-10-04: proceed with the
 single provisioned staging administrator; multi-administrator coverage is a
 Stage 9 production-readiness item, not a Stage 6 gate.
 
-### Hibernated for cost control — 2026-10-21
+### Retirement for production cost measurement — 2026-10-21
 
-The owner retained the isolated staging corpus and resources for deliberate
-pre-production verification but disabled automatic wake-ups. The staging
-Worker has no cron trigger; Cloud Scheduler jobs `suluan-processing-trigger`
-and `suluan-embed-trigger` are paused; and query/Assistant Cloud Run services
-retain minimum zero. Queue bindings and private R2/Neon data remain intact.
-Reactivation requires an explicit owner decision, deployment of a staging cron
-if wanted, and resuming only the necessary Google scheduler. Historical
-activation evidence below records prior verification, not current scheduler
-state.
+To isolate future Neon compute measurement to production, the owner deleted the
+staging Neon project and authorized full retirement. Cloudflare Worker
+`suluan-api-staging`, its queue and DLQ, and private R2 bucket were deleted; the
+bucket was emptied first (193 objects, 474 MB). Google project
+`suluan-staging` was placed into deletion, covering Firebase, the two paused
+schedulers, three Cloud Run jobs, two Cloud Run services, Artifact Registry,
+secrets, identities, and its budget configuration. Staging-only local secrets,
+examples, deployment descriptors, Firebase Hosting files, and npm scripts were
+removed. Nothing below proves that a resource still exists, and no historical
+command below may be used to recreate staging without a new explicit owner and
+architecture decision.
 
-Hibernation was applied with Worker version
-`9f6a1ce9-28ec-4487-9682-ebe1741d2e01`. Its deployment output lists only the
-staging producer/consumers and no scheduled trigger. Both Google scheduler jobs
-report `PAUSED`; both interactive Cloud Run services use the default minimum of
-zero and retain their one-instance maximum.
-
-The approved topology uses the existing owner accounts and billing account; it
-does not require another Google login or billing account:
+The retired topology used the existing owner accounts and billing account:
 
 | Layer | Staging resource |
 |---|---|
@@ -42,17 +37,17 @@ does not require another Google login or billing account:
 | Artifact Registry | staging-project repository `suluan` |
 | Browser | local Vite `http://localhost:5174` |
 
-When the browser is started with the staging web environment, its API base is
+Historically, the staging browser's API base was
 `https://suluan-api-staging.ctrlfinder.workers.dev`. Deploying only
 `apps/worker/wrangler.toml` updates the development API and does not update the
-staging browser. Deploy staging explicitly from `apps/worker` with:
+staging browser. The retired deployment command was:
 
 ```powershell
 npx wrangler deploy -c wrangler.staging.toml
 ```
 
-The development and staging Workers have separate Neon, R2, Queue, and API
-origins; verify the active `VITE_API_BASE_URL` before live UI checks.
+These resources and the referenced staging deployment descriptor no longer
+exist.
 
 ## Locked boundaries for this stage
 
@@ -93,18 +88,12 @@ Provisioning used the single staging administrator
 two trusted admins remain a Stage 9 production-readiness item. Production
 provisioning remains separately TBD.
 
-## Repository configuration
+## Historical repository configuration
 
-- `apps/worker/wrangler.staging.toml` is a separate deployment descriptor. It
-  cannot overwrite `suluan-api`, bind `suluan-dev`, or inherit the development
-  five-minute cron.
-- `apps/worker/.dev.vars.staging.example` documents server-side placeholders.
-  Actual `.dev.vars.staging` values are ignored by Git.
-- `apps/web/.env.staging.example` documents public Firebase placeholders.
-  Actual `.env.staging.local` is ignored by Git.
-- `npm run dev:staging` runs Vite in staging mode on port 5174.
-- `npm run deploy:worker:staging:dry-run` validates the staging bundle without
-  changing Cloudflare. `npm run deploy:worker:staging` is the explicit deploy.
+The staging descriptor, placeholder files, ignored local secrets, Firebase
+Hosting files, and npm development/deployment commands were removed during
+retirement. References below describe the verified historical environment and
+must not be treated as runnable current instructions.
 
 ## Provisioning order
 

@@ -1,5 +1,10 @@
 # Gmail notifications (staging)
 
+> **Historical only:** the complete staging environment, including its Google
+> project, OAuth configuration, Worker, queues, R2 data, and local deployment
+> files, was retired on 2026-10-21. Do not follow these activation instructions
+> without a new explicit architecture decision.
+
 Owner-approved 2026-10-05. Temporary sender: the owner's UA mailbox via OAuth
 user credentials. Swapping to an REO mailbox later means re-authorizing OAuth
 for that mailbox and updating secrets — no code change.

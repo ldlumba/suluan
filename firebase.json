@@ -1,7 +1,0 @@
-{
-  "hosting": {
-    "site": "suluan-staging",
-    "public": "hosting/public",
-    "ignore": ["firebase.json"]
-  }
-}

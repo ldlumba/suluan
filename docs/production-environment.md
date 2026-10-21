@@ -87,7 +87,13 @@ remain. No staging/development resource, credential, or row has been reused.
   after deployment.
 - The retired development Worker, notification queue and DLQ, and private R2
   bucket were deleted. The bucket was explicitly emptied first (139 objects,
-  425 MB); the production and staging resources were left unchanged.
+  425 MB).
+- The owner subsequently retired staging to isolate ongoing Neon compute
+  measurement: staging Neon was owner-deleted; Cloudflare staging Worker,
+  queues, and the emptied 193-object/474 MB R2 bucket were deleted; and Google
+  project `suluan-staging` was placed into deletion. Current-period billing may
+  still include prorated staging usage before the deletion timestamp; use the
+  next full billing period for the cleanest production-only comparison.
 
 - Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
   production Desktop OAuth client (send-only scope); secrets
