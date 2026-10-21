@@ -2,10 +2,11 @@ name = "suluan-api-production"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
-# Production remains on Workers Free initially. The five-minute sweep bounds
-# recovery latency within the Free queue's 24-hour retention window.
+# Owner-approved 2026-10-21: align the recovery/index/cleanup sweep with the
+# existing 15-minute processing trigger so Neon can scale to zero between
+# activity windows. This remains well inside the Queue's 24-hour retention.
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/15 * * * *"]
 
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"

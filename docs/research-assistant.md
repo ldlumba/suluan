@@ -123,7 +123,7 @@ authorized server-side work. Original-paper links open a labeled new tab so
 readers can inspect evidence without discarding the conversation.
 Operational tables retain actor/session IDs, counters,
 status and timestamps. Payload digests are cleared at completion; the existing
-five-minute sweep scrubs expired abandoned digests in batches of 300. Metadata
+scheduled production sweep scrubs expired abandoned digests in batches of 300. Metadata
 retention/deletion policy remains Stage 9 work. Google has its own processing
 and retention terms; “SULUAN does not save chat text” is not zero provider retention.
 

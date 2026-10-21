@@ -2,8 +2,9 @@ name = "suluan-api"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
-[triggers]
-crons = ["*/5 * * * *"]
+# The remote development environment was retired on 2026-10-21 after its Neon
+# project was deleted. Local Wrangler scheduled-event testing remains available,
+# but this default config must not recreate a deployed cron accidentally.
 
 # Non-secret config only. DATABASE_URL and any future credentials are
 # secrets: local via .dev.vars, production via `wrangler secret put`.

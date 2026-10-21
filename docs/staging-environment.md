@@ -9,6 +9,24 @@ Firebase, or Cloud Run resources. Owner decision 2026-10-04: proceed with the
 single provisioned staging administrator; multi-administrator coverage is a
 Stage 9 production-readiness item, not a Stage 6 gate.
 
+### Hibernated for cost control — 2026-10-21
+
+The owner retained the isolated staging corpus and resources for deliberate
+pre-production verification but disabled automatic wake-ups. The staging
+Worker has no cron trigger; Cloud Scheduler jobs `suluan-processing-trigger`
+and `suluan-embed-trigger` are paused; and query/Assistant Cloud Run services
+retain minimum zero. Queue bindings and private R2/Neon data remain intact.
+Reactivation requires an explicit owner decision, deployment of a staging cron
+if wanted, and resuming only the necessary Google scheduler. Historical
+activation evidence below records prior verification, not current scheduler
+state.
+
+Hibernation was applied with Worker version
+`9f6a1ce9-28ec-4487-9682-ebe1741d2e01`. Its deployment output lists only the
+staging producer/consumers and no scheduled trigger. Both Google scheduler jobs
+report `PAUSED`; both interactive Cloud Run services use the default minimum of
+zero and retain their one-instance maximum.
+
 The approved topology uses the existing owner accounts and billing account; it
 does not require another Google login or billing account:
 

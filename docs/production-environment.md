@@ -67,6 +67,28 @@ remain. No staging/development resource, credential, or row has been reused.
   corpus is fully extracted, indexed, and embedded; until then both
   paths stay disabled/fallback by configuration, not by code branch.
 
+### Neon cost control — 2026-10-21
+
+- The owner changed the production Worker's combined recovery, indexing,
+  expired-Assistant cleanup, and DOI sweep from every 5 minutes to every 15
+  minutes. It is aligned with the existing
+  `suluan-processing-production-trigger` schedule (`*/15`, UTC), allowing both
+  recovery mechanisms to share activity windows so Neon can scale to zero
+  between otherwise idle periods.
+- Queue delivery remains the primary notification path. The durable outbox,
+  one-minute failure cooldown, five-minute abandoned-claim lease, bounded
+  batches, and idempotent indexing are unchanged. A 15-minute fallback remains
+  far inside Cloudflare Queue's 24-hour retention.
+- Keep Neon scale-to-zero enabled. The corpus is small enough to begin at the
+  minimum 0.25 CU; raise the autoscaling ceiling only from observed production
+  memory or latency evidence.
+- Worker version `a58c2270-0d17-4b06-a492-7367553d623b` deployed the `*/15`
+  schedule. The public `/api/health` endpoint returned `200 {"status":"ok"}`
+  after deployment.
+- The retired development Worker, notification queue and DLQ, and private R2
+  bucket were deleted. The bucket was explicitly emptied first (139 objects,
+  425 MB); the production and staging resources were left unchanged.
+
 - Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
   production Desktop OAuth client (send-only scope); secrets
   `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/SENDER` plus `REO_MAILBOX` are
@@ -94,7 +116,7 @@ remain. No staging/development resource, credential, or row has been reused.
   would return the same IDs per environment-scoped idempotency.
 - Individual owner review/acceptance of all 139 is now due in the
   production review queue (50 per batch); the 15-minute scheduler
-  extracts acceptances automatically and the 5-minute sweep indexes
+  extracts acceptances automatically and the aligned 15-minute sweep indexes
   them for keyword search.
 
 ### Embedding backfill — day 1 (2026-10-15, temporary 160/2,000 ceiling)

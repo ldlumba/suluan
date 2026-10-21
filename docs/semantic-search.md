@@ -20,7 +20,7 @@ keyword matches without an automatic paid retry.
 
 1. **Extraction** — a manager-accepted PDF/DOCX is turned into text by
    `services/processing` (`EXTRACTED`).
-2. **Keyword preparation** — the Worker's five-minute scheduled sweep splits
+2. **Keyword preparation** — the Worker's scheduled sweep splits
    extracted text into 2,000-character chunks and stores it with a full-text
    index. `POST /api/search/index` remains a manager-only recovery escape hatch.
 3. **Embedding** — "Embed papers for semantic search" sends each chunk to Gemini

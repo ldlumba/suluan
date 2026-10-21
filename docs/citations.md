@@ -33,7 +33,7 @@ submission authors when no repository authors exist.
 
 Migration 0014 adds nullable `doi`, `venue`, `volume`, `issue`, `pages`,
 `pub_year`, `doi_source`, and `doi_checked_at` to `research_records`. The
-Worker's five-minute scheduled sweep checks up to five never-checked accepted
+Worker's scheduled sweep checks up to five never-checked accepted
 records per run against Crossref (`apps/worker/src/doi.ts`):
 
 - Candidate titles must normalize identically (case, punctuation, and
