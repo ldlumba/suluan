@@ -97,6 +97,9 @@ export interface Env {
   PROCESSING_SERVICE_AUDIENCE?: string
   /** Exact dedicated Cloud Run Job service-account email. */
   PROCESSING_SERVICE_ACCOUNT?: string
+  /** Ticket dispatcher for manager-started bounded Cloud Run Jobs. */
+  OPERATIONS_DISPATCHER_URL?: string
+  OPERATIONS_SERVICE_ACCOUNT?: string
   /** Test/dev REO recipient. Unset until the mailbox decision lands. */
   REO_MAILBOX?: string
   /**

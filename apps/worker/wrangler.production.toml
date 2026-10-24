@@ -2,11 +2,11 @@ name = "suluan-api-production"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
-# Owner-approved 2026-10-24: align recovery/index/cleanup with processing and
-# embedding every two hours so Neon can scale to zero between activity windows.
-# Queue delivery remains immediate and primary; this is the durable fallback.
+# Owner-approved 2026-10-24: manager/admin manual pipeline controls permit the
+# aligned durable fallback to run every three hours. Queue delivery remains
+# immediate and primary; job bounds and quotas are unchanged.
 [triggers]
-crons = ["0 */2 * * *"]
+crons = ["0 */3 * * *"]
 
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"
@@ -31,6 +31,12 @@ SEMANTIC_AUTHENTICATED_ONLY = "true"
 
 ASSISTANT_ACCESS_MODE = "all_authenticated"
 ASSISTANT_RETRIEVAL_DAILY_REQUEST_LIMIT = "300"
+
+# Manager/admin manual pipeline launcher. The public service accepts only
+# short-lived, single-use tickets and its IAM identity can invoke only the two
+# existing bounded production Jobs.
+OPERATIONS_DISPATCHER_URL = "https://suluan-operations-production-804189788259.asia-southeast1.run.app/dispatch"
+OPERATIONS_SERVICE_ACCOUNT = "suluan-operations-production@suluan-production.iam.gserviceaccount.com"
 
 [[r2_buckets]]
 binding = "DOCUMENTS"

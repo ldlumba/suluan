@@ -191,6 +191,9 @@ export function RootLayout() {
                       <WorkspaceLink to="/review" onClick={closeWorkspace}>
                         Review queue
                       </WorkspaceLink>
+                      <WorkspaceLink to="/operations" onClick={closeWorkspace}>
+                        Repository operations
+                      </WorkspaceLink>
                       <WorkspaceLink
                         to="/graph/analytics"
                         onClick={closeWorkspace}
@@ -290,6 +293,11 @@ export function RootLayout() {
               {manager && (
                 <MobileLink to="/review" onClick={closeMenu}>
                   Review queue
+                </MobileLink>
+              )}
+              {manager && (
+                <MobileLink to="/operations" onClick={closeMenu}>
+                  Repository operations
                 </MobileLink>
               )}
               {profile?.role === 'ADMIN' && (

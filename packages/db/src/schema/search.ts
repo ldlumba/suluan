@@ -202,5 +202,8 @@ export const embeddingClaims = pgTable(
     uniqueIndex('embedding_claims_active_evaluation_unique')
       .on(table.kind)
       .where(sql`${table.kind} = 'evaluation' and ${table.usedAt} is null`),
+    uniqueIndex('embedding_claims_active_prep_unique')
+      .on(table.kind)
+      .where(sql`${table.kind} = 'prep' and ${table.usedAt} is null`),
   ],
 )

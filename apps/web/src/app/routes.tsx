@@ -14,6 +14,7 @@ import { SemanticAccessPage } from '@/features/search/SemanticAccessPage'
 import { AssistantPage } from '@/features/assistant/AssistantPage'
 import { AdminCatalogPage } from '@/features/admin/AdminCatalogPage'
 import { AdminUsersPage } from '@/features/admin/AdminUsersPage'
+import { RepositoryOperationsPage } from '@/features/operations/RepositoryOperationsPage'
 
 const graphPage = lazy(() =>
   import('@/features/graph/GraphPage').then((module) => ({
@@ -79,6 +80,14 @@ export const routes = [
         element: (
           <ProtectedRoute>
             <ReviewQueuePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/operations',
+        element: (
+          <ProtectedRoute>
+            <RepositoryOperationsPage />
           </ProtectedRoute>
         ),
       },

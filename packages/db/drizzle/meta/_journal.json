@@ -120,6 +120,20 @@
       "when": 1791982452039,
       "tag": "0016_yellow_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792826639149,
+      "tag": "0017_true_sinister_six",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792826653106,
+      "tag": "0018_gorgeous_ronan",
+      "breakpoints": true
     }
   ]
 }

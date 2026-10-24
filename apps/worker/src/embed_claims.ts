@@ -344,8 +344,10 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
         limit 1
       `)
       const used = (usage.rows[0] as
-        | { requests: number; inputs: number }
-        | undefined) ?? { requests: 0, inputs: 0 }
+        { requests: number; inputs: number } | undefined) ?? {
+        requests: 0,
+        inputs: 0,
+      }
       return c.json({
         sourceSha256: body.sourceSha256,
         probeCount: body.probeCount,
@@ -564,6 +566,19 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
     // Optional per-record scoping for tests and single-paper recovery. The
     // Cloud Run Job omits it to drain the whole missing-chunk backlog.
     const { recordId } = c.req.valid('json')
+    // Close abandoned reservations before checking the one-active-prep guard.
+    // This happens before quota consumption, so overlapping manual and
+    // scheduled executions cannot both reserve paid work.
+    await db.execute(sql`
+      update embedding_claims set used_at = now()
+      where kind = 'prep' and used_at is null and expires_at <= now()
+    `)
+    const active = await db.execute(sql`
+      select id from embedding_claims
+      where kind = 'prep' and used_at is null and expires_at > now()
+      limit 1
+    `)
+    if (active.rows.length) return c.body(null, 204)
     const candidates = await db.execute(sql`
       select k.id as keyword_index_id, k.record_id, k.source_sha256,
         d.id as chunk_id, d.content
@@ -625,13 +640,26 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       recordId: item.recordId,
       sourceSha256: item.sourceSha256,
     }))
-    const inserted = await db.execute(sql`
-      insert into embedding_claims
-        (claim_token, kind, inputs, payload, expires_at)
-      values (${claimToken}, 'prep', ${items.length},
-        ${JSON.stringify(stored)}::jsonb, now() + interval '10 minutes')
-      returning id as "claimId"
-    `)
+    let inserted
+    try {
+      inserted = await db.execute(sql`
+        insert into embedding_claims
+          (claim_token, kind, inputs, payload, expires_at)
+        values (${claimToken}, 'prep', ${items.length},
+          ${JSON.stringify(stored)}::jsonb, now() + interval '10 minutes')
+        returning id as "claimId"
+      `)
+    } catch (error) {
+      // The partial unique index is the final overlap boundary. A racing
+      // execution receives no chunk text and therefore cannot call Gemini.
+      const raced = await db.execute(sql`
+        select id from embedding_claims
+        where kind = 'prep' and used_at is null and expires_at > now()
+        limit 1
+      `)
+      if (raced.rows.length) return c.body(null, 204)
+      throw error
+    }
     const claimId = (inserted.rows[0] as { claimId: string }).claimId
     return c.json({
       claimId,

@@ -115,6 +115,38 @@ remain. No staging/development resource, credential, or row has been reused.
   `suluan-embed-production-trigger` report enabled with the same next UTC
   boundary and `0 */2 * * *` schedule.
 
+### Manual repository operations and three-hour fallback — 2026-10-24
+
+- Repository managers and administrators can use `/operations` to start the
+  existing bounded extraction Job, index up to 50 eligible extracted records,
+  or start one paper-bounded embedding claim. The page uses explicit status
+  refresh and labels a Cloud Run acceptance as launched—not completed.
+- Migrations 0017–0018 add audited operation tickets and the one-active-prep
+  database guard. The minimum-zero `suluan-operations-production` dispatcher
+  runs revision `suluan-operations-production-00004-cxj` from image digest
+  `sha256:08da112d48b4e98bb45b482cfd13da751689d0905ae67b38cc896b8c1d67e94a`.
+  Its dedicated identity has `roles/run.invoker` only on the production
+  processing and embedding Jobs; it has no repository or model secrets.
+- Worker version `b9ff0ab2-7f5c-4ec1-aa34-988a9f134096` activated the manager
+  API while retaining the two-hour fallback for rollout. Anonymous operation
+  status returned 401, production health returned 200, dispatcher health
+  returned 200, a forged ticket reached the workload-authenticated callback
+  and was rejected as stale (409), and `db:check` passed with both new
+  concurrency guards. A post-deploy production reconciliation found zero
+  claimable/active/failed extraction jobs, zero missing embedding records or
+  chunks, and zero manual operation rows; no paid or document Job was started
+  for the no-work verification.
+- After those boundaries passed, all three fallbacks moved to `0 */3 * * *`
+  UTC. No-work manager requests stop before dispatcher invocation. Without a
+  manual run, allow roughly 3–6 hours for keyword readiness and 9–12 hours for
+  typical multi-claim semantic readiness.
+- Worker version `ec0fdc82-4d27-4be8-9a0a-8dbd29750a36` deployed the final
+  three-hour cron. Both Google schedulers report enabled at `0 */3 * * *` with
+  the next shared UTC boundary at 09:00.
+- Cloudflare Pages deployment `99e0df2f` published the manager/admin workspace;
+  `/operations` serves through the production SPA and signed-out access
+  redirects to sign-in before operational data is requested.
+
 - Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
   production Desktop OAuth client (send-only scope); secrets
   `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/SENDER` plus `REO_MAILBOX` are
@@ -141,8 +173,8 @@ remain. No staging/development resource, credential, or row has been reused.
   REJECTED Gmail fixture), confirming non-leakage. Immediate replay
   would return the same IDs per environment-scoped idempotency.
 - Individual owner review/acceptance of all 139 is now due in the
-  production review queue (50 per batch); the current two-hour scheduler
-  extracts acceptances automatically and the aligned two-hour sweep indexes
+  production review queue (50 per batch); the current three-hour scheduler
+  extracts acceptances automatically and the aligned three-hour sweep indexes
   them for keyword search.
 
 ### Embedding backfill — day 1 (2026-10-15, temporary 160/2,000 ceiling)
@@ -182,7 +214,7 @@ remain. No staging/development resource, credential, or row has been reused.
 ### Automatic document embeddings — 2026-10-21
 
 - Owner-approved Cloud Scheduler job `suluan-embed-production-trigger` invokes
-  `suluan-embed-production` every two hours (`0 */2 * * *`, UTC), aligned with the
+  `suluan-embed-production` every three hours (`0 */3 * * *`, UTC), aligned with the
   extraction and Worker-maintenance schedules. The existing production
   Scheduler service account has `roles/run.invoker` on this Job only.
 - The pinned Job remains one task, parallelism one, `SULUAN_MAX_CLAIMS=1`, zero

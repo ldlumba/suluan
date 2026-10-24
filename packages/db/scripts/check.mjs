@@ -25,6 +25,7 @@ const expectedTables = [
   'audit_events',
   'outbox_events',
   'notifications',
+  'repository_operation_runs',
   'processing_jobs',
   'keyword_indexes',
   'document_chunks',
@@ -46,6 +47,13 @@ const expectedEnums = {
   notification_status: ['PENDING', 'SENT', 'SKIPPED', 'FAILED'],
   extraction_status: ['QUEUED', 'PROCESSING', 'EXTRACTED', 'FAILED'],
   record_visibility: ['PUBLIC', 'UA_ONLY', 'RESTRICTED'],
+  repository_operation_action: ['EXTRACTION', 'EMBEDDING'],
+  repository_operation_status: [
+    'REQUESTED',
+    'DISPATCHING',
+    'LAUNCHED',
+    'FAILED',
+  ],
 }
 
 const failures = []
@@ -148,6 +156,31 @@ try {
   } else {
     console.log('FAIL embedding_claims missing active evaluation guard')
     failures.push('embedding_claims active evaluation guard')
+  }
+
+  const { rows: operationGuards } = await client.query(
+    `select indexname from pg_indexes
+     where schemaname = current_schema() and indexname in (
+       'embedding_claims_active_prep_unique',
+       'repository_operation_runs_active_action_unique'
+     ) and indexdef like '%UNIQUE%'`,
+  )
+  const guardNames = new Set(operationGuards.map((row) => row.indexname))
+  for (const [name, label] of [
+    [
+      'embedding_claims_active_prep_unique',
+      'one active document embedding claim',
+    ],
+    [
+      'repository_operation_runs_active_action_unique',
+      'one active manual launch per operation',
+    ],
+  ]) {
+    if (guardNames.has(name)) console.log(`ok   ${label}`)
+    else {
+      console.log(`FAIL ${label} guard missing`)
+      failures.push(label)
+    }
   }
 
   // Locked rule: remarks required before either decision.

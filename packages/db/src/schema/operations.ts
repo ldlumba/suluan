@@ -4,8 +4,10 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import { profiles } from './identity'
 import { submissions } from './intake'
 
@@ -53,6 +55,52 @@ export const notificationStatus = pgEnum('notification_status', [
   'SKIPPED',
   'FAILED',
 ])
+
+export const repositoryOperationAction = pgEnum('repository_operation_action', [
+  'EXTRACTION',
+  'EMBEDDING',
+])
+
+export const repositoryOperationStatus = pgEnum('repository_operation_status', [
+  'REQUESTED',
+  'DISPATCHING',
+  'LAUNCHED',
+  'FAILED',
+])
+
+/**
+ * Audited, single-use handoff from a manager-authorized Worker request to the
+ * public-ticket Cloud Run dispatcher. The dispatcher has no repository data
+ * access; it can start only the two bounded production Jobs granted by IAM.
+ */
+export const repositoryOperationRuns = pgTable(
+  'repository_operation_runs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => profiles.id),
+    action: repositoryOperationAction('action').notNull(),
+    status: repositoryOperationStatus('status').notNull().default('REQUESTED'),
+    ticketHash: text('ticket_hash').notNull().unique(),
+    executionName: text('execution_name'),
+    errorCode: text('error_code'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('repository_operation_runs_active_action_unique')
+      .on(table.action)
+      .where(
+        sql`${table.status} in ('REQUESTED'::repository_operation_status, 'DISPATCHING'::repository_operation_status)`,
+      ),
+  ],
+)
 
 /**
  * One row per notification attempt, tracked separately from processing

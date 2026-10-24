@@ -32,6 +32,10 @@ import { CHUNKER_VERSION } from './chunking'
 import { graphRoutes } from './graph'
 import { assistantRoutes } from './assistant-routes'
 import {
+  repositoryOperationRoutes,
+  serviceRepositoryOperationRoutes,
+} from './repository-operations'
+import {
   cacheControlFor,
   effectiveVisibility,
   effectiveVisibilityLevel,
@@ -215,6 +219,33 @@ export function createApp(
     await next()
   }
 
+  const requireOperationsService: MiddlewareHandler<AppContext> = async (
+    c,
+    next,
+  ) => {
+    const audience = c.env.PROCESSING_SERVICE_AUDIENCE?.trim()
+    const serviceAccount = c.env.OPERATIONS_SERVICE_ACCOUNT?.trim()
+    if (!audience || !serviceAccount)
+      return c.json({ error: 'service_auth_not_configured' }, 503)
+    const header = c.req.header('authorization')
+    if (!header?.startsWith('Bearer '))
+      return c.json({ error: 'unauthorized' }, 401)
+    try {
+      c.set(
+        'serviceIdentity',
+        await verifyServiceToken(
+          header.slice('Bearer '.length),
+          serviceVerifier,
+          audience,
+          serviceAccount,
+        ),
+      )
+    } catch {
+      return c.json({ error: 'unauthorized' }, 401)
+    }
+    await next()
+  }
+
   app.route(
     '/api/internal/processing',
     serviceProcessingRoutes(requireProcessingService),
@@ -224,6 +255,10 @@ export function createApp(
   app.route(
     '/api/internal/embeddings',
     serviceEmbedRoutes(requireProcessingService),
+  )
+  app.route(
+    '/api/internal/repository-operations',
+    serviceRepositoryOperationRoutes(requireOperationsService),
   )
   // Dedicated query service identity cannot access document processing routes.
   app.post(
@@ -312,6 +347,10 @@ export function createApp(
     },
   )
   app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))
+  app.route(
+    '/api/repository-operations',
+    repositoryOperationRoutes(requireAuth, requireRole(...MANAGERS)),
+  )
   // Search reads are public; preparation stays manager-only.
   app.route(
     '/api/search',

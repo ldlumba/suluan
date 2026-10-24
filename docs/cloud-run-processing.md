@@ -150,12 +150,24 @@ has `roles/run.invoker` on this Job only. The Job remains one task with
 the query evaluation Job remains scheduler-free and keyless.
 
 Production uses the same bounded document-only pattern as of 2026-10-21.
-`suluan-embed-production-trigger` invokes `suluan-embed-production` every two
-hours (`0 */2 * * *`, UTC) with the production Scheduler identity granted resource-scoped
+`suluan-embed-production-trigger` invokes `suluan-embed-production` every three
+hours (`0 */3 * * *`, UTC) with the production Scheduler identity granted resource-scoped
 `roles/run.invoker`. The Job remains one claim/execution, zero task retries,
 and subject to the production 20-request/2,000-input daily document ceiling.
 When no accepted/current-index chunks lack vectors, claim returns before quota
 reservation and the Job makes no Gemini request.
+
+Managers and administrators may also start these same bounded Jobs from the
+Repository operations page. The Worker first verifies the persisted Neon role,
+checks that eligible work exists, records an expiring single-use ticket, and
+calls `suluan-operations-production`. That minimum-zero service redeems the
+ticket with its audience-bound workload identity and invokes only the approved
+production Job selected by the Worker grant. Its service account has
+resource-scoped `roles/run.invoker` on those two Jobs and no Neon, R2, Gemini,
+Gmail, or Firebase secret. A launch is audited separately from later pipeline
+completion. Migration 0018's partial unique index permits only one active
+document-preparation claim, preventing scheduled/manual overlap from issuing
+two paid calls.
 
 One canary plus 19 executions were paced by at least 30 seconds. All 20 claims
 completed exactly once (395 inputs; some paper-bounded claims contained fewer
