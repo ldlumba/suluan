@@ -2,11 +2,11 @@ name = "suluan-api-production"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
-# Owner-approved 2026-10-21: align the recovery/index/cleanup sweep with the
-# existing 15-minute processing trigger so Neon can scale to zero between
-# activity windows. This remains well inside the Queue's 24-hour retention.
+# Owner-approved 2026-10-24: align recovery/index/cleanup with processing and
+# embedding every two hours so Neon can scale to zero between activity windows.
+# Queue delivery remains immediate and primary; this is the durable fallback.
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["0 */2 * * *"]
 
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"

@@ -13,7 +13,7 @@
 
 No token-copying or Python rerun is required for papers already EXTRACTED.
 New papers still need the local Python extraction step before preparation.
-Keyword indexing runs automatically from the deployed production Worker's 15-minute
+Keyword indexing runs automatically from the deployed production Worker's two-hour
 scheduled sweep. The manager-only `POST /api/search/index` endpoint remains an
 incident/recovery escape hatch, but is not needed for normal operation.
 

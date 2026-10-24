@@ -150,8 +150,8 @@ has `roles/run.invoker` on this Job only. The Job remains one task with
 the query evaluation Job remains scheduler-free and keyless.
 
 Production uses the same bounded document-only pattern as of 2026-10-21.
-`suluan-embed-production-trigger` invokes `suluan-embed-production` every 15
-minutes in UTC with the production Scheduler identity granted resource-scoped
+`suluan-embed-production-trigger` invokes `suluan-embed-production` every two
+hours (`0 */2 * * *`, UTC) with the production Scheduler identity granted resource-scoped
 `roles/run.invoker`. The Job remains one claim/execution, zero task retries,
 and subject to the production 20-request/2,000-input daily document ceiling.
 When no accepted/current-index chunks lack vectors, claim returns before quota

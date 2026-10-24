@@ -95,6 +95,26 @@ remain. No staging/development resource, credential, or row has been reused.
   still include prorated staging usage before the deletion timestamp; use the
   next full billing period for the cleanest production-only comparison.
 
+### Two-hour production cadence — 2026-10-24
+
+- The owner reduced the Worker's combined maintenance trigger and both Cloud
+  Scheduler jobs (processing and document embedding) from every 15 minutes to
+  `0 */2 * * *` UTC. Aligning all three preserves a single scheduled Neon wake
+  window every two hours when production is otherwise idle.
+- Immediate queue delivery remains primary. The two-hour Worker trigger is the
+  durable fallback for missed notification enqueue/delivery, keyword indexing,
+  expired Assistant-request cleanup, and DOI enrichment; Cloudflare Queue's
+  24-hour retention is unchanged.
+- The accepted latency tradeoff is roughly 2–4 hours from acceptance to keyword
+  readiness and roughly 6–8 hours to complete semantic vectors for a typical
+  paper requiring multiple bounded embedding claims. Submission/decision
+  commits and user-facing search, download, Semantic Search, and Assistant
+  requests remain immediate and request-driven.
+- Worker version `ba4ff2f0-646f-4672-b53d-402bb5ee5dea` deployed the two-hour
+  cron. Both `suluan-processing-production-trigger` and
+  `suluan-embed-production-trigger` report enabled with the same next UTC
+  boundary and `0 */2 * * *` schedule.
+
 - Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
   production Desktop OAuth client (send-only scope); secrets
   `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/SENDER` plus `REO_MAILBOX` are
@@ -121,8 +141,8 @@ remain. No staging/development resource, credential, or row has been reused.
   REJECTED Gmail fixture), confirming non-leakage. Immediate replay
   would return the same IDs per environment-scoped idempotency.
 - Individual owner review/acceptance of all 139 is now due in the
-  production review queue (50 per batch); the 15-minute scheduler
-  extracts acceptances automatically and the aligned 15-minute sweep indexes
+  production review queue (50 per batch); the current two-hour scheduler
+  extracts acceptances automatically and the aligned two-hour sweep indexes
   them for keyword search.
 
 ### Embedding backfill — day 1 (2026-10-15, temporary 160/2,000 ceiling)
@@ -162,7 +182,7 @@ remain. No staging/development resource, credential, or row has been reused.
 ### Automatic document embeddings — 2026-10-21
 
 - Owner-approved Cloud Scheduler job `suluan-embed-production-trigger` invokes
-  `suluan-embed-production` every 15 minutes (`*/15`, UTC), aligned with the
+  `suluan-embed-production` every two hours (`0 */2 * * *`, UTC), aligned with the
   extraction and Worker-maintenance schedules. The existing production
   Scheduler service account has `roles/run.invoker` on this Job only.
 - The pinned Job remains one task, parallelism one, `SULUAN_MAX_CLAIMS=1`, zero
