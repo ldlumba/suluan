@@ -61,5 +61,4 @@ instructions.
 - **IMPLEMENTATION RULE** states a required safeguard, not proof that it exists.
 - **PROPOSED / TBD** remains unresolved unless a later dated amendment explicitly
   supersedes it.
-- Verify current code, deployed configuration, and test evidence independently;
-  documentation alone is not proof of implementation or ISO conformance.
+- Verify current code, deployed configuration, and test results independently.

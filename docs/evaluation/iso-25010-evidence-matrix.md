@@ -2,10 +2,10 @@
 
 ## Scope and interpretation
 
-This matrix supports an external review against an unknown edition-specific
-rubric. It conservatively covers the ISO/IEC 25010:2011 product-quality model
-and the revised 2023 model. It is an evidence index, not a declaration of
-conformance or certification.
+This matrix maps SULUAN's available evidence and open questions to the
+ISO/IEC 25010:2011 product-quality model and the revised 2023 model. The
+evaluator's edition and rubric have not yet been supplied. This matrix is not
+a certification or a conformance assessment.
 
 Status vocabulary:
 
@@ -31,7 +31,7 @@ rubric rather than treating the crosswalk as normative wording.
 | Usability | Interaction capability | Feature-level UI tests cover routing, authentication guards, forms, status, review, search, graph, administration, operations, citations, and assistant disclosures. Labels, keyboard-focus styles, semantic headings, text rendering, and error states are implemented. | Automated + Design | **Gap:** no independent task-completion study, SUS score, WCAG audit, axe report, keyboard-only protocol, screen-reader report, or contrast evidence. |
 | Reliability | Reliability | Atomic submission/decision writes, idempotency, outbox recovery, lease fencing, stale-claim rejection, queue retry/DLQ behavior, safe parsing failures, and recovery tests. See [`../error-handling.md`](../error-handling.md). | Automated + Operational | **Gap:** no measured availability, MTBF, MTTR, fault-injection campaign, production RTO/RPO acceptance, or current institutional restore drill. |
 | Security | Security | Firebase token verification; exact identity admission; Neon roles; server-side visibility; private R2 mediation; CORS; size/schema validation; quotas; audit events; last-admin guard; untrusted-text handling; authorization regression tests. | Automated + Design | **Gap:** dependency vulnerability audit is unresolved because the package tree first needs a clean-install verification; no independent penetration test, SAST report, SBOM, DAST, or full Git-history secret scan is recorded. Privacy/retention approval remains TBD. |
-| Maintainability | Maintainability | Lint, formatting, strict frontend TypeScript, workspace tests, Drizzle migrations, architecture records, feature organization, and bounded extraction of three large modules. | Automated + Design | No coverage threshold, complexity budget, mutation testing, or maintainability-index baseline. `apps/worker/src/app.ts` remains a large coordination module. |
+| Maintainability | Maintainability | Lint, formatting, strict frontend TypeScript, workspace tests, Drizzle migrations, architecture records, and feature organization. | Automated + Design | No coverage threshold, complexity budget, mutation testing, or maintainability-index baseline. `apps/worker/src/app.ts` remains a large coordination module. |
 | Portability | Flexibility | Vite browser build, Cloudflare Worker bindings, migration-owned schema, environment templates, remote Cloud Build, and provider boundaries are documented. Credential-free checks run locally. | Automated + Design | Deployment depends on Cloudflare, Neon, Firebase/Google Cloud, and provider configuration. No alternate-provider portability test or clean-clone timing record yet. |
 | — | Safety | AI responses label repository evidence versus general guidance; evidence is PUBLIC-only; quotas, no-tool policy, prompt-injection defenses, safe parser failures, and human review boundaries are tested/documented. | Automated + Design | Institutional harm analysis, misuse review, safety acceptance criteria, monitoring thresholds, and incident ownership remain incomplete. Assistant output is advisory and must not be treated as authoritative research judgment. |
 
@@ -47,7 +47,7 @@ rubric rather than treating the crosswalk as normative wording.
 | Production topology | [`../production-environment.md`](../production-environment.md) | Current operational record | Must be reconciled with actual provider configuration and deployment identifiers during evaluation. |
 | Architecture safeguards | [`../../SULUAN_ARCHITECTURE_V1_CONTEXT.md`](../../SULUAN_ARCHITECTURE_V1_CONTEXT.md) | Authoritative decision record | A requirement source, not proof of implementation. Verify against code/tests/runtime. |
 
-## Evidence that must not be overstated
+## Limits of the evidence
 
 1. Passing unit/component tests do not prove production availability or
    end-to-end correctness.
@@ -59,7 +59,7 @@ rubric rather than treating the crosswalk as normative wording.
 5. Semantic and generative relevance tests demonstrate bounded test-set
    behavior, not universal correctness.
 
-## Recommended evaluator measurements
+## Further checks
 
 1. Record five representative task flows: public discovery/download, user
    submission/status, manager review, administrator role/catalog control, and

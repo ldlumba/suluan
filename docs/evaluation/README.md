@@ -1,7 +1,8 @@
 # External evaluation evidence
 
-This directory is the entry point for an independent software-quality review.
-It does not claim ISO/IEC certification or replace the evaluator's rubric.
+This directory contains the quality evidence and requirements traceability for
+SULUAN. The ISO/IEC 25010 matrix is a reference for review, not a certification
+or a substitute for the evaluator's criteria.
 
 - [`iso-25010-evidence-matrix.md`](iso-25010-evidence-matrix.md) maps current
   evidence and known gaps to both ISO/IEC 25010:2011 and 25010:2023.
@@ -11,8 +12,8 @@ It does not claim ISO/IEC certification or replace the evaluator's rubric.
 
 ## Evaluated baseline
 
-- Source commit: `9546cef` (`docs: add ISO 25010 evaluation evidence`; the
-  preceding `c9e9b22` contains all code changes — `9546cef` touches only docs)
+- Source commit: `9546cef`. The preceding commit, `c9e9b22`, contains the
+  application code; `9546cef` changes documentation only.
 - Public application: <https://suluan-repository.pages.dev>
 - API health: <https://suluan-api-production.ctrlfinder.workers.dev/api/health>
 - Evidence refresh date: 2026-10-28
@@ -25,8 +26,7 @@ Live deployment identifiers, verified 2026-10-28:
 | Pages frontend | deployment `b594373d-3243-47e6-8f32-4b27b0ca123b` | `9546cef`, serving the production alias |
 
 Both the API health endpoint and the public application returned HTTP 200
-immediately after deployment. The source commit is authoritative for repository
-evidence; the identifiers above bind the live system to that source.
+immediately after deployment.
 
 ## Reproduce the credential-free checks
 
@@ -53,8 +53,9 @@ Observed on 2026-10-28:
 - The build reported a large main JavaScript chunk; this remains a performance
   risk, not a failed functional test.
 
-Skipped tests are not passes. Database integration evidence requires an
-explicitly authorized isolated target or controlled production-safe procedure.
+Database integration tests require an explicitly authorized isolated target or
+a controlled production-safe procedure. The skipped tests have not been verified
+by this run.
 
 ## Evaluator handling rules
 

@@ -1,8 +1,7 @@
 # Requirements-to-test traceability
 
-This table traces the principal product and security requirements to current
-implementation and test evidence. It is intentionally requirement-oriented;
-test file counts alone do not establish quality.
+This table links the main product and security requirements to their
+implementation, tests, and remaining checks.
 
 | ID | Requirement | Implementation boundary | Primary automated evidence | Residual verification |
 |---|---|---|---|---|

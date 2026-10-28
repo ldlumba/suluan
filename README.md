@@ -133,6 +133,3 @@ retired resources still exist or that their former settings remain approved.
   handover.
 - Semantic search and assistant output are bounded aids, not authoritative
   research judgments; their interfaces disclose provenance and limitations.
-
-Do not describe the project as ISO/IEC 25010 certified. Evaluation results must
-identify the tested version, criteria, procedures, evidence, and residual risks.
