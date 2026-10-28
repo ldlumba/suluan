@@ -29,7 +29,7 @@ export function SignInPage() {
             Sign in to your research workspace.
           </h1>
           <p className="mt-6 max-w-md leading-7 text-white/75">
-            Use your authorized UA Google account to submit research, track its
+            Use your authorized Google account to submit research, track its
             review, and use authenticated discovery tools.
           </p>
         </div>
@@ -47,8 +47,9 @@ export function SignInPage() {
             Continue with Google
           </h2>
           <p className="mt-4 max-w-md leading-7 text-[var(--ink-muted)]">
-            Choose the Google account issued by the University of the
-            Assumption. Non-UA accounts are not admitted.
+            University of the Assumption accounts are admitted by default.
+            Named evaluation accounts may also sign in during an approved,
+            time-limited assessment.
           </p>
 
           <div className="my-8 border-y border-[var(--border)] py-6">

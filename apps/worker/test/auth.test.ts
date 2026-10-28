@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/neon-http'
 import { generateKeyPair, SignJWT } from 'jose'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { profiles } from '@suluan/db/schema'
+import { isAllowedIdentity } from '../src/config'
 import { KID, PROJECT_ID, setupTestAuth, type TestAuth } from './helpers'
 
 let t: TestAuth
@@ -71,6 +72,79 @@ describe('domain allowlist', () => {
   it('rejects lookalike domains', async () => {
     const token = await mintToken({ sub: 'uid-f', email: 'x@fakeua.edu.ph' })
     expect((await authed('/api/me', token)).status).toBe(403)
+  })
+
+  it('admits only an exact verified evaluator before the configured expiry', () => {
+    const expiresAt = '2026-11-30T16:00:00Z'
+    const beforeExpiry = Date.parse('2026-11-30T15:59:59Z')
+    expect(
+      isAllowedIdentity(
+        'Evaluation.Person@Gmail.com',
+        true,
+        'ua.edu.ph',
+        'evaluation.person@gmail.com,other@gmail.com',
+        expiresAt,
+        beforeExpiry,
+      ),
+    ).toBe(true)
+    expect(
+      isAllowedIdentity(
+        'not-listed@gmail.com',
+        true,
+        'ua.edu.ph',
+        'evaluation.person@gmail.com',
+        expiresAt,
+        beforeExpiry,
+      ),
+    ).toBe(false)
+    expect(
+      isAllowedIdentity(
+        'evaluation.person@gmail.com',
+        false,
+        'ua.edu.ph',
+        'evaluation.person@gmail.com',
+        expiresAt,
+        beforeExpiry,
+      ),
+    ).toBe(false)
+  })
+
+  it('fails closed at expiry or with malformed temporary configuration', () => {
+    const email = 'evaluation.person@gmail.com'
+    const allowlist = email
+    const expiresAt = '2026-11-30T16:00:00Z'
+    expect(
+      isAllowedIdentity(
+        email,
+        true,
+        'ua.edu.ph',
+        allowlist,
+        expiresAt,
+        Date.parse(expiresAt),
+      ),
+    ).toBe(false)
+    expect(
+      isAllowedIdentity(
+        email,
+        true,
+        'ua.edu.ph',
+        allowlist,
+        'not-a-date',
+      ),
+    ).toBe(false)
+    expect(
+      isAllowedIdentity(email, true, 'ua.edu.ph', undefined, expiresAt),
+    ).toBe(false)
+    // Institutional access is independent of the temporary exception.
+    expect(
+      isAllowedIdentity(
+        'student@ua.edu.ph',
+        false,
+        'ua.edu.ph',
+        undefined,
+        undefined,
+      ),
+    ).toBe(true)
   })
 })
 

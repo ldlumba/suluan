@@ -153,8 +153,8 @@ export function AdminUsersPage() {
           </h2>
           <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-[var(--ink-muted)] marker:text-[var(--primary)]">
             <li>
-              View verified UA accounts and assign User, Repository manager, or
-              Administrator roles.
+              View admitted UA and evaluation accounts and assign User,
+              Repository manager, or Administrator roles.
             </li>
             <li>
               Activate or deactivate courses available for new submissions.
@@ -170,7 +170,7 @@ export function AdminUsersPage() {
         </p>
       )}
       {accounts.isSuccess && accounts.data.length === 0 && (
-        <p>No verified UA accounts have signed in yet.</p>
+        <p>No admitted accounts have signed in yet.</p>
       )}
 
       {accounts.isSuccess && accounts.data.length > 0 && (

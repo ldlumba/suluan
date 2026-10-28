@@ -37,13 +37,14 @@ export function PrivacyPage() {
           <p>
             SULUAN signs you in with your Google account through Firebase
             Authentication. Google shares your name, email address, and profile
-            photo with the application. SULUAN stores your verified University
-            of the Assumption email address, display name, and repository role
-            in its project database to enforce access: only verified{' '}
-            <span className="font-medium">ua.edu.ph</span> accounts can submit,
-            review, or use signed-in discovery and AI features. Public search
-            and public paper downloads work without signing in and store nothing
-            about you.
+            photo with the application. SULUAN stores your verified email
+            address, display name, and repository role in its project database
+            to enforce access. Verified{' '}
+            <span className="font-medium">ua.edu.ph</span> accounts are admitted
+            by default; specifically authorized evaluation accounts may receive
+            the same signed-in access for a documented, time-limited assessment.
+            Public search and public paper downloads work without signing in and
+            store nothing about you.
           </p>
         </section>
 

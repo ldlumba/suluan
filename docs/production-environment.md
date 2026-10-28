@@ -147,6 +147,29 @@ remain. No staging/development resource, credential, or row has been reused.
   `/operations` serves through the production SPA and signed-out access
   redirects to sign-in before operational data is requested.
 
+### Time-bounded evaluation identity — 2026-10-28
+
+- The owner approved one named external Google account for ISO and related
+  evaluation. The exact address is stored only in the production Worker secret
+  `EVALUATION_EMAILS`; Gmail is not added to `ALLOWED_DOMAINS`.
+- Admission requires Firebase `email_verified`, an exact case-insensitive email
+  match, and the future `EVALUATION_ACCESS_EXPIRES_AT` value. Production expires
+  the exception at `2026-11-30T16:00:00Z`, equivalent to December 1 at 00:00 in
+  the Philippines. Missing, malformed, or expired configuration denies access.
+- An admitted evaluator receives the normal auto-created `USER` profile and
+  UA-equivalent signed-in visibility/features. Any role promotion remains an
+  ADMIN-only audited Neon change with optimistic concurrency and last-admin
+  protection. Expiry denies authentication but preserves the profile and audit
+  trail, so any temporary elevated role must be demoted before the deadline.
+- Worker version `2bfc6ee9-e6f2-47f6-b117-eed324453568` activated the gate;
+  Cloudflare secret inventory confirms the named-email secret without exposing
+  its value, and production health returned 200. Pages deployment `6672dd78`
+  published the updated sign-in, privacy, and account-administration copy.
+  Automated policy tests cover exact matching, verified-email enforcement,
+  expiry-boundary denial, malformed configuration, and unchanged UA access.
+  A real first sign-in remains the evaluator-operated canary because account
+  credentials are never collected by the project or deployment operator.
+
 - Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
   production Desktop OAuth client (send-only scope); secrets
   `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/SENDER` plus `REO_MAILBOX` are
@@ -271,6 +294,14 @@ remain free; current staging traffic is far below the request ceiling.
 
 - Public visitors retain visibility-filtered keyword discovery and PUBLIC files.
 - Any server-verified `ua.edu.ph` profile may use authenticated Semantic Search.
+- Through `2026-11-30T16:00:00Z`, specifically named external Google accounts
+  in the production-only `EVALUATION_EMAILS` Worker secret are admitted as a
+  time-bounded evaluation exception. This is exact-email matching, not an
+  allowed Gmail domain. Firebase must report the email verified. The account
+  receives normal UA-equivalent visibility and feature access, starts as
+  `USER`, and may be promoted only through the existing audited ADMIN workflow.
+  Any elevated role must be demoted before expiry; expiry blocks sign-in but
+  deliberately preserves the profile and audit history.
 - Semantic Search is limited to 10 meaning-based queries/user/UTC day and 500
   aggregate/day. It uses a production-only quota bucket; exhaustion falls back
   to labeled keyword evidence.

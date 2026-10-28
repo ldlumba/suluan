@@ -44,7 +44,7 @@ describe('account role administration', () => {
       screen.getByText(/activate or deactivate courses/i),
     ).toBeInTheDocument()
     expect(
-      await screen.findByText('No verified UA accounts have signed in yet.'),
+      await screen.findByText('No admitted accounts have signed in yet.'),
     ).toBeInTheDocument()
   })
 })

@@ -11,6 +11,9 @@ crons = ["0 */3 * * *"]
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"
 ALLOWED_ORIGINS = "https://suluan-repository.pages.dev"
+# Owner-approved external evaluation exception. Exact emails are stored only
+# in the EVALUATION_EMAILS Worker secret; access ends at midnight Asia/Manila.
+EVALUATION_ACCESS_EXPIRES_AT = "2026-11-30T16:00:00Z"
 
 # Corpus/document embedding is conservative and independent of query use.
 # The temporary 160-request backfill override (owner-approved 2026-10-15)

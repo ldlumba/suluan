@@ -40,6 +40,13 @@ export interface Env {
   FIREBASE_PROJECT_ID: string
   ALLOWED_DOMAINS: string
   /**
+   * Exact temporary evaluation emails. Deployed as a Worker secret so named
+   * evaluator identities are not committed to source control.
+   */
+  EVALUATION_EMAILS?: string
+  /** ISO timestamp after which every temporary evaluation email is denied. */
+  EVALUATION_ACCESS_EXPIRES_AT?: string
+  /**
    * Comma-separated exact origins allowed to call the API from browsers
    * (e.g. "http://localhost:5173"). Production value is set at deploy time;
    * never "*" — the API carries Authorization headers and must not accept
@@ -145,6 +152,35 @@ export function isAllowedDomain(
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean)
     .includes(domain)
+}
+
+/**
+ * Identity admission remains domain-first. A named external evaluator is an
+ * explicit, time-bounded exception: exact email, verified Google identity, and
+ * a valid future expiry are all required. Missing or malformed configuration
+ * fails closed. Roles remain authoritative in Neon after admission.
+ */
+export function isAllowedIdentity(
+  email: string,
+  emailVerified: boolean,
+  allowedDomains: string,
+  evaluationEmails: string | undefined,
+  evaluationAccessExpiresAt: string | undefined,
+  now = Date.now(),
+): boolean {
+  if (isAllowedDomain(email, allowedDomains)) return true
+  if (!emailVerified || !evaluationEmails || !evaluationAccessExpiresAt)
+    return false
+
+  const expiresAt = Date.parse(evaluationAccessExpiresAt)
+  if (!Number.isFinite(expiresAt) || now >= expiresAt) return false
+
+  const normalized = email.trim().toLowerCase()
+  return evaluationEmails
+    .split(',')
+    .map((candidate) => candidate.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(normalized)
 }
 
 /** Parse the CORS origin allowlist. Matching is exact — no wildcards. */

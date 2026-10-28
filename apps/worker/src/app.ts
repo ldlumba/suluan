@@ -13,7 +13,7 @@ import {
   type TokenVerifier,
   type VerifiedServiceIdentity,
 } from './auth'
-import { isAllowedDomain, parseAllowedOrigins, type Env } from './config'
+import { isAllowedIdentity, parseAllowedOrigins, type Env } from './config'
 import { createDb } from './db'
 import { createSubmissionAtomic, recordDecisionAtomic } from './writes'
 import {
@@ -83,9 +83,10 @@ export function createApp(
 
   /**
    * Authentication + authorization boundary. Verifies the Firebase ID token,
-   * enforces the UA domain allowlist, and loads (or auto-creates as USER)
-   * the Neon profile. Client-supplied roles are never trusted — the role
-   * comes from Neon only. Every protected route goes through this middleware.
+   * enforces institutional or time-bounded evaluator admission, and loads (or
+   * auto-creates as USER) the Neon profile. Client-supplied roles are never
+   * trusted — the role comes from Neon only. Every protected route goes
+   * through this middleware.
    */
   const requireAuth: MiddlewareHandler<AppContext> = async (c, next) => {
     const header = c.req.header('authorization')
@@ -101,7 +102,15 @@ export function createApp(
     } catch {
       return c.json({ error: 'unauthorized' }, 401)
     }
-    if (!isAllowedDomain(identity.email, c.env.ALLOWED_DOMAINS)) {
+    if (
+      !isAllowedIdentity(
+        identity.email,
+        identity.emailVerified,
+        c.env.ALLOWED_DOMAINS,
+        c.env.EVALUATION_EMAILS,
+        c.env.EVALUATION_ACCESS_EXPIRES_AT,
+      )
+    ) {
       return c.json({ error: 'forbidden' }, 403)
     }
 
@@ -133,8 +142,9 @@ export function createApp(
    * through as an anonymous visitor instead of failing the request, so an
    * expired session degrades to public results rather than an error.
    *
-   * A *valid* token for a non-UA domain is rejected outright (403): silently
-   * downgrading a real identity to anonymous would hide a policy violation.
+   * A *valid* token for a non-admitted identity is rejected outright (403):
+   * silently downgrading a real identity to anonymous would hide a policy
+   * violation.
    */
   const optionalAuth: MiddlewareHandler<AppContext> = async (c, next) => {
     const header = c.req.header('authorization')
@@ -148,7 +158,15 @@ export function createApp(
     } catch {
       return next()
     }
-    if (!isAllowedDomain(identity.email, c.env.ALLOWED_DOMAINS)) {
+    if (
+      !isAllowedIdentity(
+        identity.email,
+        identity.emailVerified,
+        c.env.ALLOWED_DOMAINS,
+        c.env.EVALUATION_EMAILS,
+        c.env.EVALUATION_ACCESS_EXPIRES_AT,
+      )
+    ) {
       return c.json({ error: 'forbidden' }, 403)
     }
     const db = createDb(c.env.DATABASE_URL)
@@ -156,7 +174,7 @@ export function createApp(
       where: eq(profiles.firebaseUid, identity.uid),
     })
     // Read paths must never auto-create profiles (that is a write); a visitor
-    // with a valid UA token but no profile row is treated as a plain UA user.
+    // with a valid admitted token but no profile row is treated as a plain user.
     c.set('identity', identity)
     if (existing) c.set('profile', existing)
     else

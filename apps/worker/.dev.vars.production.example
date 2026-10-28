@@ -2,6 +2,8 @@
 # never copy real values into this file or Git.
 DATABASE_URL=
 FIREBASE_PROJECT_ID=suluan-production
+EVALUATION_EMAILS=
+EVALUATION_ACCESS_EXPIRES_AT=
 PROCESSING_SERVICE_AUDIENCE=https://suluan-api-production.ctrlfinder.workers.dev
 PROCESSING_SERVICE_ACCOUNT=suluan-processing-production@suluan-production.iam.gserviceaccount.com
 QUERY_EMBEDDING_URL=

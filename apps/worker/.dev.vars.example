@@ -9,6 +9,10 @@
 DATABASE_URL=
 FIREBASE_PROJECT_ID=
 ALLOWED_DOMAINS=ua.edu.ph
+# Optional exact-email evaluation exception. Keep empty unless an owner-approved
+# test is active; both values are required and malformed/expired config denies.
+EVALUATION_EMAILS=
+EVALUATION_ACCESS_EXPIRES_AT=
 # Local frontend origin. Add more comma-separated origins if you serve the
 # frontend on another port; production sets this via the dashboard instead.
 ALLOWED_ORIGINS=http://localhost:5173
