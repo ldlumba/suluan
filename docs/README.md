@@ -30,6 +30,14 @@ to recreate a retired environment.
 | [`../PRODUCT.md`](../PRODUCT.md) | Product audience, purpose, voice, and durable UX constraints |
 | [`../apps/web/DESIGN.md`](../apps/web/DESIGN.md) | Implemented frontend design system |
 
+## External evaluation
+
+| Document | Purpose |
+|---|---|
+| [`evaluation/README.md`](evaluation/README.md) | Evaluation baseline, reproducible checks, limitations, and handling rules |
+| [`evaluation/iso-25010-evidence-matrix.md`](evaluation/iso-25010-evidence-matrix.md) | ISO/IEC 25010:2011 and 2023 evidence crosswalk and gaps |
+| [`evaluation/requirements-test-traceability.md`](evaluation/requirements-test-traceability.md) | Principal requirements mapped to implementation, tests, and residual verification |
+
 ## Historical and bounded evaluation evidence
 
 The following documents are retained for reproducibility and audit history.
