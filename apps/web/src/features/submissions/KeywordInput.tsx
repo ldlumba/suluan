@@ -45,9 +45,7 @@ export function KeywordInput({
                 type="button"
                 aria-label={`Remove keyword ${term}`}
                 className="text-muted-foreground hover:text-foreground"
-                onClick={() =>
-                  onChange(value.filter((v) => v !== term))
-                }
+                onClick={() => onChange(value.filter((v) => v !== term))}
               >
                 ×
               </button>

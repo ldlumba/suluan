@@ -83,9 +83,7 @@ export function effectiveVisibility(
  * Case expression yielding the effective level, for labeling results so the
  * UI never has to re-derive the embargo rule.
  */
-export function effectiveVisibilityLevel(
-  table: string,
-): SQL {
+export function effectiveVisibilityLevel(table: string): SQL {
   const t = (column: string) => sql.raw(`${table}.${column}`)
   return sql`case
     when ${t('visibility')} = 'PUBLIC'

@@ -124,13 +124,7 @@ describe('domain allowlist', () => {
       ),
     ).toBe(false)
     expect(
-      isAllowedIdentity(
-        email,
-        true,
-        'ua.edu.ph',
-        allowlist,
-        'not-a-date',
-      ),
+      isAllowedIdentity(email, true, 'ua.edu.ph', allowlist, 'not-a-date'),
     ).toBe(false)
     expect(
       isAllowedIdentity(email, true, 'ua.edu.ph', undefined, expiresAt),

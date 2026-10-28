@@ -1,7 +1,7 @@
 /**
- * Development upload policy, recorded 2026-10-01 (Architecture v1 §12).
+ * Current v1 upload policy, recorded 2026-10-01 (Architecture v1 §12).
  * PDF/DOCX only, 30 MB maximum, private `suluan-dev` bucket, no automatic
- * rejected-file deletion. These are development defaults, not permanent
+ * rejected-file deletion. These are implementation defaults, not permanent
  * policy.
  */
 export const UPLOAD_POLICY = {
@@ -47,9 +47,7 @@ export function extensionMatchesMime(
  */
 export function inferMimeFromFileName(fileName: string): string | null {
   const ext = fileName.split('.').pop()?.toLowerCase()
-  for (const [mime, mapped] of Object.entries(
-    UPLOAD_POLICY.extensionForMime,
-  )) {
+  for (const [mime, mapped] of Object.entries(UPLOAD_POLICY.extensionForMime)) {
     if (mapped === ext) return mime
   }
   return null
@@ -73,7 +71,9 @@ export interface ValidatedUpload {
  * and unit-testable without HTTP. The effective MIME is the browser's
  * content type, falling back to extension inference when empty.
  */
-export function validateUploadFile(file: File): ValidatedUpload | FileRejection {
+export function validateUploadFile(
+  file: File,
+): ValidatedUpload | FileRejection {
   const fileName = file.name ?? ''
   if (!fileName) return 'missing_file'
   const mimeType = file.type || inferMimeFromFileName(fileName) || ''

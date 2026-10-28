@@ -15,6 +15,7 @@ __pycache__/
 # Wrangler local secrets (never commit)
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
 !.dev.vars.*.example
 
 # Wrangler dev/deploy artifacts (never commit)
@@ -34,6 +35,11 @@ suluan-import-report.json.tmp
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Local AI/design-agent tooling is not part of the product source tree
+.opencode/
+.impeccable/
+**/.impeccable/
 # impeccable-ignore-start
 # Ephemeral output, runtime state, and per-developer overrides.
 **/.impeccable/config.local.json

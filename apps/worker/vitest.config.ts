@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 
-/** Worker integration tests use the remote Neon development database. */
+/** Database integration tests run only when an explicit DATABASE_URL is supplied. */
 export default defineConfig({
   test: {
     testTimeout: 30_000,

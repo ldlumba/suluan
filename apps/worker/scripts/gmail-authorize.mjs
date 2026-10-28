@@ -104,7 +104,9 @@ async function fetchWithRetry(what, attempt, retries = 3) {
     return await attempt()
   } catch (err) {
     if (retries <= 1) {
-      fail(`${what} failed: network unreachable (${err.cause?.code ?? err.message}); check the connection and re-run`)
+      fail(
+        `${what} failed: network unreachable (${err.cause?.code ?? err.message}); check the connection and re-run`,
+      )
     }
     console.log(`${what} hit a network error, retrying...`)
     await new Promise((r) => setTimeout(r, 1500))
@@ -135,7 +137,9 @@ async function wranglerSecretPut(name, value, cwd) {
     child.on('close', (code) =>
       code === 0
         ? resolve()
-        : reject(new Error(`wrangler secret put ${name} exited with code ${code}`)),
+        : reject(
+            new Error(`wrangler secret put ${name} exited with code ${code}`),
+          ),
     )
     child.stdin.end(value, 'utf8')
   })
@@ -148,7 +152,9 @@ async function confirmWranglerAvailable() {
       cwd: workerDir,
       stdio: 'ignore',
     })
-    child.on('error', (err) => reject(new Error(`could not start Wrangler: ${err.message}`)))
+    child.on('error', (err) =>
+      reject(new Error(`could not start Wrangler: ${err.message}`)),
+    )
     child.on('close', (code) =>
       code === 0
         ? resolve()
@@ -170,7 +176,10 @@ function openBrowser(url) {
 
 async function waitForCode(server, expectedState) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timed out waiting for consent (5 minutes)')), CALLBACK_TIMEOUT_MS)
+    const timer = setTimeout(
+      () => reject(new Error('timed out waiting for consent (5 minutes)')),
+      CALLBACK_TIMEOUT_MS,
+    )
     server.on('request', (req, res) => {
       const url = new URL(req.url ?? '/', 'http://127.0.0.1')
       if (url.pathname !== '/callback') {
@@ -182,31 +191,37 @@ async function waitForCode(server, expectedState) {
       const code = url.searchParams.get('code')
       const state = url.searchParams.get('state')
       if (error || !code || state !== expectedState) {
-        res.writeHead(400, { 'content-type': 'text/plain' }).end('Authorization failed; you can close this tab.')
-        reject(new Error(error ? `consent denied (${error})` : 'invalid callback; try again'))
+        res
+          .writeHead(400, { 'content-type': 'text/plain' })
+          .end('Authorization failed; you can close this tab.')
+        reject(
+          new Error(
+            error ? `consent denied (${error})` : 'invalid callback; try again',
+          ),
+        )
         return
       }
-      res.writeHead(200, { 'content-type': 'text/plain' }).end('Authorized. You can close this tab and return to the terminal.')
+      res
+        .writeHead(200, { 'content-type': 'text/plain' })
+        .end('Authorized. You can close this tab and return to the terminal.')
       resolve(code)
     })
   })
 }
 
 async function exchangeCode({ clientId, clientSecret, code, redirectUri }) {
-  const res = await fetchWithRetry(
-    'token exchange',
-    () =>
-      fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          code,
-          redirect_uri: redirectUri,
-          grant_type: 'authorization_code',
-        }).toString(),
-      }),
+  const res = await fetchWithRetry('token exchange', () =>
+    fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }).toString(),
+    }),
   )
   if (!res.ok) fail(`token exchange failed: HTTP ${res.status}`)
   const data = await res.json()
@@ -222,16 +237,17 @@ async function confirmSenderMailbox(accessToken, sender) {
   // tokeninfo reports the identity because the authorization request includes
   // the standard `openid email` scopes. This avoids Gmail's users.getProfile,
   // which would require a Gmail read scope we deliberately do not request.
-  const res = await fetchWithRetry(
-    'mailbox verification',
-    () =>
-      fetch(
-        `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
-      ),
+  const res = await fetchWithRetry('mailbox verification', () =>
+    fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
+    ),
   )
   if (!res.ok) fail(`could not verify mailbox: HTTP ${res.status}`)
   const info = await res.json()
-  if (typeof info.email !== 'string' || info.email.toLowerCase() !== sender.toLowerCase()) {
+  if (
+    typeof info.email !== 'string' ||
+    info.email.toLowerCase() !== sender.toLowerCase()
+  ) {
     fail(
       `consent came from ${info.email ?? '(unknown account)'}, not ${sender}; ` +
         `re-run and approve as the sender address, then this run stores nothing`,
@@ -239,7 +255,9 @@ async function confirmSenderMailbox(accessToken, sender) {
   }
   const granted = typeof info.scope === 'string' ? info.scope.split(' ') : []
   if (!granted.includes(GMAIL_SEND_SCOPE)) {
-    fail('consent did not include the Gmail send scope; re-run and approve sending mail')
+    fail(
+      'consent did not include the Gmail send scope; re-run and approve sending mail',
+    )
   }
 }
 
@@ -251,10 +269,11 @@ const clientId = await prompt('OAuth client ID', { secret: true })
 if (!clientId) fail('client ID is required')
 const clientSecret = await prompt('OAuth client secret', { secret: true })
 if (!clientSecret) fail('client secret is required')
-const sender = await prompt('Sender UA mailbox', { def: 'ld_lumba.student@ua.edu.ph' })
+const sender = await prompt('Sender UA mailbox')
 if (!sender || !sender.includes('@')) fail('a valid sender address is required')
 const reoMailbox = await prompt('REO recipient mailbox', { def: sender })
-if (!reoMailbox || !reoMailbox.includes('@')) fail('a valid recipient address is required')
+if (!reoMailbox || !reoMailbox.includes('@'))
+  fail('a valid recipient address is required')
 
 const server = createServer()
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -296,5 +315,7 @@ await wranglerSecretPut('GMAIL_REFRESH_TOKEN', tokens.refresh_token, workerDir)
 await wranglerSecretPut('GMAIL_SENDER', sender, workerDir)
 await wranglerSecretPut('REO_MAILBOX', reoMailbox, workerDir)
 
-console.log(`\nDone. Redeploy the ${useProduction ? 'production' : 'staging'} Worker so the new secrets take effect:`)
+console.log(
+  `\nDone. Redeploy the ${useProduction ? 'production' : 'staging'} Worker so the new secrets take effect:`,
+)
 console.log(`  ${DEPLOY_HINT}`)

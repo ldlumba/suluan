@@ -60,7 +60,7 @@ export const roleManagementState = pgTable(
 )
 
 // School/course catalogs live in Neon with course depending on school.
-// Concrete catalog contents are TBD — these tables ship EMPTY.
+// Migration 0008 owns the approved 4-school/24-course institutional catalog.
 export const schools = pgTable('schools', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull().unique(),

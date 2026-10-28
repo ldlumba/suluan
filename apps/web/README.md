@@ -1,32 +1,43 @@
-# React + TypeScript + Vite
+# SULUAN web application
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This workspace contains SULUAN's React browser application. It provides public
+repository discovery and record pages plus authenticated submission, status,
+review, administration, repository operations, semantic search, and research
+assistant interfaces.
 
-Currently, two official plugins are available:
+## Commands
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Run from the repository root:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm run dev
+npm run test -w web
+npm run typecheck -w web
+npm run lint -w web
+npm run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The local application defaults to `http://localhost:5173` and calls
+`http://localhost:8787` unless `VITE_API_BASE_URL` is configured.
+
+## Browser configuration
+
+Copy `.env.example` to `.env.local` and supply the public Firebase browser
+configuration. Missing Firebase configuration disables interactive sign-in but
+does not expose server credentials. Production examples are placeholders in
+`.env.production.example`; real local values remain ignored.
+
+## Structure
+
+- `src/app` — routing, public pages, and shared layout.
+- `src/features` — feature-owned pages, components, and tests.
+- `src/components/ui` — shared shadcn/ui primitives.
+- `src/lib` — API, Firebase, and TanStack Query infrastructure.
+
+The browser never decides authorization. Roles, workflow state, visibility,
+file keys, quotas, and publication eligibility are enforced by the Worker.
+Extracted or generated text is rendered as text, never trusted HTML.
+
+Frontend decisions and accessibility expectations are documented in
+[`DESIGN.md`](DESIGN.md) and
+[`../../docs/architecture/suluan-v1-frontend-handoff.md`](../../docs/architecture/suluan-v1-frontend-handoff.md).

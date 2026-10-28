@@ -2,11 +2,11 @@
 
 ## Status and scope
 
-Stage 5 design is complete as of 2026-10-04. This document defines the
-authorized, reproducible 40-document pilot that will be executed only after an
-isolated staging environment exists. It does not authorize a staging or
-production deployment, automatic scheduling, OCR, semantic embedding, or a
-change to the current development limits.
+**HISTORICAL TEST DESIGN.** Stage 5 design was completed on 2026-10-04 and the
+bounded pilot was later executed; see `stage8-pilot-results.md`. The isolated
+staging environment was retired on 2026-10-21. This document preserves the
+authorized, reproducible 40-document protocol and does not authorize recreating
+staging, changing production, automatic scheduling, OCR, or semantic embedding.
 
 The pilot covers upload, individual review, acceptance, private download,
 bounded extraction, keyword preparation, discovery, and controlled extraction
@@ -75,7 +75,7 @@ Generate F01–F04 into an ignored or temporary directory:
 
 ```powershell
 services/processing/.venv/Scripts/python.exe services/processing/pilot_fixtures.py `
-  --output C:\Users\Lims\AppData\Local\Temp\opencode\suluan-pilot-fixtures
+  --output <temporary-directory>/suluan-pilot-fixtures
 ```
 
 | ID | Case | Expected terminal result |

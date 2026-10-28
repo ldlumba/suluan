@@ -12,7 +12,8 @@ const dialect = new PgDialect()
 
 /** Render a fragment to SQL, normalized so assertions ignore template spacing. */
 function text(sql: SQL): string {
-  return dialect.sqlToQuery(sql)
+  return dialect
+    .sqlToQuery(sql)
     .sql.replace(/\s+/g, ' ')
     .replace(/\(\s+/g, '(')
     .replace(/\s+\)/g, ')')

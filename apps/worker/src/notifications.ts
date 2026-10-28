@@ -227,7 +227,10 @@ async function submissionEmailDetails(
     limit 1
   `)
   if (result.rows.length === 0) return null
-  const row = result.rows[0] as Omit<SubmissionEmailDetails, 'sizeBytes' | 'keywords'> & {
+  const row = result.rows[0] as Omit<
+    SubmissionEmailDetails,
+    'sizeBytes' | 'keywords'
+  > & {
     sizeBytes: string | null
     keywords: string[] | null
   }

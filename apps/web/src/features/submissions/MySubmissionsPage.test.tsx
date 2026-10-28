@@ -68,9 +68,7 @@ describe('MySubmissionsPage', () => {
     expect(
       screen.getByText(/access restrictions until 2027-01-01/),
     ).toBeInTheDocument()
-    expect(
-      screen.getByText('Keywords: Machine Learning'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Keywords: Machine Learning')).toBeInTheDocument()
   })
 
   it('renders a pending submission with no remarks', async () => {

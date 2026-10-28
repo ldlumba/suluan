@@ -37,7 +37,7 @@ The earlier strict contract was implemented and live-canary-passed in staging,
 only for the exact-email adult pilot allowlist with all service settings
 configured** (`ASSISTANT_SERVICE_URL` set, secret attached to the dedicated
 service identity). Owner
-confirmed an adult-only staging pilot for `ld_lumba.student@ua.edu.ph` on
+confirmed an adult-only staging pilot for one exact owner-approved UA account on
 2026-10-10. This is not authorization for every UA account or production.
 
 The owner-approved 2026-10-06 model is `gemini-3-flash-preview`. Limits are server-owned: 10 attempts

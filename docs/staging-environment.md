@@ -84,7 +84,7 @@ All items were completed on 2026-10-04:
    direct endpoint for migrations and pooled endpoint for the Worker.
 
 Provisioning used the single staging administrator
-(`ld_lumba.student@ua.edu.ph`). No second staging administrator is required;
+(stored only in the retired environment's server configuration). No second staging administrator is required;
 two trusted admins remain a Stage 9 production-readiness item. Production
 provisioning remains separately TBD.
 
@@ -253,7 +253,7 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   is returned only after Gmail supplies a non-empty message ID, a notification
   row is persisted with status `SENT` and provider `gmail`, and the outbox row
   is completed. This verifies real Gmail delivery rather than the log adapter.
-- Sender and recipient are both `ld_lumba.student@ua.edu.ph` for staging only.
+- Sender and recipient used the same temporary UA mailbox for staging only.
   Re-authorization under an institutionally owned REO mailbox remains Stage 9.
 - A follow-up submission from a different authenticated UA account proved the
   recipient split and rejection path. The configured REO mailbox received the
@@ -370,7 +370,7 @@ After this exit, Stage 7 reliability/security hardening runs before the full
   delivery continued asynchronously and did not affect durable submission
   success.
 - Redacted operator reports remain outside Git at
-  `C:\Users\Lims\AppData\Local\Temp\opencode\staging-legacy-import-{dry-run,apply,replay}-20261008.json`.
+  outside the repository in the operator's temporary directory.
   The next gate is authorized individual review. No bulk acceptance path was
   introduced or used.
 

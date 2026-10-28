@@ -48,7 +48,11 @@ export type KeywordValidationError =
 export function prepareSubmissionKeywords(
   input: unknown,
 ): { keywords: PreparedKeyword[] } | { error: KeywordValidationError } {
-  const parts = Array.isArray(input) ? input : input === undefined ? [] : [input]
+  const parts = Array.isArray(input)
+    ? input
+    : input === undefined
+      ? []
+      : [input]
   if (parts.length > MAX_RAW_PARTS) return { error: 'too_many_parts' }
   const seen = new Set<string>()
   const keywords: PreparedKeyword[] = []

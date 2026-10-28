@@ -36,7 +36,9 @@ describe('ReviewQueuePage access display', () => {
 
   it('shows the queue shell for managers', () => {
     renderPage('REPOSITORY_MANAGER')
-    expect(screen.getByRole('heading', { name: 'Review queue' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Review queue' }),
+    ).toBeInTheDocument()
   })
 
   it('asks for re-sign-in when permissions fail to load', () => {

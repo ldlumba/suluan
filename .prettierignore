@@ -1,5 +1,8 @@
 node_modules
 dist
 package-lock.json
+# Generated/frozen evidence must retain producer output and registered hashes
+packages/db/drizzle/meta/
+services/processing/*queries.json
 # Documentation is maintained by hand; do not let formatters churn it
 *.md

@@ -176,7 +176,7 @@ remain. No staging/development resource, credential, or row has been reused.
   removed evaluation-access disclosure from the public sign-in page; the
   privacy notice continues to document the category of temporary access.
 
-- Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
+- A temporary owner-authorized UA sender was configured via a
   production Desktop OAuth client (send-only scope); secrets
   `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN/SENDER` plus `REO_MAILBOX` are
   stored against the production Worker only. A first live drill failed
@@ -341,9 +341,9 @@ or provider claims. Hash/manifests remain the corpus identity boundary.
 ## Ownership and administration
 
 The project owner is the initial infrastructure, billing, deployment, and
-application administrator. On 2026-10-16, the owner promoted
-`majtayag.student@ua.edu.ph` from USER to ADMIN through the production Admin
-users page. Authoritative verification found two administrators, a synchronized
+application administrator. On 2026-10-16, the owner promoted a separate
+recovery account from USER to ADMIN through the production Admin users page.
+Authoritative verification found two administrators, a synchronized
 `role_management_state.admin_count` of 2, and the expected `role.changed` audit
 event. This satisfies the separate recovery-administrator gate. First-admin
 bootstrap must be production-explicit and audited; the development promotion

@@ -1,4 +1,4 @@
-/** Development default: character windows, not model tokens. Offsets use JS
+/** Current v1 policy: character windows, not model tokens. Offsets use JS
  * UTF-16 code units and refer to the unchanged extracted text. Changing the
  * strategy requires a new version. No tokenizer/model dependency yet.
  */

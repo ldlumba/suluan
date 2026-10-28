@@ -279,12 +279,7 @@ export async function deleteProfiles(db: Db, uids: string[]) {
   const admins = await db
     .select({ id: profiles.id })
     .from(profiles)
-    .where(
-      and(
-        inArray(profiles.firebaseUid, uids),
-        eq(profiles.role, 'ADMIN'),
-      ),
-    )
+    .where(and(inArray(profiles.firebaseUid, uids), eq(profiles.role, 'ADMIN')))
   await db.delete(profiles).where(inArray(profiles.firebaseUid, uids))
   if (admins.length) {
     await db.execute(sql`

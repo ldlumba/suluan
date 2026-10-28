@@ -525,7 +525,7 @@ export function assistantRoutes(requireAuth: MiddlewareHandler<AppContext>) {
             authors: item.authors,
             repositoryAcceptanceYear: item.year,
             // SULUAN policy 2026-10-11: repository (acceptance) year serves
-            // as the citation publication year; all 182 staging records are 2026.
+            // as the citation publication year under the approved repository policy.
             publicationYear: item.year,
           },
           excerpt: item.content.slice(0, 2000),

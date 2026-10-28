@@ -37,22 +37,24 @@ export const submissionKeywords = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => [unique('submission_keywords_submission_normalized').on(t.submissionId, t.normalizedName)],
+  (t) => [
+    unique('submission_keywords_submission_normalized').on(
+      t.submissionId,
+      t.normalizedName,
+    ),
+  ],
 )
 
 /** One row per normalized concept. Append-only: never delete these rows. */
-export const keywords = pgTable(
-  'keywords',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    normalizedName: text('normalized_name').notNull().unique(),
-    /** First-seen original casing, for display. */
-    displayName: text('display_name').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-)
+export const keywords = pgTable('keywords', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  normalizedName: text('normalized_name').notNull().unique(),
+  /** First-seen original casing, for display. */
+  displayName: text('display_name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+})
 
 /** Repository links. Position preserves author order. */
 export const researchKeywords = pgTable(
@@ -70,7 +72,9 @@ export const researchKeywords = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => [unique('research_keywords_record_keyword').on(t.recordId, t.keywordId)],
+  (t) => [
+    unique('research_keywords_record_keyword').on(t.recordId, t.keywordId),
+  ],
 )
 
 export const submissionKeywordsRelations = relations(

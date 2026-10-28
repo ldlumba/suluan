@@ -82,15 +82,26 @@ describe('batches', () => {
 describe('embedTexts', () => {
   it('sends the key in a header, not the URL, and normalizes results', async () => {
     const seen: { url?: string; init?: RequestInit } = {}
-    vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
-      seen.url = String(input)
-      seen.init = init
-      return new Response(
-        JSON.stringify({ embeddings: [{ values: [0, 0, 5, 0, ...Array(EMBEDDING_DIMS - 4).fill(0)] }] }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      )
-    })
-    const [vector] = await embedTexts('AQ.test-key-value', ['hello'], 'RETRIEVAL_QUERY')
+    vi.stubGlobal(
+      'fetch',
+      async (input: string | URL | Request, init?: RequestInit) => {
+        seen.url = String(input)
+        seen.init = init
+        return new Response(
+          JSON.stringify({
+            embeddings: [
+              { values: [0, 0, 5, 0, ...Array(EMBEDDING_DIMS - 4).fill(0)] },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      },
+    )
+    const [vector] = await embedTexts(
+      'AQ.test-key-value',
+      ['hello'],
+      'RETRIEVAL_QUERY',
+    )
     const headers = seen.init?.headers as Record<string, string>
     // A key in the query string would land in every access log.
     expect(seen.url).not.toContain('AQ.test-key-value')

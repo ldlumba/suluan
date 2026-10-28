@@ -21,7 +21,10 @@ needsDb('admin course availability', () => {
     t = await setupTestAuth()
     await insertProfile(testDb(), uid, `${uid}@ua.edu.ph`, 'ADMIN')
     token = await t.mintToken({ sub: uid, email: `${uid}@ua.edu.ph` })
-    const [school] = await testDb().select({ id: schools.id }).from(schools).limit(1)
+    const [school] = await testDb()
+      .select({ id: schools.id })
+      .from(schools)
+      .limit(1)
     const [course] = await testDb()
       .insert(courses)
       .values({
@@ -40,8 +43,7 @@ needsDb('admin course availability', () => {
       await testDb()
         .delete(auditEvents)
         .where(eq(auditEvents.actorId, actor.id))
-    if (courseId)
-      await testDb().delete(courses).where(eq(courses.id, courseId))
+    if (courseId) await testDb().delete(courses).where(eq(courses.id, courseId))
     await deleteProfiles(testDb(), [uid])
   })
 
