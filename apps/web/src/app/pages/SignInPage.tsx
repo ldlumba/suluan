@@ -48,8 +48,6 @@ export function SignInPage() {
           </h2>
           <p className="mt-4 max-w-md leading-7 text-[var(--ink-muted)]">
             University of the Assumption accounts are admitted by default.
-            Named evaluation accounts may also sign in during an approved,
-            time-limited assessment.
           </p>
 
           <div className="my-8 border-y border-[var(--border)] py-6">

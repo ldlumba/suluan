@@ -149,8 +149,8 @@ remain. No staging/development resource, credential, or row has been reused.
 
 ### Time-bounded evaluation identity — 2026-10-28
 
-- The owner approved one named external Google account for ISO and related
-  evaluation. The exact address is stored only in the production Worker secret
+- The owner approved three named external Google accounts for ISO and related
+  evaluation. The exact addresses are stored only in the production Worker secret
   `EVALUATION_EMAILS`; Gmail is not added to `ALLOWED_DOMAINS`.
 - Admission requires Firebase `email_verified`, an exact case-insensitive email
   match, and the future `EVALUATION_ACCESS_EXPIRES_AT` value. Production expires
@@ -169,6 +169,12 @@ remain. No staging/development resource, credential, or row has been reused.
   expiry-boundary denial, malformed configuration, and unchanged UA access.
   A real first sign-in remains the evaluator-operated canary because account
   credentials are never collected by the project or deployment operator.
+- The owner expanded the same exception to three exact evaluation addresses on
+  2026-10-28. Secret-change Worker version
+  `463082c7-9330-44ad-9402-0cf7d8cbdb0a` carries the complete three-address
+  allowlist with the unchanged expiry and policy. Pages deployment `5242508b`
+  removed evaluation-access disclosure from the public sign-in page; the
+  privacy notice continues to document the category of temporary access.
 
 - Temporary sender `ld_lumba.student@ua.edu.ph` authorized via a
   production Desktop OAuth client (send-only scope); secrets
