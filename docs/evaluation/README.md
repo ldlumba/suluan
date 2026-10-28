@@ -11,15 +11,22 @@ It does not claim ISO/IEC certification or replace the evaluator's rubric.
 
 ## Evaluated baseline
 
-- Source commit: `c9e9b22` (`chore: prepare repository for evaluation`)
+- Source commit: `9546cef` (`docs: add ISO 25010 evaluation evidence`; the
+  preceding `c9e9b22` contains all code changes — `9546cef` touches only docs)
 - Public application: <https://suluan-repository.pages.dev>
 - API health: <https://suluan-api-production.ctrlfinder.workers.dev/api/health>
 - Evidence refresh date: 2026-10-28
 
-The source commit is authoritative for repository evidence. At the refresh
-date, deployment of this final cleanup commit was blocked before upload by an
-expired local Cloudflare login. The live system therefore must not be assumed
-to contain `c9e9b22` until a later deployment identifier is recorded.
+Live deployment identifiers, verified 2026-10-28:
+
+| Layer | Deployment | Source |
+|---|---|---|
+| Worker API | version `4879b3d0-afe2-4074-95dc-1000ce680f04` | working tree at `9546cef` (code identical to `c9e9b22`) |
+| Pages frontend | deployment `b594373d-3243-47e6-8f32-4b27b0ca123b` | `9546cef`, serving the production alias |
+
+Both the API health endpoint and the public application returned HTTP 200
+immediately after deployment. The source commit is authoritative for repository
+evidence; the identifiers above bind the live system to that source.
 
 ## Reproduce the credential-free checks
 
