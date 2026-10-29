@@ -17,6 +17,7 @@ import { AdminCatalogPage } from '@/features/admin/AdminCatalogPage'
 import { AdminUsersPage } from '@/features/admin/AdminUsersPage'
 import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage'
 import { RepositoryOperationsPage } from '@/features/operations/RepositoryOperationsPage'
+import { ManagerDashboardPage } from '@/features/operations/ManagerDashboardPage'
 import { BookmarksPage } from '@/features/search/BookmarksPage'
 
 const graphPage = lazy(() =>
@@ -100,6 +101,14 @@ export const routes = [
         element: (
           <ProtectedRoute roles={['ADMIN', 'REPOSITORY_MANAGER']}>
             <RepositoryOperationsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/manager',
+        element: (
+          <ProtectedRoute roles={['REPOSITORY_MANAGER']}>
+            <ManagerDashboardPage />
           </ProtectedRoute>
         ),
       },

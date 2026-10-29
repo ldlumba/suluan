@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { RefreshCw, ShieldCheck, UserCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -91,6 +92,7 @@ function RoleEditor({ account }: { account: UserRow }) {
 }
 
 export function AdminUsersPage() {
+  const [search, setSearch] = useState('')
   const { user, profile, loading, getIdToken } = useAuth()
   const accounts = useQuery({
     queryKey: ['admin-users', profile?.id],
@@ -106,6 +108,10 @@ export function AdminUsersPage() {
     return <p>Only administrators can manage account roles.</p>
   if (accounts.error instanceof ApiError && accounts.error.status === 403)
     return <NotFoundPage />
+
+  const matchingAccounts = (accounts.data ?? []).filter((account) =>
+    (account.email ?? '').toLowerCase().includes(search.trim().toLowerCase()),
+  )
 
   return (
     <section className="space-y-8">
@@ -166,6 +172,19 @@ export function AdminUsersPage() {
         </div>
       </section>
 
+      <label
+        className="block max-w-md space-y-2 text-sm font-medium"
+        htmlFor="account-search"
+      >
+        Search by email
+        <Input
+          id="account-search"
+          type="search"
+          placeholder="Enter an email address"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
       {accounts.isPending && <p role="status">Loading accounts…</p>}
       {accounts.isError && (
         <p role="alert" className="text-destructive">
@@ -175,10 +194,13 @@ export function AdminUsersPage() {
       {accounts.isSuccess && accounts.data.length === 0 && (
         <p>No admitted accounts have signed in yet.</p>
       )}
+      {accounts.isSuccess &&
+        accounts.data.length > 0 &&
+        matchingAccounts.length === 0 && <p>No accounts match this email.</p>}
 
       {accounts.isSuccess && accounts.data.length > 0 && (
         <ul className="divide-y divide-border border-y border-border">
-          {accounts.data.map((account) => (
+          {matchingAccounts.map((account) => (
             <li
               key={`${account.id}:${account.updatedAt}`}
               className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,auto)] lg:items-center"

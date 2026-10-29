@@ -460,10 +460,6 @@ export function SearchPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <KeywordFilter
-                  initial={keywordFilter}
-                  onApply={(next) => updateFilter('keyword', next)}
-                />
                 <div className="space-y-2">
                   <Label htmlFor="search-school">School</Label>
                   <Select
@@ -562,6 +558,10 @@ export function SearchPage() {
                     }
                   />
                 </div>
+                <KeywordFilter
+                  initial={keywordFilter}
+                  onApply={(next) => updateFilter('keyword', next)}
+                />
               </div>
             </div>
           )}

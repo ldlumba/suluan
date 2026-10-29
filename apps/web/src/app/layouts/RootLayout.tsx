@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -33,6 +33,7 @@ export function RootLayout() {
   const [signedOutNotice, setSignedOutNotice] = useState(false)
   const [signOutError, setSignOutError] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuRef = useRef<HTMLElement>(null)
   const workspaceRef = useRef<HTMLDivElement>(null)
@@ -74,6 +75,7 @@ export function RootLayout() {
     try {
       await signOut()
       setSignOutOpen(false)
+      navigate('/', { replace: true })
       setSignedOutNotice(true)
     } catch {
       setSignOutError(true)
@@ -238,22 +240,6 @@ export function RootLayout() {
                       Bookmarks
                     </WorkspaceLink>
                   )}
-                  {repositoryManager && (
-                    <>
-                      <WorkspaceLink to="/review" onClick={closeWorkspace}>
-                        Review queue
-                      </WorkspaceLink>
-                      <WorkspaceLink to="/operations" onClick={closeWorkspace}>
-                        Repository operations
-                      </WorkspaceLink>
-                      <WorkspaceLink
-                        to="/graph/analytics"
-                        onClick={closeWorkspace}
-                      >
-                        Analytics
-                      </WorkspaceLink>
-                    </>
-                  )}
                 </div>
               )}
             </div>
@@ -272,6 +258,14 @@ export function RootLayout() {
                       className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 text-[0.72rem] font-bold tracking-[0.08em] text-[var(--highlight)] transition-colors hover:bg-[var(--highlight)] hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--highlight)]"
                     >
                       ADMIN
+                    </Link>
+                  ) : repositoryManager ? (
+                    <Link
+                      to="/manager"
+                      aria-label="Repository manager — open dashboard"
+                      className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 text-[0.72rem] font-bold text-[var(--highlight)]"
+                    >
+                      REPO
                     </Link>
                   ) : (
                     <span className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 text-[0.72rem] font-bold tracking-[0.08em] text-[var(--highlight)]">
@@ -342,21 +336,6 @@ export function RootLayout() {
                   Bookmarks
                 </MobileLink>
               )}
-              {repositoryManager && (
-                <MobileLink to="/review" onClick={closeMenu}>
-                  Review queue
-                </MobileLink>
-              )}
-              {repositoryManager && (
-                <MobileLink to="/operations" onClick={closeMenu}>
-                  Repository operations
-                </MobileLink>
-              )}
-              {repositoryManager && (
-                <MobileLink to="/graph/analytics" onClick={closeMenu}>
-                  Analytics
-                </MobileLink>
-              )}
               {user && (
                 <div className="flex items-center justify-between border-t border-white/10 px-3 pt-3 text-xs text-white/60">
                   <span>{user.email}</span>
@@ -370,6 +349,15 @@ export function RootLayout() {
                         className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 font-bold tracking-[0.08em] text-[var(--highlight)] hover:bg-[var(--highlight)] hover:text-[var(--foreground)]"
                       >
                         ADMIN
+                      </Link>
+                    ) : repositoryManager ? (
+                      <Link
+                        to="/manager"
+                        onClick={closeMenu}
+                        aria-label="Repository manager — open dashboard"
+                        className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 font-bold text-[var(--highlight)]"
+                      >
+                        REPO
                       </Link>
                     ) : (
                       <span className="font-bold tracking-[0.08em] text-[var(--highlight)]">

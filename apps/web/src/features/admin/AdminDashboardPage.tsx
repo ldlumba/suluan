@@ -64,7 +64,7 @@ function Metric({
   )
 }
 
-function AdminTool({
+export function AdminTool({
   to,
   icon,
   title,
@@ -155,8 +155,8 @@ export function AdminDashboardPage() {
               Admin dashboard
             </h1>
             <p className="mt-3 max-w-3xl leading-7 text-[var(--ink-muted)]">
-              A read-only overview of admitted accounts and repository pipeline
-              health. Actions remain in their dedicated, audited workspaces.
+              See account activity and the progress of papers in the repository.
+              Use the tools below to manage your work.
             </p>
           </div>
         </div>
@@ -168,34 +168,33 @@ export function AdminDashboardPage() {
             Administration tools
           </h2>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">
-            Open review, operations, analytics, and configuration from one
-            workspace.
+            Choose a task to get started.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <AdminTool
             to="/review"
             icon={<BookOpenCheck aria-hidden="true" />}
-            title="Review queue"
-            description="Review pending submissions and record decisions."
+            title="Review submissions"
+            description="Read submitted papers and record your decisions."
           />
           <AdminTool
             to="/operations"
             icon={<CloudCog aria-hidden="true" />}
-            title="Repository operations"
-            description="Monitor and launch bounded processing work."
+            title="Prepare papers for search"
+            description="Check paper processing and start preparation when needed."
           />
           <AdminTool
             to="/graph/analytics"
             icon={<Network aria-hidden="true" />}
-            title="Repository analytics"
-            description="Explore visibility-safe repository concentrations."
+            title="Explore research trends"
+            description="See research topics, courses, and years in the repository."
           />
           <AdminTool
             to="/admin/users"
             icon={<UserCog aria-hidden="true" />}
             title="Account roles"
-            description="Manage audited user, manager, and administrator roles."
+            description="Choose who can review papers or manage the repository."
           />
           <AdminTool
             to="/admin/catalog"
@@ -263,45 +262,45 @@ export function AdminDashboardPage() {
               className="size-5 text-[var(--primary)]"
               aria-hidden="true"
             />{' '}
-            Repository pipeline
+            Paper preparation
           </h2>
           <Link
             to="/operations"
             className="inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-4"
           >
-            Open operations{' '}
+            Prepare papers{' '}
             <ArrowUpRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
         {operations.isError ? (
           <p role="alert" className="text-sm text-[var(--impact-red)]">
-            Pipeline data is unavailable.
+            Paper preparation details are unavailable.
           </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric
               label="Needs attention"
               value={operations.isPending ? '…' : (needsAttention ?? 0)}
-              detail="Queued or failed extraction jobs"
+              detail="Papers waiting for preparation or needing a retry"
             />
             <Metric
-              label="Awaiting indexing"
+              label="Awaiting search preparation"
               value={
                 operations.isPending ? '…' : (pipeline?.unindexedRecords ?? 0)
               }
-              detail="Extracted records without keyword snapshots"
+              detail="Papers not yet ready for keyword search"
             />
             <Metric
-              label="Missing vectors"
+              label="Sections awaiting semantic preparation"
               value={
                 operations.isPending
                   ? '…'
                   : (pipeline?.missingEmbeddingChunks ?? 0)
               }
-              detail={`${pipeline?.missingEmbeddingRecords ?? 0} papers need embedding work`}
+              detail={`${pipeline?.missingEmbeddingRecords ?? 0} papers need semantic search preparation`}
             />
             <Metric
-              label="Embedding requests"
+              label="Semantic preparation requests"
               value={
                 operations.isPending
                   ? '…'

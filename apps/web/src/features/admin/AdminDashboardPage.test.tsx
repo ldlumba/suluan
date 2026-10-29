@@ -61,15 +61,14 @@ describe('AdminDashboardPage', () => {
       </QueryClientProvider>,
     )
 
-    expect(screen.getByRole('link', { name: /Review queue/ })).toHaveAttribute(
-      'href',
-      '/review',
-    )
     expect(
-      screen.getByRole('link', { name: /Repository operations/ }),
+      screen.getByRole('link', { name: /Review submissions/ }),
+    ).toHaveAttribute('href', '/review')
+    expect(
+      screen.getByRole('link', { name: /Prepare papers for search/ }),
     ).toHaveAttribute('href', '/operations')
     expect(
-      screen.getByRole('link', { name: /Repository analytics/ }),
+      screen.getByRole('link', { name: /Explore research trends/ }),
     ).toHaveAttribute('href', '/graph/analytics')
     expect(screen.getByRole('link', { name: /Account roles/ })).toHaveAttribute(
       'href',
