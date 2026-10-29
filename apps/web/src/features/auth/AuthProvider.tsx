@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!auth) return
     return onAuthStateChanged(auth, (next) => {
       void (async () => {
+        setLoading(true)
         setUser(next)
         setProfile(null)
         setError(null)

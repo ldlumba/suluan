@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuth } from '@/features/auth/useAuth'
+import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { ApiError, apiFetch } from '@/lib/api'
 
 interface OperationsStatus {
@@ -106,6 +107,12 @@ export function RepositoryOperationsPage() {
         operations.
       </p>
     )
+  if (
+    [status.error, extraction.error, indexing.error, embedding.error].some(
+      (error) => error instanceof ApiError && error.status === 403,
+    )
+  )
+    return <NotFoundPage />
 
   const data = status.data
   const busy = extraction.isPending || indexing.isPending || embedding.isPending

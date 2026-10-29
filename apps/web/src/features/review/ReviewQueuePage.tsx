@@ -29,6 +29,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError, apiDownload, apiFetch } from '@/lib/api'
 import { useAuth } from '@/features/auth/useAuth'
+import { NotFoundPage } from '@/app/pages/NotFoundPage'
 
 interface QueueItem {
   id: string
@@ -148,6 +149,12 @@ export function ReviewQueuePage() {
       </Card>
     )
   }
+  if (
+    [queueQuery.error, decideMutation.error].some(
+      (error) => error instanceof ApiError && error.status === 403,
+    )
+  )
+    return <NotFoundPage />
 
   async function download(item: QueueItem) {
     setDownloadError(null)

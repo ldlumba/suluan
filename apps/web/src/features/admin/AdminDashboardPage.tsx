@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { useAuth } from '@/features/auth/useAuth'
 import { apiFetch, ApiError } from '@/lib/api'
 
@@ -126,6 +127,12 @@ export function AdminDashboardPage() {
   if (profile?.role !== 'ADMIN') {
     return <p>Only administrators can open this dashboard.</p>
   }
+  if (
+    [users.error, operations.error, activity.error].some(
+      (error) => error instanceof ApiError && error.status === 403,
+    )
+  )
+    return <NotFoundPage />
 
   const accounts = users.data ?? []
   const managers = accounts.filter((account) => account.role !== 'USER').length

@@ -43,12 +43,9 @@ const STATUS_LABEL: Record<MySubmission['status'], string> = {
 }
 
 const STATUS_STYLE: Record<MySubmission['status'], string> = {
-  PENDING:
-    'border-[var(--archive-gold)] bg-[var(--archive-gold)]/15 text-[var(--foreground)]',
-  ACCEPTED:
-    'border-[var(--signal-blue)]/40 bg-[var(--signal-blue)]/10 text-[var(--signal-blue)]',
-  REJECTED:
-    'border-[var(--impact-red)]/40 bg-[var(--impact-red)]/10 text-[var(--impact-red)]',
+  PENDING: 'border-amber-300 bg-amber-50 text-amber-900',
+  ACCEPTED: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+  REJECTED: 'border-red-300 bg-red-50 text-red-800',
 }
 
 const STATUS_OPTIONS = [
@@ -254,15 +251,9 @@ export function MySubmissionsPage() {
                 {item.status === 'PENDING' ? (
                   <Clock3 className="size-3.5" aria-hidden="true" />
                 ) : item.status === 'ACCEPTED' ? (
-                  <CircleCheck
-                    className="size-3.5 text-[var(--signal-blue)]"
-                    aria-hidden="true"
-                  />
+                  <CircleCheck className="size-3.5" aria-hidden="true" />
                 ) : (
-                  <CircleX
-                    className="size-3.5 text-[var(--impact-red)]"
-                    aria-hidden="true"
-                  />
+                  <CircleX className="size-3.5" aria-hidden="true" />
                 )}
                 {STATUS_LABEL[item.status]}
               </span>

@@ -90,7 +90,7 @@ export const routes = [
       {
         path: '/review',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute roles={['ADMIN', 'REPOSITORY_MANAGER']}>
             <ReviewQueuePage />
           </ProtectedRoute>
         ),
@@ -98,7 +98,7 @@ export const routes = [
       {
         path: '/operations',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute roles={['ADMIN', 'REPOSITORY_MANAGER']}>
             <RepositoryOperationsPage />
           </ProtectedRoute>
         ),
@@ -106,7 +106,7 @@ export const routes = [
       {
         path: '/admin',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute roles={['ADMIN']}>
             <AdminDashboardPage />
           </ProtectedRoute>
         ),
@@ -114,7 +114,7 @@ export const routes = [
       {
         path: '/admin/users',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute roles={['ADMIN']}>
             <AdminUsersPage />
           </ProtectedRoute>
         ),
@@ -122,7 +122,7 @@ export const routes = [
       {
         path: '/admin/catalog',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute roles={['ADMIN']}>
             <AdminCatalogPage />
           </ProtectedRoute>
         ),

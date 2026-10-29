@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookOpenCheck, Eye, EyeOff, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 
@@ -47,6 +48,12 @@ export function AdminCatalogPage() {
   if (!user) return <p>Sign in to manage the institutional catalog.</p>
   if (profile?.role !== 'ADMIN')
     return <p>Only administrators can manage course availability.</p>
+  if (
+    [catalog.error, toggle.error].some(
+      (error) => error instanceof ApiError && error.status === 403,
+    )
+  )
+    return <NotFoundPage />
 
   const schools = new Map<string, { name: string; courses: CourseRow[] }>()
   for (const course of catalog.data ?? []) {

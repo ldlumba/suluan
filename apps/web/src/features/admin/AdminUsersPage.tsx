@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { RefreshCw, ShieldCheck, UserCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -103,6 +104,8 @@ export function AdminUsersPage() {
   if (!user) return <p>Sign in to manage account roles.</p>
   if (profile?.role !== 'ADMIN')
     return <p>Only administrators can manage account roles.</p>
+  if (accounts.error instanceof ApiError && accounts.error.status === 403)
+    return <NotFoundPage />
 
   return (
     <section className="space-y-8">

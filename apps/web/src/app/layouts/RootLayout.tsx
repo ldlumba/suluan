@@ -30,6 +30,8 @@ export function RootLayout() {
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
   const [signedInNotice, setSignedInNotice] = useState(false)
+  const [signedOutNotice, setSignedOutNotice] = useState(false)
+  const [signOutError, setSignOutError] = useState(false)
   const location = useLocation()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuRef = useRef<HTMLElement>(null)
@@ -68,9 +70,21 @@ export function RootLayout() {
   const signInPath = `${location.pathname}${location.search}`
 
   async function confirmSignOut() {
-    setSignOutOpen(false)
-    await signOut()
+    setSignOutError(false)
+    try {
+      await signOut()
+      setSignOutOpen(false)
+      setSignedOutNotice(true)
+    } catch {
+      setSignOutError(true)
+    }
   }
+
+  useEffect(() => {
+    if (!signedOutNotice) return
+    const timer = window.setTimeout(() => setSignedOutNotice(false), 3000)
+    return () => window.clearTimeout(timer)
+  }, [signedOutNotice])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -404,6 +418,14 @@ export function RootLayout() {
           You have successfully signed in.
         </div>
       )}
+      {signedOutNotice && (
+        <div
+          role="status"
+          className="fixed right-4 bottom-4 z-50 rounded-[8px] bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-lg"
+        >
+          You have successfully signed out.
+        </div>
+      )}
       <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <DialogContent>
           <DialogHeader>
@@ -413,6 +435,9 @@ export function RootLayout() {
               other account features.
             </DialogDescription>
           </DialogHeader>
+          {signOutError && (
+            <p role="alert">Sign out failed. Please try again.</p>
+          )}
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>
               Cancel

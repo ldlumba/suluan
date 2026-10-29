@@ -8,10 +8,15 @@ vi.mock('./useAuth', () => ({ useAuth: vi.fn() }))
 
 const mockedUseAuth = vi.mocked(useAuth)
 
-function renderProtected(authValue: { user: unknown; loading: boolean }) {
+function renderProtected(authValue: {
+  user: unknown
+  loading: boolean
+  role?: 'USER' | 'ADMIN' | 'REPOSITORY_MANAGER'
+  roles?: ('USER' | 'ADMIN' | 'REPOSITORY_MANAGER')[]
+}) {
   mockedUseAuth.mockReturnValue({
     user: authValue.user,
-    profile: null,
+    profile: authValue.role ? { role: authValue.role } : null,
     loading: authValue.loading,
     error: null,
     signIn: vi.fn(),
@@ -22,7 +27,7 @@ function renderProtected(authValue: { user: unknown; loading: boolean }) {
       {
         path: '/',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute roles={authValue.roles}>
             <p>secret content</p>
           </ProtectedRoute>
         ),
@@ -50,5 +55,35 @@ describe('ProtectedRoute', () => {
     renderProtected({ user: null, loading: true })
     expect(screen.getByText(/checking sign-in/i)).toBeInTheDocument()
     expect(screen.queryByText('signin page')).not.toBeInTheDocument()
+  })
+
+  it('shows the standard 404 to a user without the required role', () => {
+    renderProtected({
+      user: {},
+      loading: false,
+      role: 'USER',
+      roles: ['ADMIN'],
+    })
+    expect(
+      screen.getByRole('heading', { name: 'Page not found' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('secret content')).not.toBeInTheDocument()
+  })
+
+  it('allows the required role', () => {
+    renderProtected({
+      user: {},
+      loading: false,
+      role: 'ADMIN',
+      roles: ['ADMIN'],
+    })
+    expect(screen.getByText('secret content')).toBeInTheDocument()
+  })
+
+  it('does not expose privileged content when the profile is unavailable', () => {
+    renderProtected({ user: {}, loading: false, roles: ['ADMIN'] })
+    expect(
+      screen.getByRole('heading', { name: 'Page not found' }),
+    ).toBeInTheDocument()
   })
 })
