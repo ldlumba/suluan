@@ -291,10 +291,10 @@ export function NewSubmissionPage() {
                       label: s.name,
                     }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select a school" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start">
                       {schools.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
                           {s.name}
@@ -320,7 +320,7 @@ export function NewSubmissionPage() {
                       label: c.name,
                     }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue
                         placeholder={
                           courses.length === 0
@@ -329,7 +329,7 @@ export function NewSubmissionPage() {
                         }
                       />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start">
                       {courses.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name}

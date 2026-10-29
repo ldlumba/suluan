@@ -1,5 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
-import { Activity, ArrowUpRight, ShieldCheck, Users } from 'lucide-react'
+import {
+  Activity,
+  ArrowUpRight,
+  BookOpenCheck,
+  CloudCog,
+  GraduationCap,
+  Network,
+  ShieldCheck,
+  UserCog,
+  Users,
+} from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '@/features/auth/useAuth'
 import { apiFetch, ApiError } from '@/lib/api'
@@ -49,6 +60,37 @@ function Metric({
       <p className="mt-2 text-3xl font-semibold">{value}</p>
       <p className="mt-2 text-xs text-[var(--ink-muted)]">{detail}</p>
     </div>
+  )
+}
+
+function AdminTool({
+  to,
+  icon,
+  title,
+  description,
+}: {
+  to: string
+  icon: ReactNode
+  title: string
+  description: string
+}) {
+  return (
+    <Link
+      to={to}
+      className="group border-t-2 border-[var(--primary)] bg-white p-5 transition-colors hover:bg-[var(--secondary)]"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <span className="text-[var(--primary)] [&_svg]:size-5">{icon}</span>
+        <ArrowUpRight
+          className="size-4 text-[var(--ink-muted)] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+          aria-hidden="true"
+        />
+      </div>
+      <h3 className="mt-4 font-semibold">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
+        {description}
+      </p>
+    </Link>
   )
 }
 
@@ -112,6 +154,50 @@ export function AdminDashboardPage() {
           </div>
         </div>
       </header>
+
+      <section aria-labelledby="admin-tools-heading" className="space-y-4">
+        <div>
+          <h2 id="admin-tools-heading" className="text-xl font-semibold">
+            Administration tools
+          </h2>
+          <p className="mt-1 text-sm text-[var(--ink-muted)]">
+            Open review, operations, analytics, and configuration from one
+            workspace.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <AdminTool
+            to="/review"
+            icon={<BookOpenCheck aria-hidden="true" />}
+            title="Review queue"
+            description="Review pending submissions and record decisions."
+          />
+          <AdminTool
+            to="/operations"
+            icon={<CloudCog aria-hidden="true" />}
+            title="Repository operations"
+            description="Monitor and launch bounded processing work."
+          />
+          <AdminTool
+            to="/graph/analytics"
+            icon={<Network aria-hidden="true" />}
+            title="Repository analytics"
+            description="Explore visibility-safe repository concentrations."
+          />
+          <AdminTool
+            to="/admin/users"
+            icon={<UserCog aria-hidden="true" />}
+            title="Account roles"
+            description="Manage audited user, manager, and administrator roles."
+          />
+          <AdminTool
+            to="/admin/catalog"
+            icon={<GraduationCap aria-hidden="true" />}
+            title="Course availability"
+            description="Control courses available for new submissions."
+          />
+        </div>
+      </section>
 
       <section aria-labelledby="account-overview-heading" className="space-y-4">
         <div className="flex items-center justify-between gap-4">

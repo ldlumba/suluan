@@ -227,11 +227,14 @@ export function PaperPage() {
             ) : (
               <Bookmark className="size-4" aria-hidden="true" />
             )}
-            {bookmark.data?.bookmarked ? 'Saved paper' : 'Save paper'}
+            {bookmark.data?.bookmarked ? 'Bookmarked' : 'Add bookmark'}
           </Button>
           {bookmarkMutation.isError && (
             <p role="alert" className="text-sm text-[var(--impact-red)]">
-              This paper could not be saved. Please try again.
+              {bookmarkMutation.error instanceof ApiError &&
+              bookmarkMutation.error.status === 404
+                ? 'Bookmarks are not enabled by the repository service yet.'
+                : 'This bookmark could not be updated. Please try again.'}
             </p>
           )}
           <Button

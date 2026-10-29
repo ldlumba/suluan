@@ -45,15 +45,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async () => {
     if (!auth || !googleProvider) {
       setError('Sign-in is not configured in this build.')
-      return false
+      return null
     }
     setError(null)
     try {
-      await signInWithPopup(auth, googleProvider)
-      return true
-    } catch {
-      setError('Google sign-in failed. Check popups and try again.')
-      return false
+      const credential = await signInWithPopup(auth, googleProvider)
+      const token = await credential.user.getIdToken()
+      const nextProfile = await apiFetch<ServerProfile>('/api/me', token)
+      setUser(credential.user)
+      setProfile(nextProfile)
+      return nextProfile
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Google sign-in failed. Check popups and try again.',
+      )
+      return null
     }
   }, [])
 

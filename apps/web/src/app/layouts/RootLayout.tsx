@@ -36,7 +36,7 @@ export function RootLayout() {
   const workspaceRef = useRef<HTMLDivElement>(null)
   const workspaceButtonRef = useRef<HTMLButtonElement>(null)
   const { user, profile, loading, signOut } = useAuth()
-  const manager = profile && profile.role !== 'USER'
+  const repositoryManager = profile?.role === 'REPOSITORY_MANAGER'
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `inline-flex items-center gap-2 border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
       isActive
@@ -220,11 +220,11 @@ export function RootLayout() {
                     </WorkspaceLink>
                   )}
                   {user && (
-                    <WorkspaceLink to="/saved" onClick={closeWorkspace}>
-                      Saved papers
+                    <WorkspaceLink to="/bookmarks" onClick={closeWorkspace}>
+                      Bookmarks
                     </WorkspaceLink>
                   )}
-                  {manager && (
+                  {repositoryManager && (
                     <>
                       <WorkspaceLink to="/review" onClick={closeWorkspace}>
                         Review queue
@@ -240,19 +240,6 @@ export function RootLayout() {
                       </WorkspaceLink>
                     </>
                   )}
-                  {profile?.role === 'ADMIN' && (
-                    <>
-                      <WorkspaceLink to="/admin" onClick={closeWorkspace}>
-                        Admin dashboard
-                      </WorkspaceLink>
-                      <WorkspaceLink
-                        to="/admin/catalog"
-                        onClick={closeWorkspace}
-                      >
-                        Course availability
-                      </WorkspaceLink>
-                    </>
-                  )}
                 </div>
               )}
             </div>
@@ -265,9 +252,9 @@ export function RootLayout() {
                 {profile &&
                   (profile.role === 'ADMIN' ? (
                     <Link
-                      to="/admin/users"
-                      aria-label="Administrator — open account roles"
-                      title="Open account roles"
+                      to="/admin"
+                      aria-label="Administrator — open admin dashboard"
+                      title="Open admin dashboard"
                       className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 text-[0.72rem] font-bold tracking-[0.08em] text-[var(--highlight)] transition-colors hover:bg-[var(--highlight)] hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--highlight)]"
                     >
                       ADMIN
@@ -337,31 +324,21 @@ export function RootLayout() {
                 </MobileLink>
               )}
               {user && (
-                <MobileLink to="/saved" onClick={closeMenu}>
-                  Saved papers
+                <MobileLink to="/bookmarks" onClick={closeMenu}>
+                  Bookmarks
                 </MobileLink>
               )}
-              {manager && (
+              {repositoryManager && (
                 <MobileLink to="/review" onClick={closeMenu}>
                   Review queue
                 </MobileLink>
               )}
-              {manager && (
+              {repositoryManager && (
                 <MobileLink to="/operations" onClick={closeMenu}>
                   Repository operations
                 </MobileLink>
               )}
-              {profile?.role === 'ADMIN' && (
-                <MobileLink to="/admin" onClick={closeMenu}>
-                  Admin dashboard
-                </MobileLink>
-              )}
-              {profile?.role === 'ADMIN' && (
-                <MobileLink to="/admin/catalog" onClick={closeMenu}>
-                  Course availability
-                </MobileLink>
-              )}
-              {manager && (
+              {repositoryManager && (
                 <MobileLink to="/graph/analytics" onClick={closeMenu}>
                   Analytics
                 </MobileLink>
@@ -372,10 +349,10 @@ export function RootLayout() {
                   {profile &&
                     (profile.role === 'ADMIN' ? (
                       <Link
-                        to="/admin/users"
+                        to="/admin"
                         onClick={closeMenu}
-                        aria-label="Administrator — open account roles"
-                        title="Open account roles"
+                        aria-label="Administrator — open admin dashboard"
+                        title="Open admin dashboard"
                         className="rounded-[4px] border border-[var(--highlight)]/60 px-2 py-1 font-bold tracking-[0.08em] text-[var(--highlight)] hover:bg-[var(--highlight)] hover:text-[var(--foreground)]"
                       >
                         ADMIN

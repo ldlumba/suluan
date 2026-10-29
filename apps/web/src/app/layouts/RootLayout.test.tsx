@@ -7,7 +7,7 @@ import { RootLayout } from './RootLayout'
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: vi.fn() }))
 
 describe('administrator navigation', () => {
-  it('uses the role badge as the account-roles entry point', () => {
+  it('uses the role badge as the dashboard entry point and simplifies submissions', () => {
     vi.mocked(useAuth).mockReturnValue({
       user: { email: 'admin@ua.edu.ph' },
       profile: { id: 'admin-1', role: 'ADMIN' },
@@ -27,16 +27,19 @@ describe('administrator navigation', () => {
 
     expect(
       screen.getByRole('link', {
-        name: 'Administrator — open account roles',
+        name: 'Administrator — open admin dashboard',
       }),
-    ).toHaveAttribute('href', '/admin/users')
+    ).toHaveAttribute('href', '/admin')
 
     fireEvent.click(screen.getByRole('button', { name: 'Submissions' }))
     expect(
-      screen.queryByRole('link', { name: 'Account roles' }),
+      screen.queryByRole('menuitem', { name: 'Admin dashboard' }),
     ).not.toBeInTheDocument()
     expect(
-      screen.getByRole('menuitem', { name: 'Course availability' }),
-    ).toHaveAttribute('href', '/admin/catalog')
+      screen.queryByRole('menuitem', { name: 'Course availability' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('menuitem', { name: 'Review queue' }),
+    ).not.toBeInTheDocument()
   })
 })

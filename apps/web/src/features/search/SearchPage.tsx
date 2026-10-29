@@ -158,15 +158,26 @@ export function SearchPage() {
     ...(yearTo ? { yearTo } : {}),
   }
   const catalog = useQuery({
-    queryKey: ['search-catalog'],
+    queryKey: ['search-catalog', profile?.id],
     queryFn: async () => {
-      const result = await apiFetch<unknown>('/api/schools', null)
+      const result = await apiFetch<unknown>('/api/schools', await getIdToken())
       return Array.isArray(result) ? (result as CatalogSchool[]) : []
     },
-    enabled: Boolean(profile),
+    enabled: mode !== 'semantic',
     staleTime: 5 * 60 * 1000,
   })
   const selectedSchool = catalog.data?.find((school) => school.id === schoolId)
+  const availableCourses = selectedSchool
+    ? selectedSchool.courses.map((course) => ({
+        ...course,
+        label: course.name,
+      }))
+    : (catalog.data ?? []).flatMap((school) =>
+        school.courses.map((course) => ({
+          ...course,
+          label: `${course.name} — ${school.name}`,
+        })),
+      )
 
   function updateFilter(name: string, value: string | null) {
     const next = new URLSearchParams(params)
@@ -468,10 +479,13 @@ export function SearchPage() {
                       })),
                     ]}
                   >
-                    <SelectTrigger id="search-school">
+                    <SelectTrigger
+                      id="search-school"
+                      className="w-full sm:w-56"
+                    >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start">
                       <SelectItem value="all">All schools</SelectItem>
                       {(catalog.data ?? []).map((school) => (
                         <SelectItem key={school.id} value={school.id}>
@@ -490,25 +504,36 @@ export function SearchPage() {
                     }
                     items={[
                       { value: 'all', label: 'All courses' },
-                      ...(selectedSchool?.courses ?? []).map((course) => ({
+                      ...availableCourses.map((course) => ({
                         value: course.id,
-                        label: course.name,
+                        label: course.label,
                       })),
                     ]}
                   >
-                    <SelectTrigger id="search-course">
+                    <SelectTrigger
+                      id="search-course"
+                      className="w-full sm:w-64"
+                    >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start">
                       <SelectItem value="all">All courses</SelectItem>
-                      {(selectedSchool?.courses ?? []).map((course) => (
+                      {availableCourses.map((course) => (
                         <SelectItem key={course.id} value={course.id}>
-                          {course.name}
+                          {course.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+                {catalog.isError && !results.isError && (
+                  <p
+                    role="alert"
+                    className="basis-full text-sm text-destructive"
+                  >
+                    School and course filters could not be loaded.
+                  </p>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="search-year-from">Since year</Label>
                   <Input

@@ -14,7 +14,8 @@ export interface AuthState {
   profile: ServerProfile | null
   loading: boolean
   error: string | null
-  signIn: () => Promise<boolean>
+  /** Returns the authoritative server profile after a successful sign-in. */
+  signIn: () => Promise<ServerProfile | null>
   signOut: () => Promise<void>
   /** Fresh ID token for API calls (refreshes when expired). Null when signed out. */
   getIdToken: () => Promise<string | null>

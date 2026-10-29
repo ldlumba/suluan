@@ -1,4 +1,5 @@
 import { createElement, lazy, Suspense } from 'react'
+import { Navigate } from 'react-router'
 import { RootLayout } from './layouts/RootLayout'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -16,7 +17,7 @@ import { AdminCatalogPage } from '@/features/admin/AdminCatalogPage'
 import { AdminUsersPage } from '@/features/admin/AdminUsersPage'
 import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage'
 import { RepositoryOperationsPage } from '@/features/operations/RepositoryOperationsPage'
-import { SavedPapersPage } from '@/features/search/SavedPapersPage'
+import { BookmarksPage } from '@/features/search/BookmarksPage'
 
 const graphPage = lazy(() =>
   import('@/features/graph/GraphPage').then((module) => ({
@@ -70,13 +71,14 @@ export const routes = [
         ),
       },
       {
-        path: '/saved',
+        path: '/bookmarks',
         element: (
           <ProtectedRoute>
-            <SavedPapersPage />
+            <BookmarksPage />
           </ProtectedRoute>
         ),
       },
+      { path: '/saved', element: <Navigate to="/bookmarks" replace /> },
       {
         path: '/submit',
         element: (

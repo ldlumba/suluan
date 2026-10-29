@@ -18,9 +18,11 @@ export function SignInButton({ returnTo }: { returnTo?: string } = {}) {
       : '/'
 
   async function handleSignIn() {
-    const succeeded = await signIn()
-    if (!succeeded) return
-    navigate(destination, { state: { signedIn: true } })
+    const profile = await signIn()
+    if (!profile) return
+    const postSignInDestination =
+      destination === '/' && profile.role === 'ADMIN' ? '/admin' : destination
+    navigate(postSignInDestination, { state: { signedIn: true } })
   }
 
   return (
