@@ -45,13 +45,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async () => {
     if (!auth || !googleProvider) {
       setError('Sign-in is not configured in this build.')
-      return
+      return false
     }
     setError(null)
     try {
       await signInWithPopup(auth, googleProvider)
+      return true
     } catch {
       setError('Google sign-in failed. Check popups and try again.')
+      return false
     }
   }, [])
 

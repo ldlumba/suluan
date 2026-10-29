@@ -14,7 +14,9 @@ import { SemanticAccessPage } from '@/features/search/SemanticAccessPage'
 import { AssistantPage } from '@/features/assistant/AssistantPage'
 import { AdminCatalogPage } from '@/features/admin/AdminCatalogPage'
 import { AdminUsersPage } from '@/features/admin/AdminUsersPage'
+import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage'
 import { RepositoryOperationsPage } from '@/features/operations/RepositoryOperationsPage'
+import { SavedPapersPage } from '@/features/search/SavedPapersPage'
 
 const graphPage = lazy(() =>
   import('@/features/graph/GraphPage').then((module) => ({
@@ -68,6 +70,14 @@ export const routes = [
         ),
       },
       {
+        path: '/saved',
+        element: (
+          <ProtectedRoute>
+            <SavedPapersPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: '/submit',
         element: (
           <ProtectedRoute>
@@ -88,6 +98,14 @@ export const routes = [
         element: (
           <ProtectedRoute>
             <RepositoryOperationsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/admin',
+        element: (
+          <ProtectedRoute>
+            <AdminDashboardPage />
           </ProtectedRoute>
         ),
       },

@@ -14,11 +14,22 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useAuth } from '@/features/auth/useAuth'
 
 export function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
+  const [signOutOpen, setSignOutOpen] = useState(false)
+  const [signedInNotice, setSignedInNotice] = useState(false)
   const location = useLocation()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileMenuRef = useRef<HTMLElement>(null)
@@ -37,6 +48,28 @@ export function RootLayout() {
   const closeWorkspace = () => {
     setWorkspaceOpen(false)
     workspaceButtonRef.current?.focus()
+  }
+
+  useEffect(() => {
+    const state = location.state as { signedIn?: boolean } | null
+    if (!state?.signedIn) return
+    const showTimer = window.setTimeout(() => {
+      setSignedInNotice(true)
+      window.setTimeout(() => setSignedInNotice(false), 3000)
+    }, 0)
+    window.history.replaceState(
+      {},
+      '',
+      `${location.pathname}${location.search}`,
+    )
+    return () => window.clearTimeout(showTimer)
+  }, [location.pathname, location.search, location.state])
+
+  const signInPath = `${location.pathname}${location.search}`
+
+  async function confirmSignOut() {
+    setSignOutOpen(false)
+    await signOut()
   }
 
   useEffect(() => {
@@ -186,6 +219,11 @@ export function RootLayout() {
                       My submissions
                     </WorkspaceLink>
                   )}
+                  {user && (
+                    <WorkspaceLink to="/saved" onClick={closeWorkspace}>
+                      Saved papers
+                    </WorkspaceLink>
+                  )}
                   {manager && (
                     <>
                       <WorkspaceLink to="/review" onClick={closeWorkspace}>
@@ -203,9 +241,17 @@ export function RootLayout() {
                     </>
                   )}
                   {profile?.role === 'ADMIN' && (
-                    <WorkspaceLink to="/admin/catalog" onClick={closeWorkspace}>
-                      Course availability
-                    </WorkspaceLink>
+                    <>
+                      <WorkspaceLink to="/admin" onClick={closeWorkspace}>
+                        Admin dashboard
+                      </WorkspaceLink>
+                      <WorkspaceLink
+                        to="/admin/catalog"
+                        onClick={closeWorkspace}
+                      >
+                        Course availability
+                      </WorkspaceLink>
+                    </>
                   )}
                 </div>
               )}
@@ -235,7 +281,7 @@ export function RootLayout() {
                   variant="outline"
                   size="sm"
                   className="border-white/30 bg-transparent text-white hover:bg-white hover:text-[var(--primary)]"
-                  onClick={() => void signOut()}
+                  onClick={() => setSignOutOpen(true)}
                 >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
                   Sign out
@@ -243,7 +289,7 @@ export function RootLayout() {
               </>
             ) : (
               <Link
-                to="/signin"
+                to={`/signin?returnTo=${encodeURIComponent(signInPath)}`}
                 className="inline-flex items-center gap-2 rounded-[6px] bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--highlight)] hover:text-[var(--foreground)]"
               >
                 Sign in <ArrowUpRight className="size-4" aria-hidden="true" />
@@ -290,6 +336,11 @@ export function RootLayout() {
                   My submissions
                 </MobileLink>
               )}
+              {user && (
+                <MobileLink to="/saved" onClick={closeMenu}>
+                  Saved papers
+                </MobileLink>
+              )}
               {manager && (
                 <MobileLink to="/review" onClick={closeMenu}>
                   Review queue
@@ -298,6 +349,11 @@ export function RootLayout() {
               {manager && (
                 <MobileLink to="/operations" onClick={closeMenu}>
                   Repository operations
+                </MobileLink>
+              )}
+              {profile?.role === 'ADMIN' && (
+                <MobileLink to="/admin" onClick={closeMenu}>
+                  Admin dashboard
                 </MobileLink>
               )}
               {profile?.role === 'ADMIN' && (
@@ -337,14 +393,17 @@ export function RootLayout() {
                   className="justify-start px-3 py-3 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
                   onClick={() => {
                     closeMenu()
-                    void signOut()
+                    setSignOutOpen(true)
                   }}
                 >
                   <LogOut className="size-4" aria-hidden="true" /> Sign out
                 </Button>
               )}
               {!loading && !user && (
-                <MobileLink to="/signin" onClick={closeMenu}>
+                <MobileLink
+                  to={`/signin?returnTo=${encodeURIComponent(signInPath)}`}
+                  onClick={closeMenu}
+                >
                   Sign in
                 </MobileLink>
               )}
@@ -360,6 +419,31 @@ export function RootLayout() {
           <Outlet />
         </div>
       </main>
+      {signedInNotice && (
+        <div
+          role="status"
+          className="fixed right-4 bottom-4 z-50 rounded-[8px] bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-lg"
+        >
+          You have successfully signed in.
+        </div>
+      )}
+      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign out?</DialogTitle>
+            <DialogDescription>
+              You will need to sign in again to access your submissions and
+              other account features.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              Cancel
+            </DialogClose>
+            <Button onClick={() => void confirmSignOut()}>Sign out</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <footer className="border-t border-[var(--border)] bg-white">
         <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-9 text-sm text-muted-foreground sm:px-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1fr)] lg:px-8">
           <div className="flex items-start gap-4">

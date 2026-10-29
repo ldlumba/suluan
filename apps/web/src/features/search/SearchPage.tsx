@@ -39,6 +39,11 @@ interface KeywordResult {
   page: number
   hasMore: boolean
 }
+interface CatalogSchool {
+  id: string
+  name: string
+  courses: { id: string; name: string }[]
+}
 /**
  * Semantic search degrades rather than failing: `semanticStatus` explains why
  * nothing came back, and the UI falls back to keyword results in that case.
@@ -140,9 +145,36 @@ export function SearchPage() {
   // Exact author-keyword filter (ranking-neutral). Threaded through every
   // navigation so paging and sorting never silently drop it.
   const keywordFilter = params.get('keyword') ?? ''
+  const schoolId = params.get('schoolId') ?? ''
+  const courseId = params.get('courseId') ?? ''
+  const yearFrom = params.get('yearFrom') ?? ''
+  const yearTo = params.get('yearTo') ?? ''
   const keepKeyword: Record<string, string> = {
     ...(keywordFilter ? { keyword: keywordFilter } : {}),
     ...(mode === 'title' ? { mode: 'title', scope: 'title' } : {}),
+    ...(schoolId ? { schoolId } : {}),
+    ...(courseId ? { courseId } : {}),
+    ...(yearFrom ? { yearFrom } : {}),
+    ...(yearTo ? { yearTo } : {}),
+  }
+  const catalog = useQuery({
+    queryKey: ['search-catalog'],
+    queryFn: async () => {
+      const result = await apiFetch<unknown>('/api/schools', null)
+      return Array.isArray(result) ? (result as CatalogSchool[]) : []
+    },
+    enabled: Boolean(profile),
+    staleTime: 5 * 60 * 1000,
+  })
+  const selectedSchool = catalog.data?.find((school) => school.id === schoolId)
+
+  function updateFilter(name: string, value: string | null) {
+    const next = new URLSearchParams(params)
+    next.set('page', '1')
+    if (value) next.set(name, value)
+    else next.delete(name)
+    if (name === 'schoolId') next.delete('courseId')
+    setParams(next)
   }
   const manager =
     profile?.role === 'ADMIN' || profile?.role === 'REPOSITORY_MANAGER'
@@ -388,54 +420,124 @@ export function SearchPage() {
             </Button>
           </div>
           {mode !== 'semantic' && (
-            <div className="flex flex-wrap items-end gap-4 border-t border-[var(--border)] pt-5">
-              <div className="space-y-2">
-                <Label htmlFor="search-sort">Sort papers</Label>
-                <Select
-                  value={sort}
-                  onValueChange={(value) =>
-                    setParams({
-                      q,
-                      page: '1',
-                      sort: value as SearchSort,
-                      ...keepKeyword,
-                    })
-                  }
-                  items={SORT_OPTIONS.map((option) => ({ ...option }))}
-                >
-                  <SelectTrigger id="search-sort">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SORT_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="space-y-4 border-t border-[var(--border)] pt-5">
+              <p className="text-sm font-semibold">Filter results</p>
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="search-sort">Sort papers</Label>
+                  <Select
+                    value={sort}
+                    onValueChange={(value) =>
+                      setParams({
+                        q,
+                        page: '1',
+                        sort: value as SearchSort,
+                        ...keepKeyword,
+                      })
+                    }
+                    items={SORT_OPTIONS.map((option) => ({ ...option }))}
+                  >
+                    <SelectTrigger id="search-sort">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SORT_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <KeywordFilter
+                  initial={keywordFilter}
+                  onApply={(next) => updateFilter('keyword', next)}
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="search-school">School</Label>
+                  <Select
+                    value={schoolId || 'all'}
+                    onValueChange={(value) =>
+                      updateFilter('schoolId', value === 'all' ? '' : value)
+                    }
+                    items={[
+                      { value: 'all', label: 'All schools' },
+                      ...(catalog.data ?? []).map((school) => ({
+                        value: school.id,
+                        label: school.name,
+                      })),
+                    ]}
+                  >
+                    <SelectTrigger id="search-school">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All schools</SelectItem>
+                      {(catalog.data ?? []).map((school) => (
+                        <SelectItem key={school.id} value={school.id}>
+                          {school.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="search-course">Course</Label>
+                  <Select
+                    value={courseId || 'all'}
+                    onValueChange={(value) =>
+                      updateFilter('courseId', value === 'all' ? '' : value)
+                    }
+                    items={[
+                      { value: 'all', label: 'All courses' },
+                      ...(selectedSchool?.courses ?? []).map((course) => ({
+                        value: course.id,
+                        label: course.name,
+                      })),
+                    ]}
+                  >
+                    <SelectTrigger id="search-course">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All courses</SelectItem>
+                      {(selectedSchool?.courses ?? []).map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          {course.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="search-year-from">Since year</Label>
+                  <Input
+                    id="search-year-from"
+                    type="number"
+                    min="1900"
+                    max="2100"
+                    placeholder="2026"
+                    value={yearFrom}
+                    onChange={(event) =>
+                      updateFilter('yearFrom', event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="search-year-to">Through year</Label>
+                  <Input
+                    id="search-year-to"
+                    type="number"
+                    min="1900"
+                    max="2100"
+                    placeholder="2026"
+                    value={yearTo}
+                    onChange={(event) =>
+                      updateFilter('yearTo', event.target.value)
+                    }
+                  />
+                </div>
               </div>
-              <KeywordFilter
-                initial={keywordFilter}
-                onApply={(next) =>
-                  setParams(
-                    next
-                      ? {
-                          q,
-                          page: '1',
-                          sort,
-                          ...(mode === 'title' ? { mode: 'title' } : {}),
-                          keyword: next,
-                        }
-                      : {
-                          q,
-                          page: '1',
-                          sort,
-                          ...(mode === 'title' ? { mode: 'title' } : {}),
-                        },
-                  )
-                }
-              />
             </div>
           )}
         </form>

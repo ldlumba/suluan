@@ -27,6 +27,20 @@ export function registerAdminRoutes(
     c.json({ status: 'ok', scope: 'admin' }),
   )
 
+  app.get('/api/admin/activity', requireAuth, requireAdmin, async (c) => {
+    const rows = await createDb(c.env.DATABASE_URL).execute(sql`
+      select
+        count(*) filter (where event_type = 'PAPER_VIEW')::integer as "paperViews",
+        count(*) filter (where event_type = 'CITATION_COPY')::integer as "citationCopies",
+        count(*) filter (where event_type = 'DOWNLOAD_START')::integer as "downloadStarts",
+        count(distinct profile_id) filter (where event_type = 'PAPER_VIEW')::integer as "viewers",
+        count(distinct record_id) filter (where event_type = 'PAPER_VIEW')::integer as "viewedPapers"
+      from activity_events
+      where created_at >= now() - interval '90 days'
+    `)
+    return c.json(rows.rows[0] ?? {})
+  })
+
   app.get('/api/admin/users', requireAuth, requireAdmin, async (c) => {
     const rows = await createDb(c.env.DATABASE_URL).execute(sql`
       select id, email, display_name as "displayName", role,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { useAuth } from '@/features/auth/useAuth'
@@ -87,5 +87,32 @@ describe('MySubmissionsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Session expired.',
     )
+  })
+
+  it('filters submissions by title or author without refetching', async () => {
+    vi.mocked(apiFetch).mockResolvedValue([
+      decided,
+      {
+        ...decided,
+        id: 'sub-2',
+        title: 'Water quality review',
+        authors: 'Rivera',
+        status: 'REJECTED',
+        remarks: 'Please revise and resubmit.',
+      },
+    ])
+    renderPage({ email: 'u@ua.edu.ph' })
+
+    expect(await screen.findByText('Water quality review')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Find a submission'), {
+      target: { value: 'rivera' },
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByText('ILAW - Test Paper')).not.toBeInTheDocument()
+      expect(screen.getByText('Water quality review')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Returned')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1 of 2 submissions')).toBeInTheDocument()
   })
 })

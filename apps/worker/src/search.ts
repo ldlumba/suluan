@@ -42,6 +42,10 @@ const keywordQuerySchema = querySchema.extend({
     .default('relevance'),
   /** Exact author-keyword filter (case-insensitive); ranking-neutral. */
   keyword: z.string().trim().max(100).default(''),
+  schoolId: z.string().uuid().optional(),
+  courseId: z.string().uuid().optional(),
+  yearFrom: z.coerce.number().int().min(1900).max(2100).optional(),
+  yearTo: z.coerce.number().int().min(1900).max(2100).optional(),
 })
 const indexSchema = z.object({ recordId: z.string().uuid().optional() })
 const PAGE_SIZE = 10
@@ -326,7 +330,17 @@ export function searchRoutes(
     optionalAuth,
     zValidator('query', keywordQuerySchema),
     async (c) => {
-      const { q, page, sort, keyword, scope } = c.req.valid('query')
+      const {
+        q,
+        page,
+        sort,
+        keyword,
+        scope,
+        schoolId,
+        courseId,
+        yearFrom,
+        yearTo,
+      } = c.req.valid('query')
       const db = createDb(c.env.DATABASE_URL)
       const profile = c.get('profile')
       const viewer = viewerRoleFor(profile?.role ?? null)
@@ -366,6 +380,10 @@ export function searchRoutes(
             and i.extraction_claim_token = j.claim_token
             and i.chunker_version = ${CHUNKER_VERSION} and j.status = 'EXTRACTED'
           where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
+            and (${schoolId ?? null}::uuid is null or s.school_id = ${schoolId ?? null}::uuid)
+            and (${courseId ?? null}::uuid is null or s.course_id = ${courseId ?? null}::uuid)
+            and (${yearFrom ?? null}::integer is null or r.year >= ${yearFrom ?? null}::integer)
+            and (${yearTo ?? null}::integer is null or r.year <= ${yearTo ?? null}::integer)
             and (${keywordFilter} = '' or exists (
               select 1 from research_keywords rk
               join keywords k on k.id = rk.keyword_id

@@ -1,10 +1,16 @@
 import { ArrowLeft, Check, ShieldCheck } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useAuth } from '@/features/auth/useAuth'
 import { SignInButton } from '@/features/auth/SignInButton'
 
 export function SignInPage() {
   const { user } = useAuth()
+  const [params] = useSearchParams()
+  const requestedReturnTo = params.get('returnTo') ?? '/'
+  const returnTo =
+    requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
+      ? requestedReturnTo
+      : '/'
 
   return (
     <section className="overflow-hidden border border-[var(--border)] bg-white lg:grid lg:min-h-[34rem] lg:grid-cols-[0.9fr_1.1fr]">
@@ -63,7 +69,7 @@ export function SignInPage() {
                   </span>
                 </p>
                 <Link
-                  to="/"
+                  to={returnTo}
                   className="inline-flex min-h-11 items-center gap-2 font-semibold text-[var(--primary)] underline-offset-4 hover:underline"
                 >
                   <ArrowLeft className="size-4" aria-hidden="true" /> Return
@@ -71,7 +77,7 @@ export function SignInPage() {
                 </Link>
               </div>
             ) : (
-              <SignInButton />
+              <SignInButton returnTo={returnTo} />
             )}
           </div>
 

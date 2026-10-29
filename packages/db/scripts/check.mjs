@@ -36,6 +36,9 @@ const expectedTables = [
   'assistant_sessions',
   'assistant_requests',
   'assistant_usage',
+  // private user features
+  'bookmarks',
+  'activity_events',
 ]
 
 /** Drizzle bookkeeping lives in its own schema in current drizzle-orm. */
@@ -54,6 +57,7 @@ const expectedEnums = {
     'LAUNCHED',
     'FAILED',
   ],
+  activity_event_type: ['PAPER_VIEW', 'CITATION_COPY', 'DOWNLOAD_START'],
 }
 
 const failures = []

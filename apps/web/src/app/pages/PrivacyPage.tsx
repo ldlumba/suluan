@@ -3,8 +3,8 @@ import { Link } from 'react-router'
 /**
  * Public privacy notice. States only what the repository actually does:
  * Google sign-in identity, Neon profiles, submission/review retention,
- * quota counters, and memory-only assistant chat. No analytics, tracking,
- * or advertising claims are made because none are implemented.
+ * quota counters, authenticated activity summaries, and memory-only assistant
+ * chat. Public visitors are not individually tracked.
  */
 export function PrivacyPage() {
   return (
@@ -92,10 +92,32 @@ export function PrivacyPage() {
         </section>
 
         <section
+          aria-labelledby="privacy-activity"
+          className="grid gap-3 border-b border-[var(--border)] py-7 md:grid-cols-[2rem_15rem_1fr] md:gap-6"
+        >
+          <span className="font-mono text-xs text-[var(--ink-muted)]">04</span>
+          <h2
+            id="privacy-activity"
+            className="text-lg font-semibold text-foreground"
+          >
+            Authenticated activity
+          </h2>
+          <p>
+            When you are signed in, SULUAN may record a privacy-limited paper
+            view or citation-copy event using your internal profile and the
+            repository record ID. Events are deduplicated per user, paper, and
+            event type over 24 hours and shown to administrators only as
+            aggregate counts. Public visitors are not tracked by IP address,
+            cookies, fingerprints, or identifiable viewer records. Citation-copy
+            counts describe this activity, not citations made elsewhere.
+          </p>
+        </section>
+
+        <section
           aria-labelledby="privacy-sharing"
           className="grid gap-3 py-7 md:grid-cols-[2rem_15rem_1fr] md:gap-6"
         >
-          <span className="font-mono text-xs text-[var(--ink-muted)]">04</span>
+          <span className="font-mono text-xs text-[var(--ink-muted)]">05</span>
           <h2
             id="privacy-sharing"
             className="text-lg font-semibold text-foreground"

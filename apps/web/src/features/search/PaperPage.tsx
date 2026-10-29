@@ -1,6 +1,14 @@
-import { ArrowDownToLine, ArrowLeft, Network, ShieldCheck } from 'lucide-react'
-import { Link, useParams } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
+import {
+  ArrowDownToLine,
+  ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
+  Network,
+  ShieldCheck,
+} from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { CiteSection } from '@/features/citations/CiteSection'
 import { apiDownload, apiFetch, ApiError } from '@/lib/api'
@@ -35,7 +43,9 @@ const visibilityLabels = {
 
 export function PaperPage() {
   const { id } = useParams<{ id: string }>()
-  const { getIdToken } = useAuth()
+  const { getIdToken, user } = useAuth()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const paper = useQuery({
     queryKey: ['paper', id],
     enabled: Boolean(id),
@@ -43,6 +53,43 @@ export function PaperPage() {
     queryFn: async () =>
       apiFetch<Paper>(`/api/records/${id}`, await getIdToken()),
   })
+  const bookmark = useQuery({
+    queryKey: ['bookmark', id],
+    enabled: Boolean(id && user),
+    retry: false,
+    queryFn: async () =>
+      apiFetch<{ bookmarked: boolean }>(
+        `/api/bookmarks/${id}`,
+        await getIdToken(),
+      ),
+  })
+  const bookmarkMutation = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('Missing record id')
+      const bookmarked = bookmark.data?.bookmarked ?? false
+      return apiFetch<{ bookmarked: boolean }>(
+        `/api/bookmarks/${id}`,
+        await getIdToken(),
+        { method: bookmarked ? 'DELETE' : 'POST' },
+      )
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData(['bookmark', id], result)
+      void queryClient.invalidateQueries({ queryKey: ['bookmarks'] })
+    },
+  })
+
+  useEffect(() => {
+    if (!user || !paper.data || !id) return
+    void getIdToken().then((token) => {
+      if (!token) return
+      return apiFetch('/api/activity', token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordId: id, eventType: 'PAPER_VIEW' }),
+      }).catch(() => undefined)
+    })
+  }, [getIdToken, id, paper.data, user])
 
   async function download() {
     if (!id) return
@@ -56,6 +103,16 @@ export function PaperPage() {
     anchor.download = file.fileName
     anchor.click()
     URL.revokeObjectURL(url)
+    if (user) {
+      void getIdToken().then((token) => {
+        if (!token) return
+        return apiFetch('/api/activity', token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordId: id, eventType: 'DOWNLOAD_START' }),
+        }).catch(() => undefined)
+      })
+    }
   }
 
   if (paper.isPending) return <p role="status">Loading paper…</p>
@@ -152,6 +209,32 @@ export function PaperPage() {
             </p>
           </div>
           <Button
+            variant="outline"
+            className="w-full justify-center"
+            disabled={bookmarkMutation.isPending}
+            onClick={() => {
+              if (!user) {
+                navigate(
+                  `/signin?returnTo=${encodeURIComponent(`/records/${id}`)}`,
+                )
+                return
+              }
+              bookmarkMutation.mutate()
+            }}
+          >
+            {bookmark.data?.bookmarked ? (
+              <BookmarkCheck className="size-4" aria-hidden="true" />
+            ) : (
+              <Bookmark className="size-4" aria-hidden="true" />
+            )}
+            {bookmark.data?.bookmarked ? 'Saved paper' : 'Save paper'}
+          </Button>
+          {bookmarkMutation.isError && (
+            <p role="alert" className="text-sm text-[var(--impact-red)]">
+              This paper could not be saved. Please try again.
+            </p>
+          )}
+          <Button
             className="w-full justify-center bg-[var(--primary)] hover:bg-[var(--accent)]"
             onClick={() => void download()}
           >
@@ -173,6 +256,20 @@ export function PaperPage() {
           year: paper.data.year,
         }}
         publication={paper.data.publication}
+        onCitationCopied={() => {
+          if (!user || !id) return
+          void getIdToken().then((token) => {
+            if (!token) return
+            return apiFetch('/api/activity', token, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                recordId: id,
+                eventType: 'CITATION_COPY',
+              }),
+            }).catch(() => undefined)
+          })
+        }}
       />
     </article>
   )

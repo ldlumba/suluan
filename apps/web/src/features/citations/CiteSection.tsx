@@ -41,9 +41,11 @@ async function copyText(text: string): Promise<boolean> {
 export function CiteSection({
   record,
   publication,
+  onCitationCopied,
 }: {
   record: CitationRecord
   publication?: CitationPublication | null
+  onCitationCopied?: () => void
 }) {
   const [format, setFormat] = useState<CitationFormat>('apa')
   const [copied, setCopied] = useState(false)
@@ -135,6 +137,7 @@ export function CiteSection({
           onClick={() =>
             void copyText(citation).then((ok) => {
               if (ok) {
+                onCitationCopied?.()
                 setCopied(true)
                 window.setTimeout(() => setCopied(false), 2000)
               }

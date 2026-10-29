@@ -16,6 +16,7 @@ import type { Env, QueueMessageLike } from './config'
 import { indexExtractedRecords, KEYWORD_SWEEP_BATCH } from './search'
 import { expireAssistantRequests } from './assistant-routes'
 import { DOI_SWEEP_BATCH, sweepDoiEnrichment } from './doi'
+import { sql } from 'drizzle-orm'
 
 const app = createApp(productionVerifier)
 
@@ -123,6 +124,9 @@ export default {
       )
     }
     await expireAssistantRequests(db)
+    await db.execute(
+      sql`delete from activity_events where created_at < now() - interval '90 days'`,
+    )
     const doi = await sweepDoiEnrichment(db, {
       limit: DOI_SWEEP_BATCH,
       contactEmail: env.DOI_CONTACT_EMAIL ?? env.REO_MAILBOX,

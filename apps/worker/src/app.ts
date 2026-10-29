@@ -29,6 +29,8 @@ import { normalizeTitle } from './titles'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { serviceEmbedRoutes } from './embed_claims'
 import { searchRoutes } from './search'
+import { bookmarkRoutes } from './bookmarks'
+import { activityRoutes } from './activity'
 import { CHUNKER_VERSION } from './chunking'
 import { graphRoutes } from './graph'
 import { assistantRoutes } from './assistant-routes'
@@ -369,6 +371,8 @@ export function createApp(
   )
   // Live metadata graph. Every response is viewer-specific and read-only.
   app.route('/api/graph', graphRoutes(optionalAuth))
+  app.route('/api/bookmarks', bookmarkRoutes(requireAuth))
+  app.route('/api/activity', activityRoutes(requireAuth))
 
   /**
    * Public metadata detail for one accepted record. The visibility predicate
@@ -503,7 +507,7 @@ export function createApp(
 
   // Migration-owned institutional school/course catalog for the submission
   // form. Read-only in the browser; server validation remains authoritative.
-  app.get('/api/schools', requireAuth, async (c) => {
+  app.get('/api/schools', optionalAuth, async (c) => {
     const db = createDb(c.env.DATABASE_URL)
     const rows = await db.query.schools.findMany({
       with: { courses: true },

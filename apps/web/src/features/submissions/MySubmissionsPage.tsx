@@ -1,6 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router'
-import { ClipboardList, Clock3, CircleCheck, CircleX } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router'
+import {
+  ClipboardList,
+  Clock3,
+  CircleCheck,
+  CircleX,
+  Search,
+} from 'lucide-react'
+import { useMemo } from 'react'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 
@@ -24,8 +39,25 @@ interface MySubmission {
 const STATUS_LABEL: Record<MySubmission['status'], string> = {
   PENDING: 'Awaiting REO review',
   ACCEPTED: 'Accepted',
-  REJECTED: 'Not accepted',
+  REJECTED: 'Returned',
 }
+
+const STATUS_STYLE: Record<MySubmission['status'], string> = {
+  PENDING:
+    'border-[var(--archive-gold)] bg-[var(--archive-gold)]/15 text-[var(--foreground)]',
+  ACCEPTED:
+    'border-[var(--signal-blue)]/40 bg-[var(--signal-blue)]/10 text-[var(--signal-blue)]',
+  REJECTED:
+    'border-[var(--impact-red)]/40 bg-[var(--impact-red)]/10 text-[var(--impact-red)]',
+}
+
+const STATUS_OPTIONS = [
+  { value: 'ALL', label: 'All statuses' },
+  { value: 'PENDING', label: 'Awaiting review' },
+  { value: 'ACCEPTED', label: 'Accepted' },
+  { value: 'REJECTED', label: 'Returned' },
+] as const
+const PAGE_SIZE = 10
 
 /**
  * Submitter status view (owner-approved 2026-10-01). Shows only the signed-in
@@ -34,6 +66,12 @@ const STATUS_LABEL: Record<MySubmission['status'], string> = {
  */
 export function MySubmissionsPage() {
   const { user, profile, loading, getIdToken } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const search = params.get('q') ?? ''
+  const status = params.get('status') ?? 'ALL'
+  const requestedPage = Number(params.get('page') ?? '1')
+  const page =
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const mine = useQuery({
     queryKey: ['my-submissions', profile?.id],
     enabled: user !== null,
@@ -41,6 +79,40 @@ export function MySubmissionsPage() {
     queryFn: async () =>
       apiFetch<MySubmission[]>('/api/submissions/mine', await getIdToken()),
   })
+
+  const filtered = useMemo(() => {
+    const items = mine.data ?? []
+    const normalizedSearch = search.trim().toLocaleLowerCase()
+    return items.filter((item) => {
+      const matchesStatus = status === 'ALL' || item.status === status
+      const matchesSearch =
+        !normalizedSearch ||
+        item.title.toLocaleLowerCase().includes(normalizedSearch) ||
+        (item.authors ?? '').toLocaleLowerCase().includes(normalizedSearch)
+      return matchesStatus && matchesSearch
+    })
+  }, [mine.data, search, status])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const visibleItems = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  )
+
+  function updateFilter(name: string, value: string) {
+    const next = new URLSearchParams(params)
+    next.set('page', '1')
+    if (value) next.set(name, value)
+    else next.delete(name)
+    setParams(next)
+  }
+
+  function goToPage(nextPage: number) {
+    const next = new URLSearchParams(params)
+    next.set('page', String(nextPage))
+    setParams(next)
+  }
 
   if (loading)
     return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
@@ -106,16 +178,79 @@ export function MySubmissionsPage() {
             </p>
           </div>
         )}
-        {mine.data?.map((item) => (
+        {mine.data && mine.data.length > 0 && (
+          <>
+            <div className="grid gap-4 border-y border-[var(--border)] bg-white p-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
+              <label
+                className="space-y-2 text-sm font-medium"
+                htmlFor="submission-search"
+              >
+                <span className="flex items-center gap-2">
+                  <Search className="size-4" aria-hidden="true" />
+                  Find a submission
+                </span>
+                <Input
+                  id="submission-search"
+                  type="search"
+                  placeholder="Search title or author"
+                  value={search}
+                  onChange={(event) => updateFilter('q', event.target.value)}
+                />
+              </label>
+              <label
+                className="space-y-2 text-sm font-medium"
+                htmlFor="submission-status"
+              >
+                Status
+                <Select
+                  value={status}
+                  onValueChange={(value) =>
+                    updateFilter('status', value ?? 'ALL')
+                  }
+                  items={STATUS_OPTIONS.map((option) => ({ ...option }))}
+                >
+                  <SelectTrigger id="submission-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+            </div>
+            <p className="text-sm text-[var(--ink-muted)]" aria-live="polite">
+              Showing {filtered.length} of {mine.data.length} submissions
+            </p>
+          </>
+        )}
+        {mine.data && mine.data.length > 0 && visibleItems.length === 0 && (
+          <div className="border-t-2 border-[var(--primary)] bg-white p-6">
+            <p className="font-semibold">No submissions match these filters.</p>
+            <button
+              type="button"
+              className="mt-2 text-sm underline underline-offset-4"
+              onClick={() => setParams({})}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+        {visibleItems.map((item) => (
           <article
             key={item.id}
             className="space-y-4 border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6"
           >
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="display-heading mr-auto text-2xl font-semibold leading-tight">
+            <div className="space-y-3">
+              <h2 className="display-heading text-2xl font-semibold leading-tight">
                 {item.title}
               </h2>
-              <span className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1 text-xs font-semibold">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${STATUS_STYLE[item.status]}`}
+              >
                 {item.status === 'PENDING' ? (
                   <Clock3 className="size-3.5" aria-hidden="true" />
                 ) : item.status === 'ACCEPTED' ? (
@@ -177,6 +312,32 @@ export function MySubmissionsPage() {
             )}
           </article>
         ))}
+        {filtered.length > PAGE_SIZE && (
+          <nav
+            className="flex items-center justify-between border-t border-[var(--border)] pt-4"
+            aria-label="Submission pages"
+          >
+            <button
+              type="button"
+              className="rounded border border-[var(--border)] px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={currentPage === 1}
+              onClick={() => goToPage(currentPage - 1)}
+            >
+              Previous
+            </button>
+            <span className="text-sm text-[var(--ink-muted)]">
+              Page {currentPage} of {pageCount}
+            </span>
+            <button
+              type="button"
+              className="rounded border border-[var(--border)] px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={currentPage === pageCount}
+              onClick={() => goToPage(currentPage + 1)}
+            >
+              Next
+            </button>
+          </nav>
+        )}
       </section>
     </div>
   )

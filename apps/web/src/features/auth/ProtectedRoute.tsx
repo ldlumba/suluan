@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import type { ReactNode } from 'react'
 import { useAuth } from './useAuth'
 
@@ -9,8 +9,17 @@ import { useAuth } from './useAuth'
  */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
+  const location = useLocation()
   if (loading)
     return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
-  if (!user) return <Navigate to="/signin" replace />
+  if (!user) {
+    const returnTo = `${location.pathname}${location.search}`
+    return (
+      <Navigate
+        to={`/signin?returnTo=${encodeURIComponent(returnTo)}`}
+        replace
+      />
+    )
+  }
   return <>{children}</>
 }

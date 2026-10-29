@@ -1,14 +1,32 @@
 import { LogIn } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { isFirebaseConfigured } from '@/lib/firebase'
 import { useAuth } from './useAuth'
 
-export function SignInButton() {
+export function SignInButton({ returnTo }: { returnTo?: string } = {}) {
   const { signIn, error } = useAuth()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const requestedDestination = returnTo ?? params.get('returnTo') ?? '/'
+  // Keep return navigation inside the application; never turn a query string
+  // into an open redirect.
+  const destination =
+    requestedDestination.startsWith('/') &&
+    !requestedDestination.startsWith('//')
+      ? requestedDestination
+      : '/'
+
+  async function handleSignIn() {
+    const succeeded = await signIn()
+    if (!succeeded) return
+    navigate(destination, { state: { signedIn: true } })
+  }
+
   return (
     <div className="space-y-2">
       <Button
-        onClick={() => void signIn()}
+        onClick={() => void handleSignIn()}
         disabled={!isFirebaseConfigured}
         title={
           isFirebaseConfigured
