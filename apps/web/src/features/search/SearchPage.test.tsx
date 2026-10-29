@@ -278,6 +278,41 @@ describe('semantic search', () => {
     expect(screen.queryByText('Full text searchable')).not.toBeInTheDocument()
   })
 
+  it('renders semantic and keyword matches when keyword metadata is absent', async () => {
+    const resultWithoutKeywords = {
+      id: semanticItem.id,
+      title: semanticItem.title,
+      authors: semanticItem.authors,
+      schoolName: semanticItem.schoolName,
+      courseName: semanticItem.courseName,
+      year: semanticItem.year,
+      snippet: semanticItem.snippet,
+      fullTextStatus: semanticItem.fullTextStatus,
+      visibility: semanticItem.visibility,
+    }
+    vi.mocked(apiFetch).mockResolvedValue({
+      items: [
+        { ...resultWithoutKeywords, matchType: 'semantic' },
+        {
+          ...resultWithoutKeywords,
+          id: 'keyword-only',
+          title: 'Keyword-only result',
+          matchType: 'keyword',
+        },
+      ],
+      page: 1,
+      hasMore: false,
+      semanticStatus: 'ready',
+      retrievalMode: 'hybrid',
+    } as never)
+    renderPage('USER', '/search?q=humidity&mode=semantic')
+
+    expect(await screen.findByText(semanticItem.title)).toBeInTheDocument()
+    expect(screen.getByText('Keyword-only result')).toBeInTheDocument()
+    expect(screen.getByText('Meaning match')).toBeInTheDocument()
+    expect(screen.getByText('Keyword match')).toBeInTheDocument()
+  })
+
   it('explains when neither semantic nor keyword retrieval finds a match', async () => {
     vi.mocked(apiFetch).mockResolvedValue({
       items: [],

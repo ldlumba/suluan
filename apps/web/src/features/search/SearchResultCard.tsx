@@ -9,7 +9,7 @@ export interface SearchItem {
   schoolName: string | null
   courseName: string | null
   year: string | null
-  keywords: string[]
+  keywords?: string[] | null
   snippet: string | null
   fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
   visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
@@ -28,6 +28,7 @@ export function SearchResultCard({
   manager: boolean
 }) {
   const detailsAvailable = manager || item.visibility !== 'RESTRICTED'
+  const keywords = item.keywords ?? []
 
   return (
     <li className="space-y-3 border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6">
@@ -79,14 +80,14 @@ export function SearchResultCard({
           {item.courseName || 'Course not listed'}
         </p>
       )}
-      {item.keywords.length > 0 && (
+      {keywords.length > 0 && (
         <>
-          <span className="sr-only">Keywords: {item.keywords.join('; ')}</span>
+          <span className="sr-only">Keywords: {keywords.join('; ')}</span>
           <div
             className="flex flex-wrap gap-2"
-            aria-label={`Keywords: ${item.keywords.join('; ')}`}
+            aria-label={`Keywords: ${keywords.join('; ')}`}
           >
-            {item.keywords.map((keyword) => (
+            {keywords.map((keyword) => (
               <span
                 key={keyword}
                 className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-medium"
