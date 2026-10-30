@@ -2,11 +2,10 @@ name = "suluan-api-production"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
 
-# Owner-approved 2026-10-24: manager/admin manual pipeline controls permit the
-# aligned durable fallback to run every three hours. Queue delivery remains
-# immediate and primary; job bounds and quotas are unchanged.
+# Owner-approved 2026-10-30: maintenance at 23:30 and 12:00 Asia/Manila.
+# Queue delivery remains immediate and primary; bounds and quotas are unchanged.
 [triggers]
-crons = ["0 */3 * * *"]
+crons = ["30 15 * * *", "0 4 * * *"]
 
 [vars]
 ALLOWED_DOMAINS = "ua.edu.ph"

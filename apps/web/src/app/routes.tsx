@@ -12,7 +12,6 @@ import { SearchPage } from '@/features/search/SearchPage'
 import { MySubmissionsPage } from '@/features/submissions/MySubmissionsPage'
 import { PaperPage } from '@/features/search/PaperPage'
 import { SemanticAccessPage } from '@/features/search/SemanticAccessPage'
-import { AssistantPage } from '@/features/assistant/AssistantPage'
 import { AdminCatalogPage } from '@/features/admin/AdminCatalogPage'
 import { AdminUsersPage } from '@/features/admin/AdminUsersPage'
 import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage'
@@ -45,7 +44,10 @@ export const routes = [
       // Search is public discovery: no ProtectedRoute wrapper.
       { path: '/search', element: <SearchPage /> },
       { path: '/search/semantic-access', element: <SemanticAccessPage /> },
-      { path: '/assistant', element: <AssistantPage /> },
+      {
+        path: '/assistant',
+        element: <Navigate to="/" replace state={{ openAssistant: true }} />,
+      },
       { path: '/records/:id', element: <PaperPage /> },
       {
         path: '/graph',

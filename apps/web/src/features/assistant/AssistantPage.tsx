@@ -65,12 +65,12 @@ function assistantErrorMessage(error: unknown) {
     : error.message
 }
 
-export function AssistantPage() {
+export function AssistantPage({ floating = false }: { floating?: boolean }) {
   const { profile, loading } = useAuth()
   if (loading) return <p role="status">Checking access…</p>
   if (!profile)
     return (
-      <section className="mx-auto max-w-2xl space-y-5 py-6 sm:py-12">
+      <section className="mx-auto max-w-2xl space-y-5 p-6">
         <h1 className="display-heading text-4xl font-semibold">
           Sign in to chat with the research assistant
         </h1>
@@ -86,10 +86,10 @@ export function AssistantPage() {
         </div>
       </section>
     )
-  return <AssistantConversation key={profile.id} />
+  return <AssistantConversation key={profile.id} floating={floating} />
 }
 
-function AssistantConversation() {
+function AssistantConversation({ floating }: { floating: boolean }) {
   const { profile, getIdToken } = useAuth()
   const queryClient = useQueryClient()
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
@@ -250,17 +250,32 @@ function AssistantConversation() {
   }
 
   return (
-    <section className="mx-auto flex min-h-[calc(100svh-15rem)] max-w-5xl flex-col gap-4">
-      <header className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="display-heading text-3xl font-semibold sm:text-4xl">
-            Research assistant
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-            Explore SULUAN’s public research, shape research ideas, and ask
-            follow-up questions. Repository findings stay tied to cited papers.
-          </p>
-        </div>
+    <section
+      className={
+        floating
+          ? 'flex h-full min-h-0 flex-col gap-2'
+          : 'mx-auto flex min-h-[calc(100svh-15rem)] max-w-5xl flex-col gap-4'
+      }
+    >
+      <header
+        className={
+          floating
+            ? 'px-4 pt-3 text-xs text-muted-foreground'
+            : 'flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between'
+        }
+      >
+        {!floating && (
+          <div>
+            <h1 className="display-heading text-3xl font-semibold sm:text-4xl">
+              Research assistant
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              Explore SULUAN’s public research, shape research ideas, and ask
+              follow-up questions. Repository findings stay tied to cited
+              papers.
+            </p>
+          </div>
+        )}
         <div className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground">
           <ShieldCheck
             className="size-4 text-[var(--primary)]"
@@ -270,7 +285,13 @@ function AssistantConversation() {
         </div>
       </header>
 
-      <div className="flex min-h-[36rem] flex-1 flex-col overflow-hidden rounded-[8px] border border-border bg-white">
+      <div
+        className={
+          floating
+            ? 'flex min-h-0 flex-1 flex-col overflow-hidden border-y border-border bg-white'
+            : 'flex min-h-[36rem] flex-1 flex-col overflow-hidden rounded-[8px] border border-border bg-white'
+        }
+      >
         <div className="flex items-center justify-between gap-3 border-b border-border bg-[var(--primary)] px-4 py-3 text-white sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-[6px] bg-[var(--highlight)] text-[var(--primary)]">
@@ -470,7 +491,7 @@ function AssistantConversation() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 text-xs leading-5 text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex max-h-32 shrink-0 flex-col gap-3 overflow-y-auto px-4 pb-3 text-xs leading-5 text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
         <details className="group max-w-3xl">
           <summary className="cursor-pointer list-none font-medium text-foreground underline decoration-border underline-offset-4">
             Privacy and AI limitations

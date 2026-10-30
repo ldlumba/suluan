@@ -1,5 +1,11 @@
 # Production environment
 
+## Nightly schedule (2026-10-30)
+
+The production Worker `54fc05ca-84b5-469b-bea3-9dea90e25487` runs its combined maintenance sweep at `30 15 * * *` and `0 4 * * *` UTC (23:30 and 12:00 Asia/Manila). Cloud Scheduler invokes extraction at `0 15 * * *` UTC (23:00 Manila), and the existing document embedding Job via `suluan-embed-production-trigger` at `45 15 * * *` UTC (23:45 Manila) and `suluan-embed-production-midnight-trigger` at `0 16 * * *` UTC (00:00 Manila). All three Google triggers were verified enabled on 2026-10-30. The midnight trigger uses the existing resource-scoped scheduler identity and OAuth target, with no automatic Scheduler retry. No forced paid run was made. These schedules supersede the historical three-hour descriptions below.
+
+Queue delivery remains primary. The Worker gaps alternate 12.5 and 11.5 hours; timing does not guarantee a prior stage has completed. Extraction is limited to five claims per run and each embedding run to one paper/20 chunks, so larger backlogs can take days. Existing manual controls, leases, quotas, and job safeguards remain unchanged. Measure Neon compute and backlog before asserting savings. To revert, restore the three-hour Worker cron and original two Google trigger schedules and disable the midnight trigger.
+
 ## Status
 
 **PROVISIONING IN PROGRESS (2026-10-14).** Core production resources are

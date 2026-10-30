@@ -1,7 +1,6 @@
 import {
   ArrowUpRight,
   BookOpen,
-  Bot,
   BriefcaseBusiness,
   ChevronDown,
   LogOut,
@@ -24,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuth } from '@/features/auth/useAuth'
+import { AssistantWidget } from '@/features/assistant/AssistantWidget'
 
 export function RootLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -200,9 +200,6 @@ export function RootLayout() {
             <NavLink to="/graph" className={navClass}>
               <Network className="size-4" aria-hidden="true" /> Graph
             </NavLink>
-            <NavLink to="/assistant" className={navClass}>
-              <Bot className="size-4" aria-hidden="true" /> Assistant
-            </NavLink>
             <div ref={workspaceRef} className="relative">
               <Button
                 ref={workspaceButtonRef}
@@ -320,9 +317,6 @@ export function RootLayout() {
               <MobileLink to="/graph" icon={<Network />} onClick={closeMenu}>
                 Research graph
               </MobileLink>
-              <MobileLink to="/assistant" icon={<Bot />} onClick={closeMenu}>
-                Research assistant
-              </MobileLink>
               <MobileLink to="/submit" icon={<BookOpen />} onClick={closeMenu}>
                 Submit research
               </MobileLink>
@@ -398,6 +392,7 @@ export function RootLayout() {
           <Outlet />
         </div>
       </main>
+      <AssistantWidget />
       {signedInNotice && (
         <div
           role="status"
