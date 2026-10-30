@@ -59,6 +59,27 @@ describe('assistant UI boundaries', () => {
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
     expect(apiFetch).not.toHaveBeenCalled()
   })
+  it('keeps the privacy notice and new-conversation control without a second branded header in the floating panel', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <AssistantPage floating />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(
+      screen.getByText('Chat text is not saved by SULUAN'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'New conversation' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Repository-first guidance'),
+    ).not.toBeInTheDocument()
+    expect(
+      await screen.findByLabelText('Your research question'),
+    ).toBeInTheDocument()
+  })
   it('keeps disabled generation unavailable', async () => {
     vi.mocked(apiFetch).mockResolvedValue({ ...config, enabled: false })
     page()

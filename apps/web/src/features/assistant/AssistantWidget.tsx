@@ -48,11 +48,13 @@ export function AssistantWidget() {
       <button
         ref={launcher}
         type="button"
-        aria-label="Open research assistant"
+        aria-label={
+          open ? 'Close research assistant' : 'Open research assistant'
+        }
         aria-expanded={open}
         aria-controls="assistant-panel"
-        onClick={openAssistant}
-        className="fixed bottom-4 right-4 z-40 inline-flex min-h-12 items-center gap-2 rounded-full bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
+        onClick={() => (open ? closeAssistant() : openAssistant())}
+        className="fixed bottom-4 right-4 z-50 inline-flex min-h-12 items-center gap-2 rounded-full bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-lg motion-safe:transition-transform motion-safe:duration-150 motion-safe:hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
       >
         <Bot className="size-5" aria-hidden="true" />{' '}
         <span>Research assistant</span>
@@ -63,7 +65,7 @@ export function AssistantWidget() {
           role="region"
           aria-label="Research assistant"
           hidden={!open}
-          className={`fixed inset-x-2 bottom-2 top-2 z-50 ${open ? 'flex' : 'hidden'} flex-col overflow-hidden rounded-lg border border-border bg-white shadow-xl sm:inset-auto sm:bottom-20 sm:right-4 sm:h-[min(44rem,calc(100dvh-7rem))] sm:w-[min(32rem,calc(100vw-2rem))]`}
+          className={`fixed inset-x-2 bottom-20 top-2 z-50 ${open ? 'flex motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-150' : 'hidden'} flex-col overflow-hidden rounded-lg border border-border bg-white shadow-xl sm:inset-auto sm:bottom-20 sm:right-4 sm:h-[min(44rem,calc(100dvh-7rem))] sm:w-[min(28rem,calc(100vw-2rem))]`}
         >
           <div className="flex shrink-0 items-center justify-between bg-[var(--primary)] px-4 py-2 text-white">
             <h2 className="font-semibold">Research assistant</h2>

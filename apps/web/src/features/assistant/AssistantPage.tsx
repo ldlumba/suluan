@@ -249,6 +249,25 @@ function AssistantConversation({ floating }: { floating: boolean }) {
     send.mutate()
   }
 
+  const newConversationButton = (
+    <Button
+      type="button"
+      aria-label="New conversation"
+      variant={floating ? 'outline' : 'ghost'}
+      size="sm"
+      className={
+        floating
+          ? 'shrink-0'
+          : 'border border-white/20 text-white hover:bg-white/10 hover:text-white'
+      }
+      disabled={send.isPending}
+      onClick={startNewConversation}
+    >
+      <MessageSquarePlus className="size-4" aria-hidden="true" />
+      <span>New conversation</span>
+    </Button>
+  )
+
   return (
     <section
       className={
@@ -260,7 +279,7 @@ function AssistantConversation({ floating }: { floating: boolean }) {
       <header
         className={
           floating
-            ? 'px-4 pt-3 text-xs text-muted-foreground'
+            ? 'flex flex-wrap items-center justify-between gap-2 px-4 pt-3 text-xs text-muted-foreground'
             : 'flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between'
         }
       >
@@ -283,6 +302,7 @@ function AssistantConversation({ floating }: { floating: boolean }) {
           />
           Chat text is not saved by SULUAN
         </div>
+        {floating && newConversationButton}
       </header>
 
       <div
@@ -292,30 +312,24 @@ function AssistantConversation({ floating }: { floating: boolean }) {
             : 'flex min-h-[36rem] flex-1 flex-col overflow-hidden rounded-[8px] border border-border bg-white'
         }
       >
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-[var(--primary)] px-4 py-3 text-white sm:px-5">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-[6px] bg-[var(--highlight)] text-[var(--primary)]">
-              <Bot className="size-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">SULUAN Assistant</p>
-              <p className="text-xs text-white/70">Repository-first guidance</p>
+        {!floating && (
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-[var(--primary)] px-4 py-3 text-white sm:px-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-[6px] bg-[var(--highlight)] text-[var(--primary)]">
+                <Bot className="size-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  SULUAN Assistant
+                </p>
+                <p className="text-xs text-white/70">
+                  Repository-first guidance
+                </p>
+              </div>
             </div>
+            {newConversationButton}
           </div>
-          <Button
-            type="button"
-            aria-label="New conversation"
-            variant="ghost"
-            size="sm"
-            className="border border-white/20 text-white hover:bg-white/10 hover:text-white"
-            disabled={send.isPending}
-            onClick={startNewConversation}
-          >
-            <MessageSquarePlus className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">New conversation</span>
-            <span className="sm:hidden">New</span>
-          </Button>
-        </div>
+        )}
 
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div
