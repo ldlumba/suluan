@@ -69,6 +69,12 @@ export function ManagerDashboardPage() {
             description="Check paper processing and start preparation when needed."
           />
           <AdminTool
+            to="/access-review"
+            icon={<ShieldCheck aria-hidden="true" />}
+            title="Review paper access"
+            description="Check accepted papers and change who can access them."
+          />
+          <AdminTool
             to="/graph/analytics"
             icon={<Network aria-hidden="true" />}
             title="Explore research trends"

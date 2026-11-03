@@ -105,6 +105,7 @@ Logical domains to represent (names below are illustrative, not a frozen schema)
 - Use authorized OAuth/API access for the sending mailbox; never request REO's Gmail password or use shared team passwords.
 - Enforce assistant quotas/rate limits server-side before paid work. Treat uploaded text and retrieved content as untrusted data, not instructions that override permissions or assistant behavior.
 - Preserve auditability. Do not enable automatic rejected-file deletion until REO approves retention requirements.
+- Owner decision 2026-11-03: repository managers and admins may review accepted records and change their access level and auto-lift date after acceptance. Changes require server authorization, stale-write protection, and an atomic audit event; this does not authorize withdrawal, deletion, or a change to acceptance status.
 
 ## 7. Cost controls and planning assumptions
 

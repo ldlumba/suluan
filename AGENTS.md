@@ -177,6 +177,8 @@ work from an earlier one.
 
 ## Maintaining this file
 
+- **Accepted-paper access review 2026-11-03:** owner approved a manager/admin-only accepted-record browser and audited post-acceptance visibility changes with optimistic concurrency. Existing effective visibility and embargo rules apply; public caches can remain stale for up to 30 seconds. Deployment and DB-backed verification must be checked independently. Withdrawal/deletion remain TBD.
+
 - **Manual notification refresh 2026-11-03:** manager/admin dashboards can request an audited retry of up to 50 due, unprocessed submission/decision notifications via the existing queue. Queueing is not delivery confirmation; the consumer's leases protect concurrent processing, but external Gmail delivery remains at-least-once. Deployment status must be verified independently.
 
 - **School/program intake revision 2026-11-03:** owner approved requiring both fields for new submissions and adding an Other program per school (migration 0021; catalog 4 schools/28 programs). Migration and deployment status must be verified independently; historical records are unchanged.

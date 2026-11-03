@@ -65,6 +65,9 @@ export function ReviewQueuePage() {
   const queryClient = useQueryClient()
   const [deciding, setDeciding] = useState<QueueItem | null>(null)
   const [remarks, setRemarks] = useState('')
+  const [confirmDecision, setConfirmDecision] = useState<
+    'ACCEPTED' | 'REJECTED' | null
+  >(null)
   const [decideError, setDecideError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   // Visibility defaults to PUBLIC so accepting never silently hides a paper.
@@ -80,6 +83,7 @@ export function ReviewQueuePage() {
   ] as const
 
   function resetDecisionFields() {
+    setConfirmDecision(null)
     setRemarks('')
     setDecideError(null)
     setVisibility('PUBLIC')
@@ -340,109 +344,175 @@ export function ReviewQueuePage() {
       <Dialog
         open={deciding !== null}
         onOpenChange={(open) => {
-          if (!open) setDeciding(null)
+          if (!open && !decideMutation.isPending) {
+            setDeciding(null)
+            setConfirmDecision(null)
+          }
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Decide: {deciding?.title}</DialogTitle>
-            <DialogDescription>
-              Remarks are required and will be recorded with your decision.
-              {deciding && deciding.keywords.length > 0 && (
-                <> Submitted keywords: {deciding.keywords.join('; ')}.</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="remarks">Reviewer remarks</Label>
-            <Textarea
-              id="remarks"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder="Basis for acceptance or rejection…"
-            />
-          </div>
-          {/* Visibility applies to acceptance only; rejection is always
-              REO-only regardless of these fields. */}
-          <div className="space-y-2">
-            <Label htmlFor="visibility">Access if accepted</Label>
-            <Select
-              value={visibility}
-              onValueChange={(value) => {
-                setVisibility(value as 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED')
-                if (value === 'PUBLIC') setEmbargoUntil('')
-              }}
-              items={VISIBILITY_OPTIONS.map((o) => ({
-                value: o.value,
-                label: o.label,
-              }))}
-            >
-              <SelectTrigger id="visibility">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {VISIBILITY_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {visibility !== 'PUBLIC' && (
-              <div className="space-y-1">
-                <Label htmlFor="embargo">Auto-lift date (optional)</Label>
-                <Input
-                  id="embargo"
-                  type="date"
-                  value={embargoUntil}
-                  onChange={(e) => setEmbargoUntil(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  For journals, patents, or funder agreements. On this date the
-                  paper becomes public automatically. Leave blank to restrict
-                  indefinitely.
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          {confirmDecision ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  Confirm{' '}
+                  {confirmDecision === 'ACCEPTED' ? 'acceptance' : 'return'}
+                </DialogTitle>
+                <DialogDescription>
+                  Confirm this decision for {deciding?.title}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <p>
+                  <strong>Decision:</strong>{' '}
+                  {confirmDecision === 'ACCEPTED' ? 'Accept' : 'Return'}
+                </p>
+                {confirmDecision === 'ACCEPTED' && (
+                  <p>
+                    <strong>Access:</strong>{' '}
+                    {
+                      VISIBILITY_OPTIONS.find(
+                        (option) => option.value === visibility,
+                      )?.label
+                    }
+                    {visibility !== 'PUBLIC' && embargoUntil
+                      ? ` · Auto-lift ${embargoUntil}`
+                      : ''}
+                  </p>
+                )}
+                <p className="whitespace-pre-wrap break-words">
+                  <strong>Remarks:</strong> {remarks.trim()}
                 </p>
               </div>
-            )}
-          </div>
-          {decideError && (
-            <p role="alert" className="text-sm text-destructive">
-              {decideError}
-            </p>
+              {decideError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {decideError}
+                </p>
+              )}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  disabled={decideMutation.isPending}
+                  onClick={() => setConfirmDecision(null)}
+                >
+                  Back
+                </Button>
+                <Button
+                  disabled={decideMutation.isPending}
+                  variant={
+                    confirmDecision === 'REJECTED' ? 'destructive' : 'default'
+                  }
+                  onClick={() =>
+                    deciding &&
+                    decideMutation.mutate({
+                      submissionId: deciding.id,
+                      status: confirmDecision,
+                      remarks: remarks.trim(),
+                      ...(confirmDecision === 'ACCEPTED'
+                        ? {
+                            visibility,
+                            ...(visibility !== 'PUBLIC' && embargoUntil
+                              ? { embargoUntil }
+                              : {}),
+                          }
+                        : {}),
+                    })
+                  }
+                >
+                  {decideMutation.isPending ? 'Saving…' : 'Confirm decision'}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Decide: {deciding?.title}</DialogTitle>
+                <DialogDescription>
+                  Remarks are required and will be recorded with your decision.
+                  {deciding && deciding.keywords.length > 0 && (
+                    <> Submitted keywords: {deciding.keywords.join('; ')}.</>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="remarks">Reviewer remarks</Label>
+                <Textarea
+                  id="remarks"
+                  className="min-h-32"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Basis for acceptance or rejection…"
+                />
+              </div>
+              {/* Visibility applies to acceptance only; rejection is always
+              REO-only regardless of these fields. */}
+              <div className="space-y-2">
+                <Label htmlFor="visibility">Access if accepted</Label>
+                <Select
+                  value={visibility}
+                  onValueChange={(value) => {
+                    setVisibility(value as 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED')
+                    if (value === 'PUBLIC') setEmbargoUntil('')
+                  }}
+                  items={VISIBILITY_OPTIONS.map((o) => ({
+                    value: o.value,
+                    label: o.label,
+                  }))}
+                >
+                  <SelectTrigger id="visibility">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VISIBILITY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {visibility !== 'PUBLIC' && (
+                  <div className="space-y-1">
+                    <Label htmlFor="embargo">Auto-lift date (optional)</Label>
+                    <Input
+                      id="embargo"
+                      type="date"
+                      value={embargoUntil}
+                      onChange={(e) => setEmbargoUntil(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      For journals, patents, or funder agreements. On this date
+                      the paper becomes public automatically. Leave blank to
+                      restrict indefinitely.
+                    </p>
+                  </div>
+                )}
+              </div>
+              {decideError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {decideError}
+                </p>
+              )}
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="destructive"
+                  disabled={
+                    decideMutation.isPending || remarks.trim().length === 0
+                  }
+                  onClick={() => setConfirmDecision('REJECTED')}
+                >
+                  Return
+                </Button>
+                <Button
+                  disabled={
+                    decideMutation.isPending || remarks.trim().length === 0
+                  }
+                  onClick={() => setConfirmDecision('ACCEPTED')}
+                >
+                  Accept
+                </Button>
+              </DialogFooter>
+            </>
           )}
-          <DialogFooter className="gap-2">
-            <Button
-              variant="destructive"
-              disabled={decideMutation.isPending || remarks.trim().length === 0}
-              onClick={() =>
-                deciding &&
-                decideMutation.mutate({
-                  submissionId: deciding.id,
-                  status: 'REJECTED',
-                  remarks: remarks.trim(),
-                })
-              }
-            >
-              Return
-            </Button>
-            <Button
-              disabled={decideMutation.isPending || remarks.trim().length === 0}
-              onClick={() =>
-                deciding &&
-                decideMutation.mutate({
-                  submissionId: deciding.id,
-                  status: 'ACCEPTED',
-                  remarks: remarks.trim(),
-                  visibility,
-                  ...(visibility !== 'PUBLIC' && embargoUntil
-                    ? { embargoUntil }
-                    : {}),
-                })
-              }
-            >
-              Accept
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

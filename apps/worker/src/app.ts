@@ -33,6 +33,7 @@ import { bookmarkRoutes } from './bookmarks'
 import { activityRoutes } from './activity'
 import { CHUNKER_VERSION } from './chunking'
 import { graphRoutes } from './graph'
+import { recordAccessRoutes } from './record-access'
 import { assistantRoutes } from './assistant-routes'
 import {
   repositoryOperationRoutes,
@@ -360,6 +361,10 @@ export function createApp(
     },
   )
   app.route('/api/processing', processingRoutes(requireRole(...MANAGERS)))
+  app.route(
+    '/api/record-access',
+    recordAccessRoutes(requireAuth, requireRole(...MANAGERS)),
+  )
   app.route(
     '/api/repository-operations',
     repositoryOperationRoutes(requireAuth, requireRole(...MANAGERS)),
