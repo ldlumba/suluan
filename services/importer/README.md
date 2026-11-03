@@ -41,9 +41,9 @@ course: BS Tourism Management
 Optional operator notes may follow, but are not imported or shown to reviewers.
 ```
 
-`title` is required. `authors`, `school`, and `course` are optional. Names must
-match the API catalog exactly. A unique course can infer its school, but stating
-both is recommended. Unknown fields are rejected so misspellings do not silently
+`title` and `course` are required; `authors` is optional. Names must match the
+API catalog exactly. A unique course can infer its school; specify the school for
+ambiguous programs such as `Other`. Unknown fields are rejected so misspellings do not silently
 lose metadata. Year is assigned at acceptance; research type and abstract are
 not manifest fields.
 

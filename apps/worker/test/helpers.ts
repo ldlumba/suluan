@@ -9,6 +9,7 @@ import {
 import { loadRootEnv } from '@suluan/db/scripts/env.mjs'
 import {
   auditEvents,
+  courses,
   decisions,
   notifications,
   outboxEvents,
@@ -37,6 +38,19 @@ export const KID = 'test-key-1'
  */
 
 loadRootEnv()
+
+export async function testCatalog() {
+  const [course] = await testDb()
+    .select({ schoolId: courses.schoolId, courseId: courses.id })
+    .from(courses)
+    .where(eq(courses.active, true))
+    .limit(1)
+  if (!course)
+    throw new Error(
+      'An active catalog program is required for integration tests',
+    )
+  return course
+}
 
 export interface TestAuth {
   app: ReturnType<typeof createApp>

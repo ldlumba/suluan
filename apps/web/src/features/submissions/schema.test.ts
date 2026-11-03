@@ -14,11 +14,25 @@ function docx(name = 'paper.docx', size = 1024): File {
 const base = {
   title: 'A study of something',
   authors: 'Doe, J.',
-  schoolId: '',
-  courseId: '',
+  schoolId: 'school',
+  courseId: 'program',
 }
 
 describe('submission form schema', () => {
+  it('requires school and program', () => {
+    const result = submissionFormSchema.safeParse({
+      ...base,
+      schoolId: '',
+      courseId: '',
+      file: pdf(),
+    })
+    expect(result.success).toBe(false)
+    if (!result.success)
+      expect(result.error.issues.map((issue) => issue.message)).toEqual([
+        'Select a school.',
+        'Select a program.',
+      ])
+  })
   it('accepts a valid PDF submission', () => {
     expect(
       submissionFormSchema.safeParse({ ...base, file: pdf() }).success,

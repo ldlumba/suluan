@@ -8,6 +8,7 @@ import {
   insertProfile,
   setupTestAuth,
   testDb,
+  testCatalog,
   type TestAuth,
 } from './helpers'
 
@@ -24,6 +25,7 @@ function dbIt(name: string, test: () => Promise<void>) {
 
 needsDb('record visibility and submitter status', () => {
   let t: TestAuth
+  let catalog: { schoolId: string; courseId: string }
   const uids: string[] = []
   const submissionIds: string[] = []
   const recordIds: string[] = []
@@ -37,6 +39,7 @@ needsDb('record visibility and submitter status', () => {
 
   beforeAll(async () => {
     t = await setupTestAuth()
+    catalog = await testCatalog()
     const db = testDb()
     for (const [uid, role] of [
       [managerUid, 'REPOSITORY_MANAGER'],
@@ -102,6 +105,8 @@ needsDb('record visibility and submitter status', () => {
 
   async function submitPaper(title: string): Promise<string> {
     const form = new FormData()
+    form.append('schoolId', catalog.schoolId)
+    form.append('courseId', catalog.courseId)
     form.append(
       'file',
       new File(['x'.repeat(300)], 'paper.pdf', { type: 'application/pdf' }),
@@ -348,6 +353,8 @@ needsDb('record visibility and submitter status', () => {
 
       // A pending submission has no record row, so it is unreachable here.
       const form = new FormData()
+      form.append('schoolId', catalog.schoolId)
+      form.append('courseId', catalog.courseId)
       form.append(
         'file',
         new File(['z'], 'pending.pdf', { type: 'application/pdf' }),

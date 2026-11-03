@@ -221,11 +221,11 @@ try {
        'School of Business', 'School of Technological Studies'
      )`,
   )
-  if (catalog[0]?.schools === 4 && catalog[0]?.courses === 24) {
-    console.log('ok   institutional catalog = 4 schools / 24 courses')
+  if (catalog[0]?.schools === 4 && catalog[0]?.courses === 28) {
+    console.log('ok   institutional catalog = 4 schools / 28 courses')
   } else {
     console.log(
-      'FAIL institutional catalog must contain 4 schools / 24 courses',
+      'FAIL institutional catalog must contain 4 schools / 28 courses',
     )
     failures.push('institutional catalog')
   }

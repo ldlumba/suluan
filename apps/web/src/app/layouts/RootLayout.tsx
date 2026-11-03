@@ -182,8 +182,8 @@ export function RootLayout() {
               height="44"
             />
             <span className="min-w-0">
-              <span className="suluan-wordmark block text-lg font-bold tracking-[0.12em]">
-                SULUAN
+              <span className="block text-lg font-bold tracking-[0.12em]">
+                SUL<span className="suluan-wordmark">UA</span>N
               </span>
               <span className="hidden text-[0.72rem] font-medium uppercase tracking-[0.12em] text-white/60 sm:block">
                 UA research repository

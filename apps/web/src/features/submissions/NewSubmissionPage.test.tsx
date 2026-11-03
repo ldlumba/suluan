@@ -87,6 +87,7 @@ describe('NewSubmissionPage catalog UX', () => {
 
   it('collects keyword chips and sends one part per keyword', async () => {
     renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'BS Nursing' }))
     fireEvent.change(screen.getByLabelText('Title'), {
       target: { value: 'Keyword UI Study' },
     })
@@ -166,6 +167,7 @@ describe('NewSubmissionPage catalog UX', () => {
         },
       )
     })
+    fireEvent.click(await screen.findByRole('button', { name: 'BS Nursing' }))
     fireEvent.change(screen.getByLabelText('Title'), {
       target: { value: 'Existing title' },
     })
@@ -207,6 +209,20 @@ describe('NewSubmissionPage catalog UX', () => {
     ).toHaveAttribute('accept', '.pdf,application/pdf')
     expect(
       screen.queryByText(/file stays private until/i),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows and dismisses the program hint before selecting a school', async () => {
+    renderPage()
+    fireEvent.click(screen.getByLabelText('Program'))
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Select a school first',
+    )
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'BS Nursing' }))
+    expect(
+      screen.queryByText(/choose a program from the catalog on the right/i),
     ).not.toBeInTheDocument()
   })
 })

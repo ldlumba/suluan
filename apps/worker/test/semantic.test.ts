@@ -18,6 +18,7 @@ import {
   insertProfile,
   setupTestAuth,
   testDb,
+  testCatalog,
   type TestAuth,
 } from './helpers'
 
@@ -37,6 +38,7 @@ function dbIt(name: string, test: () => Promise<void>) {
 
 needsDb('semantic search', () => {
   let t: TestAuth
+  let catalog: { schoolId: string; courseId: string }
   const uids: string[] = []
   const submissionIds: string[] = []
   const recordIds: string[] = []
@@ -132,6 +134,7 @@ needsDb('semantic search', () => {
   }
 
   beforeAll(async () => {
+    catalog = await testCatalog()
     t = await setupTestAuth()
     const db = testDb()
     for (const [uid, role] of [
@@ -215,6 +218,8 @@ needsDb('semantic search', () => {
   ) {
     const chunkTexts = Array.isArray(text) ? text : [text]
     const form = new FormData()
+    form.append('schoolId', catalog.schoolId)
+    form.append('courseId', catalog.courseId)
     form.append(
       'file',
       new File(['x'.repeat(300)], 'paper.pdf', { type: 'application/pdf' }),

@@ -31,6 +31,10 @@ def catalog():
 
 
 class ImporterTests(unittest.TestCase):
+    def test_missing_program_fails_preflight(self):
+        with self.assertRaisesRegex(ImportValidationError, "program.*required"):
+            catalog().resolve("School of Business", None)
+
     def write_pair(self, root, stem="paper", suffix=".pdf", metadata=None):
         metadata = metadata or """---
 title: A Public Research Paper

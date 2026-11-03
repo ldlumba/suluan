@@ -36,9 +36,8 @@ export const submissionFormSchema = z.object({
       'Title must include a letter or number.',
     ),
   authors: z.string().trim().max(2000).optional(),
-  // Empty string = "no selection"; mapped to undefined before sending.
-  schoolId: z.string().optional(),
-  courseId: z.string().optional(),
+  schoolId: z.string().min(1, 'Select a school.'),
+  courseId: z.string().min(1, 'Select a program.'),
   // Author keywords v1: free text, up to 5. The chip input trims and
   // dedupes client-side; the Worker re-validates authoritatively.
   keywords: z

@@ -107,7 +107,7 @@ class Catalog:
             school_id, courses = found
 
         if course is None:
-            return CatalogSelection(school_id, school, None, None)
+            raise ImportValidationError("A program (course) is required")
 
         if courses is not None:
             course_id = courses.get(course)

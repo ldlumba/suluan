@@ -22,12 +22,14 @@ try {
       'School of Technological Studies'
     )
   `)
-  if (rows[0].schools !== 4 || rows[0].courses !== 24) {
+  if (rows[0].schools !== 4 || rows[0].courses !== 28) {
     throw new Error(
-      'Catalog migration 0008 is not fully applied (expected 4 schools / 24 courses)',
+      'Catalog migrations are not fully applied (expected 4 schools / 28 courses)',
     )
   }
-  console.log('seed:dev complete (catalog already supplied by migration 0008)')
+  console.log(
+    'seed:dev complete (catalog supplied by migrations 0008 and 0021)',
+  )
 } finally {
   await client.end()
 }

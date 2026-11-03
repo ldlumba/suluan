@@ -15,8 +15,8 @@ export const submissionFormFieldsSchema = z.object({
     .max(500)
     .refine((title) => /[\p{L}\p{N}]/u.test(title.normalize('NFKC'))),
   authors: z.string().trim().max(2000).optional(),
-  schoolId: z.string().uuid().optional(),
-  courseId: z.string().uuid().optional(),
+  schoolId: z.string().uuid(),
+  courseId: z.string().uuid(),
   duplicateAcknowledged: z.literal('true').optional(),
 })
 

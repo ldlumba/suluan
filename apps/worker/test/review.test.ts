@@ -31,6 +31,7 @@ import {
   insertProfile,
   setupTestAuth,
   testDb,
+  testCatalog,
   type TestAuth,
 } from './helpers'
 
@@ -50,10 +51,12 @@ needsDb('review workflow', () => {
   let userToken = ''
   let managerToken = ''
   let serviceToken = ''
+  let defaultCatalog: { schoolId: string; courseId: string }
 
   beforeAll(async () => {
     t = await setupTestAuth()
     const db = testDb()
+    defaultCatalog = await testCatalog()
     // Fixed test identities: clear leftovers from interrupted runs first.
     await deleteSubmissionsForProfiles(db, ['uid-reviewer', 'uid-author'])
     await deleteProfiles(db, ['uid-reviewer', 'uid-author'])
@@ -115,10 +118,8 @@ needsDb('review workflow', () => {
     form.append('idempotencyKey', crypto.randomUUID())
     form.append('title', title)
     if (authors) form.append('authors', authors)
-    if (catalog) {
-      form.append('schoolId', catalog.schoolId)
-      form.append('courseId', catalog.courseId)
-    }
+    form.append('schoolId', (catalog ?? defaultCatalog).schoolId)
+    form.append('courseId', (catalog ?? defaultCatalog).courseId)
     for (const term of keywords ?? []) form.append('keywords[]', term)
     const res = await t.app.request(
       '/api/submissions',
@@ -379,6 +380,8 @@ needsDb('review workflow', () => {
     const title = `Queue duplicate ${crypto.randomUUID()}`
     const first = await submit(title)
     const secondForm = new FormData()
+    secondForm.append('schoolId', defaultCatalog.schoolId)
+    secondForm.append('courseId', defaultCatalog.courseId)
     secondForm.append(
       'file',
       new File(['x'.repeat(10)], 'paper.pdf', { type: 'application/pdf' }),

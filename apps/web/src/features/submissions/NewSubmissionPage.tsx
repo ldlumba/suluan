@@ -34,7 +34,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   file_too_large: 'The file exceeds the server upload limit.',
   empty_file: 'The selected file is empty.',
   missing_file: 'A PDF document is required.',
-  invalid_fields: 'Some fields need attention. Check the title and try again.',
+  invalid_fields: 'Check the title, school, and program and try again.',
   invalid_keywords: 'Use at most 5 keywords, each under 100 characters.',
   invalid_form: 'The submission could not be read. Please try again.',
   storage_unavailable:
@@ -59,6 +59,8 @@ export function NewSubmissionPage() {
     { recordId: string; title: string; year: string | null }[]
   >([])
   const [isDragging, setIsDragging] = useState(false)
+  const [programHint, setProgramHint] = useState(false)
+  const programHintRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // One idempotency key per form attempt: retries reuse it.
   const [idempotencyKey] = useState(() => crypto.randomUUID())
@@ -99,6 +101,25 @@ export function NewSubmissionPage() {
       form.setValue('courseId', '')
     }
   }, [courses, form, selectedCourseId])
+
+  useEffect(() => {
+    if (!programHint) return
+    const timer = window.setTimeout(() => setProgramHint(false), 6000)
+    const dismiss = (event: PointerEvent) => {
+      if (!programHintRef.current?.contains(event.target as Node))
+        setProgramHint(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProgramHint(false)
+    }
+    document.addEventListener('pointerdown', dismiss)
+    document.addEventListener('keydown', escape)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('pointerdown', dismiss)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [programHint])
 
   if (loading)
     return <p className="text-sm text-muted-foreground">Checking sign-in…</p>
@@ -163,8 +184,8 @@ export function NewSubmissionPage() {
       form.append('idempotencyKey', idempotencyKey)
       form.append('title', values.title)
       if (values.authors) form.append('authors', values.authors)
-      if (values.schoolId) form.append('schoolId', values.schoolId)
-      if (values.courseId) form.append('courseId', values.courseId)
+      form.append('schoolId', values.schoolId)
+      form.append('courseId', values.courseId)
       if (acknowledgeDuplicate) form.append('duplicateAcknowledged', 'true')
       for (const term of values.keywords ?? []) form.append('keywords[]', term)
 
@@ -283,6 +304,7 @@ export function NewSubmissionPage() {
                   <Select
                     value={field.value}
                     onValueChange={(value) => {
+                      setProgramHint(false)
                       field.onChange(value)
                       form.setValue('courseId', '')
                     }}
@@ -316,41 +338,69 @@ export function NewSubmissionPage() {
                   Clear school
                 </button>
               )}
+              {form.formState.errors.schoolId && (
+                <p role="alert" className="text-sm text-destructive">
+                  {form.formState.errors.schoolId.message}
+                </p>
+              )}
             </div>
-            <div className="space-y-2">
+            <div className="relative space-y-2" ref={programHintRef}>
               <Label htmlFor="submission-program">Program</Label>
-              <Controller
-                control={form.control}
-                name="courseId"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={courses.length === 0}
-                    items={courses.map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                    }))}
-                  >
-                    <SelectTrigger id="submission-program" className="w-full">
-                      <SelectValue
-                        placeholder={
-                          courses.length === 0
-                            ? 'Select a school first'
-                            : 'Select a program'
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent align="start">
-                      {courses.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
+              {!selectedSchoolId ? (
+                <button
+                  id="submission-program"
+                  type="button"
+                  aria-disabled="true"
+                  aria-describedby={programHint ? 'program-hint' : undefined}
+                  onClick={() => setProgramHint(true)}
+                  className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 text-left text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  Select a school first
+                </button>
+              ) : (
+                <Controller
+                  control={form.control}
+                  name="courseId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={courses.length === 0}
+                      items={courses.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                      }))}
+                    >
+                      <SelectTrigger id="submission-program" className="w-full">
+                        <SelectValue
+                          placeholder={
+                            courses.length === 0
+                              ? 'Select a school first'
+                              : 'Select a program'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent align="start">
+                        {courses.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              )}
+              {programHint && !selectedSchoolId && (
+                <p
+                  id="program-hint"
+                  role="status"
+                  className="absolute z-10 rounded-md border bg-white p-3 text-sm shadow-md"
+                >
+                  Select a school first, or choose a program from the catalog on
+                  the right.
+                </p>
+              )}
               {selectedCourseId && (
                 <button
                   type="button"
@@ -359,6 +409,11 @@ export function NewSubmissionPage() {
                 >
                   Clear program
                 </button>
+              )}
+              {form.formState.errors.courseId && (
+                <p role="alert" className="text-sm text-destructive">
+                  {form.formState.errors.courseId.message}
+                </p>
               )}
             </div>
           </div>
@@ -569,6 +624,7 @@ export function NewSubmissionPage() {
                       aria-pressed={selected}
                       className="h-auto w-full justify-start whitespace-normal py-1.5 text-left"
                       onClick={() => {
+                        setProgramHint(false)
                         form.setValue('schoolId', school.id, {
                           shouldValidate: true,
                         })

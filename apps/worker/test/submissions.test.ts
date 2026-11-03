@@ -13,6 +13,7 @@ import {
   deleteSubmissionsForProfiles,
   setupTestAuth,
   testDb,
+  testCatalog,
   type TestAuth,
 } from './helpers'
 
@@ -31,11 +32,13 @@ function pdfFile(name = 'paper.pdf', size = 1024): File {
 
 needsDb('submission intake', () => {
   let t: TestAuth
+  let catalog: { schoolId: string; courseId: string }
   const uids: string[] = []
   const submissionIds: string[] = []
 
   beforeAll(async () => {
     t = await setupTestAuth()
+    catalog = await testCatalog()
   })
 
   afterAll(async () => {
@@ -59,6 +62,8 @@ needsDb('submission intake', () => {
   ): FormData {
     const form = new FormData()
     if (file) form.append('file', file)
+    if (!('schoolId' in fields)) form.append('schoolId', catalog.schoolId)
+    if (!('courseId' in fields)) form.append('courseId', catalog.courseId)
     for (const [k, v] of Object.entries(fields)) form.append(k, v)
     return form
   }
@@ -287,6 +292,8 @@ needsDb('submission intake', () => {
     const idempotencyKey = crypto.randomUUID()
     const build = () => {
       const form = new FormData()
+      form.append('schoolId', catalog.schoolId)
+      form.append('courseId', catalog.courseId)
       form.append('file', pdfFile('paper.pdf', 100))
       form.append('idempotencyKey', idempotencyKey)
       form.append('title', 'Replay keywords')
@@ -333,6 +340,8 @@ needsDb('submission intake', () => {
   it('stores keyword terms verbatim with normalized keys and positions', async () => {
     const token = await userToken('uid-keywords', 'keywords@ua.edu.ph')
     const form = new FormData()
+    form.append('schoolId', catalog.schoolId)
+    form.append('courseId', catalog.courseId)
     form.append('file', pdfFile('paper.pdf', 64))
     form.append('idempotencyKey', crypto.randomUUID())
     form.append('title', 'Keyword intake')
@@ -384,6 +393,8 @@ needsDb('submission intake', () => {
   it('rejects more than five keywords without storing the file', async () => {
     const token = await userToken('uid-manykw', 'manykw@ua.edu.ph')
     const form = new FormData()
+    form.append('schoolId', catalog.schoolId)
+    form.append('courseId', catalog.courseId)
     form.append('file', pdfFile('paper.pdf', 64))
     form.append('idempotencyKey', crypto.randomUUID())
     form.append('title', 'Too many keywords')
