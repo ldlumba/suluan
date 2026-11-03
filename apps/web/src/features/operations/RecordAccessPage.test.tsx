@@ -52,6 +52,9 @@ describe('repository access review', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText('Accepted paper')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Change access' }).parentElement,
+    ).toHaveClass('space-y-4')
     fireEvent.click(screen.getByRole('button', { name: 'Change access' }))
     fireEvent.change(screen.getByLabelText('Access'), {
       target: { value: 'RESTRICTED' },

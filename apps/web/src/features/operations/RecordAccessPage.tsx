@@ -178,7 +178,7 @@ export function RecordAccessPage() {
             key={paper.id}
             className="border-t-2 border-[var(--primary)] bg-white p-5"
           >
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-4">
               <div>
                 <Link
                   to={`/records/${paper.id}`}

@@ -234,7 +234,7 @@ export function repositoryOperationRoutes(
         ), audit as (
           insert into audit_events (actor_id, action, entity_type, entity_id, context)
           select ${actorId}, 'repository_operation.requested', 'repository_operation',
-            run.id::text, jsonb_build_object('operation', ${action}) from run
+            run.id::text, jsonb_build_object('operation', ${action}::text) from run
         ) select id from run
       `)
         operationId = (inserted.rows[0] as { id: string }).id
