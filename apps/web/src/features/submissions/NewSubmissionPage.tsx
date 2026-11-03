@@ -297,47 +297,53 @@ export function NewSubmissionPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="submission-school">School</Label>
-              <Controller
-                control={form.control}
-                name="schoolId"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      setProgramHint(false)
-                      field.onChange(value)
+              <div className="relative">
+                <Controller
+                  control={form.control}
+                  name="schoolId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        setProgramHint(false)
+                        field.onChange(value)
+                        form.setValue('courseId', '')
+                      }}
+                      items={schools.map((s) => ({
+                        value: s.id,
+                        label: s.name,
+                      }))}
+                    >
+                      <SelectTrigger
+                        id="submission-school"
+                        className={selectedSchoolId ? 'w-full pr-16' : 'w-full'}
+                      >
+                        <SelectValue placeholder="Select a school" />
+                      </SelectTrigger>
+                      <SelectContent align="start">
+                        {schools.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {selectedSchoolId && (
+                  <button
+                    type="button"
+                    aria-label="Clear school"
+                    className="absolute inset-y-0 right-7 flex w-8 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                    onClick={() => {
+                      form.setValue('schoolId', '')
                       form.setValue('courseId', '')
                     }}
-                    items={schools.map((s) => ({
-                      value: s.id,
-                      label: s.name,
-                    }))}
                   >
-                    <SelectTrigger id="submission-school" className="w-full">
-                      <SelectValue placeholder="Select a school" />
-                    </SelectTrigger>
-                    <SelectContent align="start">
-                      {schools.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <X className="size-4" aria-hidden="true" />
+                  </button>
                 )}
-              />
-              {selectedSchoolId && (
-                <button
-                  type="button"
-                  className="text-sm underline underline-offset-4"
-                  onClick={() => {
-                    form.setValue('schoolId', '')
-                    form.setValue('courseId', '')
-                  }}
-                >
-                  Clear school
-                </button>
-              )}
+              </div>
               {form.formState.errors.schoolId && (
                 <p role="alert" className="text-sm text-destructive">
                   {form.formState.errors.schoolId.message}
@@ -346,51 +352,68 @@ export function NewSubmissionPage() {
             </div>
             <div className="relative space-y-2" ref={programHintRef}>
               <Label htmlFor="submission-program">Program</Label>
-              {!selectedSchoolId ? (
-                <button
-                  id="submission-program"
-                  type="button"
-                  aria-disabled="true"
-                  aria-describedby={programHint ? 'program-hint' : undefined}
-                  onClick={() => setProgramHint(true)}
-                  className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 text-left text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                >
-                  Select a school first
-                </button>
-              ) : (
-                <Controller
-                  control={form.control}
-                  name="courseId"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={courses.length === 0}
-                      items={courses.map((c) => ({
-                        value: c.id,
-                        label: c.name,
-                      }))}
-                    >
-                      <SelectTrigger id="submission-program" className="w-full">
-                        <SelectValue
-                          placeholder={
-                            courses.length === 0
-                              ? 'Select a school first'
-                              : 'Select a program'
+              <div className="relative">
+                {!selectedSchoolId ? (
+                  <button
+                    id="submission-program"
+                    type="button"
+                    aria-disabled="true"
+                    aria-describedby={programHint ? 'program-hint' : undefined}
+                    onClick={() => setProgramHint(true)}
+                    className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 text-left text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    Select a school first
+                  </button>
+                ) : (
+                  <Controller
+                    control={form.control}
+                    name="courseId"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={courses.length === 0}
+                        items={courses.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                        }))}
+                      >
+                        <SelectTrigger
+                          id="submission-program"
+                          className={
+                            selectedCourseId ? 'w-full pr-16' : 'w-full'
                           }
-                        />
-                      </SelectTrigger>
-                      <SelectContent align="start">
-                        {courses.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              )}
+                        >
+                          <SelectValue
+                            placeholder={
+                              courses.length === 0
+                                ? 'Select a school first'
+                                : 'Select a program'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          {courses.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                )}
+                {selectedCourseId && (
+                  <button
+                    type="button"
+                    aria-label="Clear program"
+                    className="absolute inset-y-0 right-7 flex w-8 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                    onClick={() => form.setValue('courseId', '')}
+                  >
+                    <X className="size-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
               {programHint && !selectedSchoolId && (
                 <p
                   id="program-hint"
@@ -400,15 +423,6 @@ export function NewSubmissionPage() {
                   Select a school first, or choose a program from the catalog on
                   the right.
                 </p>
-              )}
-              {selectedCourseId && (
-                <button
-                  type="button"
-                  className="text-sm underline underline-offset-4"
-                  onClick={() => form.setValue('courseId', '')}
-                >
-                  Clear program
-                </button>
               )}
               {form.formState.errors.courseId && (
                 <p role="alert" className="text-sm text-destructive">
