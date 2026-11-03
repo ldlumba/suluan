@@ -4,7 +4,6 @@ import {
   Bookmark,
   BookmarkCheck,
   Network,
-  ShieldCheck,
 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -33,12 +32,6 @@ interface Paper {
   visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
   fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
   keywords: string[]
-}
-
-const visibilityLabels = {
-  PUBLIC: 'Publicly accessible',
-  UA_ONLY: 'University access only',
-  RESTRICTED: 'Repository managers only',
 }
 
 export function PaperPage() {
@@ -169,6 +162,28 @@ export function PaperPage() {
       </div>
       <div className="grid gap-10 py-10 md:grid-cols-[1fr_16rem]">
         <div>
+          <CiteSection
+            record={{
+              title: paper.data.title,
+              authors: paper.data.authorList,
+              year: paper.data.year,
+            }}
+            publication={paper.data.publication}
+            onCitationCopied={() => {
+              if (!user || !id) return
+              void getIdToken().then((token) => {
+                if (!token) return
+                return apiFetch('/api/activity', token, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    recordId: id,
+                    eventType: 'CITATION_COPY',
+                  }),
+                }).catch(() => undefined)
+              })
+            }}
+          />
           <h2 className="display-heading text-2xl font-bold">
             About this record
           </h2>
@@ -195,22 +210,10 @@ export function PaperPage() {
             </div>
           )}
         </div>
-        <aside className="space-y-4">
-          <div className="rounded-[25px] bg-[var(--secondary)] p-5">
-            <ShieldCheck
-              className="size-6 text-[var(--primary)]"
-              aria-hidden="true"
-            />
-            <p className="mt-4 text-sm font-semibold">
-              {visibilityLabels[paper.data.visibility]}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-              Access is enforced by the repository, not by this page.
-            </p>
-          </div>
+        <aside className="order-first space-y-4 md:order-none">
           <Button
             variant="outline"
-            className="w-full justify-center"
+            className="h-12 w-full justify-center gap-2 text-base"
             disabled={bookmarkMutation.isPending}
             onClick={() => {
               if (!user) {
@@ -223,9 +226,9 @@ export function PaperPage() {
             }}
           >
             {bookmark.data?.bookmarked ? (
-              <BookmarkCheck className="size-4" aria-hidden="true" />
+              <BookmarkCheck className="size-5" aria-hidden="true" />
             ) : (
-              <Bookmark className="size-4" aria-hidden="true" />
+              <Bookmark className="size-5" aria-hidden="true" />
             )}
             {bookmark.data?.bookmarked ? 'Bookmarked' : 'Add bookmark'}
           </Button>
@@ -238,42 +241,23 @@ export function PaperPage() {
             </p>
           )}
           <Button
-            className="w-full justify-center bg-[var(--primary)] hover:bg-[var(--accent)]"
+            className="h-12 w-full justify-center gap-2 bg-[var(--primary)] text-base hover:bg-[var(--accent)]"
             onClick={() => void download()}
           >
-            <ArrowDownToLine className="size-4" aria-hidden="true" /> Download
+            <ArrowDownToLine className="size-5" aria-hidden="true" /> Download
             paper
           </Button>
           <Link
-            className={`${buttonVariants({ variant: 'outline' })} w-full justify-center`}
+            className={buttonVariants({
+              variant: 'outline',
+              className: 'h-12 w-full justify-center gap-2 text-base',
+            })}
             to={`/graph?record=${encodeURIComponent(paper.data.id)}`}
           >
-            <Network className="size-4" aria-hidden="true" /> View relationships
+            <Network className="size-5" aria-hidden="true" /> View relationships
           </Link>
         </aside>
       </div>
-      <CiteSection
-        record={{
-          title: paper.data.title,
-          authors: paper.data.authorList,
-          year: paper.data.year,
-        }}
-        publication={paper.data.publication}
-        onCitationCopied={() => {
-          if (!user || !id) return
-          void getIdToken().then((token) => {
-            if (!token) return
-            return apiFetch('/api/activity', token, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                recordId: id,
-                eventType: 'CITATION_COPY',
-              }),
-            }).catch(() => undefined)
-          })
-        }}
-      />
     </article>
   )
 }
