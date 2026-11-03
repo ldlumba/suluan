@@ -13,6 +13,42 @@ vi.mock('@/lib/api', async (original) => ({
 }))
 
 describe('paper page', () => {
+  it('omits the keywords section when the paper has no keywords', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      getIdToken: async () => null,
+    } as never)
+    vi.mocked(apiFetch).mockResolvedValue({
+      id: 'paper-2',
+      title: 'Another paper',
+      authors: null,
+      authorList: [],
+      publication: null,
+      schoolName: null,
+      courseName: null,
+      year: null,
+      visibility: 'PUBLIC',
+      fullTextStatus: 'READY',
+      keywords: [],
+    })
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <MemoryRouter initialEntries={['/records/paper-2']}>
+          <Routes>
+            <Route path="/records/:id" element={<PaperPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('heading', { name: 'Cite now' })
+    expect(
+      screen.queryByRole('heading', { name: 'Author keywords' }),
+    ).not.toBeInTheDocument()
+  })
   it('prioritizes citation and prominent paper actions without the access notice', async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: null,
@@ -45,11 +81,14 @@ describe('paper page', () => {
       </QueryClientProvider>,
     )
     const cite = await screen.findByRole('heading', { name: 'Cite now' })
-    const about = screen.getByRole('heading', { name: 'About this record' })
+    const about = screen.getByRole('heading', { name: 'Author keywords' })
     expect(
       cite.compareDocumentPosition(about) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     expect(screen.queryByText('Publicly accessible')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'About this record' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('Health')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add bookmark' })).toHaveClass(
       'h-12',

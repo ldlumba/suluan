@@ -184,19 +184,11 @@ export function PaperPage() {
               })
             }}
           />
-          <h2 className="display-heading text-2xl font-bold">
-            About this record
-          </h2>
-          <p className="mt-4 max-w-prose leading-8 text-[var(--ink-muted)]">
-            This accepted research record is part of the University of the
-            Assumption repository. The available metadata is shown here; the
-            paper file remains subject to its access policy.
-          </p>
           {paper.data.keywords.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+            <section>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--ink-muted)]">
                 Author keywords
-              </h3>
+              </h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {paper.data.keywords.map((keyword) => (
                   <span
@@ -207,7 +199,7 @@ export function PaperPage() {
                   </span>
                 ))}
               </div>
-            </div>
+            </section>
           )}
         </div>
         <aside className="order-first space-y-4 md:order-none">

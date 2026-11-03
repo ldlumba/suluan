@@ -27,8 +27,8 @@ describe('cite section', () => {
     fireEvent.click(screen.getByRole('button', { name: 'RIS' }))
     expect(screen.getByText(/TY - UNPB/)).toBeInTheDocument()
     expect(
-      screen.getByText(/No verified external publication/),
-    ).toBeInTheDocument()
+      screen.queryByText(/No verified external publication/),
+    ).not.toBeInTheDocument()
   })
 
   it('copies the visible citation', async () => {

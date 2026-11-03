@@ -76,11 +76,12 @@ export function CiteSection({
       <h2 id="cite-now" className="display-heading text-2xl font-bold">
         Cite now
       </h2>
-      <p className="mt-3 max-w-prose text-sm leading-6 text-[var(--ink-muted)]">
-        {published
-          ? 'Published version first, from automatically verified registry metadata. The repository record follows.'
-          : 'Built from this record’s SULUAN metadata. No verified external publication was found.'}
-      </p>
+      {published && (
+        <p className="mt-3 max-w-prose text-sm leading-6 text-[var(--ink-muted)]">
+          Published version first, from automatically verified registry
+          metadata. The repository record follows.
+        </p>
+      )}
       <div
         role="group"
         aria-label="Citation format"
