@@ -72,6 +72,17 @@ describe('NewSubmissionPage catalog UX', () => {
     expect(nursing).toHaveAttribute('aria-pressed', 'false')
     fireEvent.click(nursing)
     expect(nursing).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Clear program' }))
+    expect(nursing).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      screen.getByRole('button', { name: 'Clear school' }),
+    ).toBeInTheDocument()
+    fireEvent.click(nursing)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear school' }))
+    expect(nursing).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      screen.queryByRole('button', { name: 'Clear program' }),
+    ).not.toBeInTheDocument()
   })
 
   it('collects keyword chips and sends one part per keyword', async () => {
@@ -191,5 +202,11 @@ describe('NewSubmissionPage catalog UX', () => {
     ).toBeInTheDocument()
     expect(screen.getByText(/one author per line/i)).toBeInTheDocument()
     expect(screen.getByText(/dela cruz/i)).toBeInTheDocument()
+    expect(
+      screen.getByLabelText('Document (PDF, up to 15 MB)'),
+    ).toHaveAttribute('accept', '.pdf,application/pdf')
+    expect(
+      screen.queryByText(/file stays private until/i),
+    ).not.toBeInTheDocument()
   })
 })

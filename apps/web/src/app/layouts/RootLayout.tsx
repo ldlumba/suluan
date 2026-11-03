@@ -182,7 +182,7 @@ export function RootLayout() {
               height="44"
             />
             <span className="min-w-0">
-              <span className="block text-lg font-bold tracking-[0.12em]">
+              <span className="suluan-wordmark block text-lg font-bold tracking-[0.12em]">
                 SULUAN
               </span>
               <span className="hidden text-[0.72rem] font-medium uppercase tracking-[0.12em] text-white/60 sm:block">
@@ -386,7 +386,11 @@ export function RootLayout() {
       </header>
       <main
         id="main-content"
-        className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-12"
+        className={
+          location.pathname === '/'
+            ? 'w-full min-w-0 flex-1'
+            : 'mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-12'
+        }
       >
         <div key={location.pathname} className="page-enter">
           <Outlet />

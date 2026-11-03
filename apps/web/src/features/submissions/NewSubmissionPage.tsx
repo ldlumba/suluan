@@ -29,24 +29,24 @@ interface School {
 type Phase = 'editing' | 'uploading' | 'success'
 
 const FRIENDLY_ERRORS: Record<string, string> = {
-  unsupported_file_type: 'Only PDF or DOCX documents are accepted.',
+  unsupported_file_type: 'The document type is not accepted.',
   filename_type_mismatch: 'The file name does not match its document type.',
-  file_too_large: 'The file exceeds the 30 MB limit.',
+  file_too_large: 'The file exceeds the server upload limit.',
   empty_file: 'The selected file is empty.',
-  missing_file: 'A PDF or DOCX document is required.',
+  missing_file: 'A PDF document is required.',
   invalid_fields: 'Some fields need attention. Check the title and try again.',
   invalid_keywords: 'Use at most 5 keywords, each under 100 characters.',
   invalid_form: 'The submission could not be read. Please try again.',
   storage_unavailable:
     'File storage is temporarily unavailable. Please try again in a moment.',
   unknown_school: 'The selected school is no longer available.',
-  unknown_course: 'The selected course is no longer available.',
+  unknown_course: 'The selected program is no longer available.',
   course_inactive:
-    'The selected course is no longer open for new submissions. Choose another course.',
+    'The selected program is no longer open for new submissions. Choose another program.',
   duplicate_pending:
     'You already have a paper with this title awaiting review. Check My submissions before sending it again.',
   course_school_mismatch:
-    'The selected course does not belong to the selected school.',
+    'The selected program does not belong to the selected school.',
 }
 
 export function NewSubmissionPage() {
@@ -275,7 +275,7 @@ export function NewSubmissionPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>School</Label>
+              <Label htmlFor="submission-school">School</Label>
               <Controller
                 control={form.control}
                 name="schoolId"
@@ -291,7 +291,7 @@ export function NewSubmissionPage() {
                       label: s.name,
                     }))}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="submission-school" className="w-full">
                       <SelectValue placeholder="Select a school" />
                     </SelectTrigger>
                     <SelectContent align="start">
@@ -304,9 +304,21 @@ export function NewSubmissionPage() {
                   </Select>
                 )}
               />
+              {selectedSchoolId && (
+                <button
+                  type="button"
+                  className="text-sm underline underline-offset-4"
+                  onClick={() => {
+                    form.setValue('schoolId', '')
+                    form.setValue('courseId', '')
+                  }}
+                >
+                  Clear school
+                </button>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Course</Label>
+              <Label htmlFor="submission-program">Program</Label>
               <Controller
                 control={form.control}
                 name="courseId"
@@ -320,12 +332,12 @@ export function NewSubmissionPage() {
                       label: c.name,
                     }))}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="submission-program" className="w-full">
                       <SelectValue
                         placeholder={
                           courses.length === 0
                             ? 'Select a school first'
-                            : 'Select a course'
+                            : 'Select a program'
                         }
                       />
                     </SelectTrigger>
@@ -339,11 +351,20 @@ export function NewSubmissionPage() {
                   </Select>
                 )}
               />
+              {selectedCourseId && (
+                <button
+                  type="button"
+                  className="text-sm underline underline-offset-4"
+                  onClick={() => form.setValue('courseId', '')}
+                >
+                  Clear program
+                </button>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="file">Document (PDF or DOCX, up to 30 MB)</Label>
+            <Label htmlFor="file">Document (PDF, up to 15 MB)</Label>
             <div
               onDragOver={(e) => {
                 e.preventDefault()
@@ -372,8 +393,7 @@ export function NewSubmissionPage() {
                   Drag and drop your file here, or choose a file
                 </p>
                 <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
-                  PDF or DOCX only, up to 30 MB. The file stays private until
-                  REO accepts it.
+                  PDF only, up to 15 MB.
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2">
@@ -409,7 +429,7 @@ export function NewSubmissionPage() {
                 ref={fileInputRef}
                 id="file"
                 type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                accept=".pdf,application/pdf"
                 className="sr-only"
                 onChange={(e) => {
                   const picked = e.target.files?.[0]
@@ -514,9 +534,9 @@ export function NewSubmissionPage() {
       <aside className="border-t-2 border-[var(--archive-gold)] bg-white p-5 lg:sticky lg:top-6 sm:p-6">
         <div className="border-b border-[var(--border)] pb-4">
           <div>
-            <h2 className="font-semibold">Schools and courses</h2>
+            <h2 className="font-semibold">Schools and programs</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
-              Select a course here to fill both catalog fields.
+              Select a program here to fill both catalog fields.
             </p>
           </div>
         </div>

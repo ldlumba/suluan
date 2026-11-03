@@ -1,27 +1,22 @@
 import { z } from 'zod'
 
-/** Mirrors the Worker upload policy (Architecture v1 §12, 2026-10-01). */
-export const MAX_FILE_BYTES = 30 * 1024 * 1024
+/** Browser form limit; the Worker independently applies its upload policy. */
+export const MAX_FILE_BYTES = 15 * 1024 * 1024
 
-const ACCEPTED_TYPES = [
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-] as const
+const ACCEPTED_TYPES = ['application/pdf'] as const
 
 const EXTENSION_FOR_TYPE: Record<string, string> = {
   'application/pdf': 'pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-    'docx',
 }
 
 const fileSchema = z
-  .custom<File>((v) => v instanceof File, 'A PDF or DOCX document is required.')
+  .custom<File>((v) => v instanceof File, 'A PDF document is required.')
   .refine(
     (f) => (ACCEPTED_TYPES as readonly string[]).includes(f.type),
-    'Only PDF or DOCX documents are accepted.',
+    'Only PDF documents are accepted.',
   )
   .refine((f) => f.size > 0, 'The selected file is empty.')
-  .refine((f) => f.size <= MAX_FILE_BYTES, 'The file exceeds the 30 MB limit.')
+  .refine((f) => f.size <= MAX_FILE_BYTES, 'The file exceeds the 15 MB limit.')
   .refine((f) => {
     const expected = EXTENSION_FOR_TYPE[f.type]
     return (

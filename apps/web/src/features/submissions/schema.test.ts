@@ -25,10 +25,10 @@ describe('submission form schema', () => {
     ).toBe(true)
   })
 
-  it('accepts a valid DOCX submission', () => {
+  it('rejects DOCX in the PDF-only submission form', () => {
     expect(
       submissionFormSchema.safeParse({ ...base, file: docx() }).success,
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('rejects missing titles', () => {
@@ -40,7 +40,7 @@ describe('submission form schema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects non-PDF/DOCX types', () => {
+  it('rejects non-PDF types', () => {
     const txt = new File(['hi'], 'notes.txt', { type: 'text/plain' })
     const result = submissionFormSchema.safeParse({ ...base, file: txt })
     expect(result.success).toBe(false)
@@ -57,9 +57,18 @@ describe('submission form schema', () => {
   it('rejects oversized files', () => {
     const result = submissionFormSchema.safeParse({
       ...base,
-      file: pdf('big.pdf', 31 * 1024 * 1024),
+      file: pdf('big.pdf', 15 * 1024 * 1024 + 1),
     })
     expect(result.success).toBe(false)
+  })
+
+  it('accepts a PDF at the 15 MiB limit', () => {
+    expect(
+      submissionFormSchema.safeParse({
+        ...base,
+        file: pdf('limit.pdf', 15 * 1024 * 1024),
+      }).success,
+    ).toBe(true)
   })
 
   it('rejects missing files', () => {

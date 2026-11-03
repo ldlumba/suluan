@@ -169,9 +169,29 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
+    .group:hover .suluan-wordmark {
+      animation: suluan-colors 1.8s ease-in-out 1;
+    }
+
     .page-enter {
       animation: page-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
+  }
+}
+
+@keyframes suluan-colors {
+  0%,
+  100% {
+    color: #fff;
+  }
+  25% {
+    color: #38bdf8;
+  }
+  50% {
+    color: #ffbd00;
+  }
+  75% {
+    color: #ef4444;
   }
 }
 
