@@ -177,6 +177,8 @@ work from an earlier one.
 
 ## Maintaining this file
 
+- **Manual notification refresh 2026-11-03:** manager/admin dashboards can request an audited retry of up to 50 due, unprocessed submission/decision notifications via the existing queue. Queueing is not delivery confirmation; the consumer's leases protect concurrent processing, but external Gmail delivery remains at-least-once. Deployment status must be verified independently.
+
 - **School/program intake revision 2026-11-03:** owner approved requiring both fields for new submissions and adding an Other program per school (migration 0021; catalog 4 schools/28 programs). Migration and deployment status must be verified independently; historical records are unchanged.
 
 - **Nightly production cost-control schedule approved 2026-10-30:** extraction at 23:00 Asia/Manila; Worker combined maintenance at 23:30 and 12:00; document embedding at 23:45 and 00:00. Queue delivery remains primary. Fixed offsets do not guarantee completion order; extraction is bounded to five claims per run and each embedding run to one paper/20 chunks, so backlogs can span days. Maintenance gaps are 12.5 and 11.5 hours. Measure actual Neon savings and monitor backlogs; manual manager controls and quotas are unchanged.

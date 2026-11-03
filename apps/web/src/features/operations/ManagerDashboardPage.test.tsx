@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
@@ -46,5 +46,23 @@ describe('manager dashboard', () => {
       screen.queryByRole('link', { name: /Account roles|Course availability/ }),
     ).not.toBeInTheDocument()
     expect(await screen.findByText('2')).toBeInTheDocument()
+    vi.mocked(apiFetch).mockResolvedValueOnce({
+      queued: 2,
+      hasMore: false,
+      queueFailed: false,
+    })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Refresh notifications' }),
+    )
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/repository-operations/notifications/refresh',
+        'token',
+        { method: 'POST' },
+      ),
+    )
+    expect(
+      await screen.findByText(/2 notifications queued for retry/),
+    ).toHaveTextContent('delivery is not yet confirmed')
   })
 })

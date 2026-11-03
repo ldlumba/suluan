@@ -15,6 +15,7 @@ import { Link } from 'react-router'
 import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { useAuth } from '@/features/auth/useAuth'
 import { apiFetch, ApiError } from '@/lib/api'
+import { NotificationRefresh } from '@/features/operations/NotificationRefresh'
 
 type Role = 'USER' | 'REPOSITORY_MANAGER' | 'ADMIN'
 interface UserRow {
@@ -205,6 +206,7 @@ export function AdminDashboardPage() {
         </div>
       </section>
 
+      <NotificationRefresh />
       <section aria-labelledby="account-overview-heading" className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <h2 id="account-overview-heading" className="text-xl font-semibold">

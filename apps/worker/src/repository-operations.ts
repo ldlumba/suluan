@@ -8,6 +8,7 @@ import { CHUNKER_VERSION } from './chunking'
 import { createDb } from './db'
 import { embeddingLimits } from './quota'
 import { indexExtractedRecords, KEYWORD_SWEEP_BATCH } from './search'
+import { refreshNotifications } from './notifications'
 
 const actionSchema = z.enum(['EXTRACTION', 'EMBEDDING'])
 const redeemSchema = z.object({ ticket: z.string().uuid() }).strict()
@@ -114,6 +115,15 @@ export function repositoryOperationRoutes(
       dispatcherConfigured: Boolean(c.env.OPERATIONS_DISPATCHER_URL?.trim()),
       recentRuns: recent.rows,
     })
+  })
+
+  app.post('/notifications/refresh', async (c) => {
+    const result = await refreshNotifications(
+      createDb(c.env.DATABASE_URL),
+      c.env.NOTIFICATIONS,
+      c.get('profile').id,
+    )
+    return c.json(result)
   })
 
   app.post('/index', async (c) => {

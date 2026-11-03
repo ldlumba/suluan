@@ -282,3 +282,34 @@ export async function sweepOutbox(
     await queue.send({ outboxId: row.id })
   }
 }
+
+/** Audited before queueing so even partial queue failures remain traceable. */
+export async function refreshNotifications(
+  db: Db,
+  queue: { send(message: unknown): Promise<void> },
+  actorId: string,
+) {
+  const due = await db.execute(sql`
+    select id from outbox_events
+    where event_type in ('submission.created', 'decision.made')
+      and processed_at is null and (lease_until is null or lease_until < now())
+    order by created_at, id limit 51
+  `)
+  const selected = due.rows.slice(0, 50)
+  const hasMore = due.rows.length > 50
+  await db.execute(sql`
+    insert into audit_events (actor_id, action, entity_type, entity_id, context)
+    values (${actorId}, 'notification.refresh_requested', 'outbox',
+      'notifications', ${JSON.stringify({ selected: selected.length, hasMore })}::jsonb)
+  `)
+  let queued = 0
+  for (const row of selected) {
+    try {
+      await queue.send({ outboxId: row.id })
+      queued++
+    } catch {
+      return { queued, hasMore, queueFailed: true }
+    }
+  }
+  return { queued, hasMore, queueFailed: false }
+}

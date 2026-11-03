@@ -4,6 +4,7 @@ import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { AdminTool } from '@/features/admin/AdminDashboardPage'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
+import { NotificationRefresh } from './NotificationRefresh'
 
 interface PreparationStatus {
   pipeline: {
@@ -75,6 +76,7 @@ export function ManagerDashboardPage() {
           />
         </div>
       </section>
+      <NotificationRefresh />
       <section
         aria-labelledby="manager-preparation-heading"
         className="space-y-4"

@@ -77,5 +77,8 @@ describe('AdminDashboardPage', () => {
     expect(
       screen.getByRole('link', { name: /Course availability/ }),
     ).toHaveAttribute('href', '/admin/catalog')
+    expect(
+      screen.getByRole('button', { name: 'Refresh notifications' }),
+    ).toBeInTheDocument()
   })
 })
