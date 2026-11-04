@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 import { NotFoundPage } from '@/app/pages/NotFoundPage'
+import { KeywordInput } from '@/features/submissions/KeywordInput'
 
 type Visibility = 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
 interface Paper {
@@ -27,6 +28,7 @@ interface Paper {
   updatedAt: string
   schoolName: string | null
   courseName: string | null
+  keywords: string[]
 }
 interface School {
   id: string
@@ -37,6 +39,11 @@ const labels: Record<Visibility, string> = {
   PUBLIC: 'Public',
   UA_ONLY: 'University access',
   RESTRICTED: 'Managers only',
+}
+const accessColors: Record<Visibility, string> = {
+  PUBLIC: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+  UA_ONLY: 'border-blue-300 bg-blue-50 text-blue-900',
+  RESTRICTED: 'border-amber-300 bg-amber-50 text-amber-950',
 }
 
 export function RecordAccessPage() {
@@ -49,6 +56,8 @@ export function RecordAccessPage() {
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState('title')
   const [editing, setEditing] = useState<Paper | null>(null)
+  const [keywordPaper, setKeywordPaper] = useState<Paper | null>(null)
+  const [keywords, setKeywords] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Visibility>('PUBLIC')
   const [embargo, setEmbargo] = useState('')
   const catalog = useQuery({
@@ -85,10 +94,34 @@ export function RecordAccessPage() {
       void client.invalidateQueries({ queryKey: ['search'] })
     },
   })
+  const changeKeywords = useMutation({
+    mutationFn: async () =>
+      apiFetch(
+        `/api/record-access/${keywordPaper!.id}/keywords`,
+        await getIdToken(),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            keywords,
+            expectedUpdatedAt: keywordPaper!.updatedAt,
+          }),
+        },
+      ),
+    onSuccess: () => {
+      setKeywordPaper(null)
+      void client.invalidateQueries({ queryKey: ['record-access'] })
+      void client.invalidateQueries({ queryKey: ['paper'] })
+      void client.invalidateQueries({ queryKey: ['keyword-search'] })
+      void client.invalidateQueries({ queryKey: ['semantic-search'] })
+      void client.invalidateQueries({ queryKey: ['graph'] })
+      void client.invalidateQueries({ queryKey: ['graph-counts'] })
+    },
+  })
   const selectClass =
     'h-9 w-full rounded-md border border-input bg-white px-3 text-sm'
   if (
-    [records.error, change.error].some(
+    [records.error, change.error, changeKeywords.error].some(
       (error) => error instanceof ApiError && error.status === 403,
     )
   )
@@ -128,6 +161,7 @@ export function RecordAccessPage() {
             <option value="newest">Recently accepted</option>
             <option value="oldest">Oldest accepted</option>
             <option value="program">Program A–Z</option>
+            <option value="access">Access level</option>
           </select>
         </div>
         <div>
@@ -211,7 +245,11 @@ export function RecordAccessPage() {
                 </p>
                 <p className="mt-2 text-sm">
                   Current access:{' '}
-                  <strong>{labels[paper.effectiveVisibility]}</strong>
+                  <strong
+                    className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${accessColors[paper.effectiveVisibility]}`}
+                  >
+                    {labels[paper.effectiveVisibility]}
+                  </strong>
                   {paper.embargoUntil && (
                     <> · Auto-lift: {paper.embargoUntil}</>
                   )}
@@ -228,10 +266,59 @@ export function RecordAccessPage() {
               >
                 Change access
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setKeywordPaper(paper)
+                  setKeywords(paper.keywords ?? [])
+                  changeKeywords.reset()
+                }}
+              >
+                Edit keywords
+              </Button>
             </div>
           </article>
         ))}
       </div>
+      <Dialog
+        open={keywordPaper !== null}
+        onOpenChange={(open) => {
+          if (!open && !changeKeywords.isPending) setKeywordPaper(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit author keywords</DialogTitle>
+            <DialogDescription>
+              {keywordPaper?.title}. Changes are audited and do not replace the
+              submission or file.
+            </DialogDescription>
+          </DialogHeader>
+          <KeywordInput
+            id="record-keywords"
+            value={keywords}
+            onChange={setKeywords}
+          />
+          {changeKeywords.isError && (
+            <p role="alert">Could not save keywords. Refresh and try again.</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setKeywordPaper(null)}
+              disabled={changeKeywords.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => changeKeywords.mutate()}
+              disabled={changeKeywords.isPending}
+            >
+              Save keywords
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="flex items-center gap-3">
         <Button
           variant="outline"

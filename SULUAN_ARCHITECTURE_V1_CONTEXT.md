@@ -109,6 +109,7 @@ Logical domains to represent (names below are illustrative, not a frozen schema)
 - Enforce assistant quotas/rate limits server-side before paid work. Treat uploaded text and retrieved content as untrusted data, not instructions that override permissions or assistant behavior.
 - Preserve auditability. Do not enable automatic rejected-file deletion until REO approves retention requirements.
 - Owner decision 2026-11-03: repository managers and admins may review accepted records and change their access level and auto-lift date after acceptance. Changes require server authorization, stale-write protection, and an atomic audit event; this does not authorize withdrawal, deletion, or a change to acceptance status.
+- Owner decision 2026-11-04: managers and admins may correct accepted-record keywords with optimistic concurrency and atomic audit, without changing the original submission or re-embedding. The owner also approved reason-required withdrawal and reinstatement by either role without automatic email; this workflow remains **not implemented** until all discovery, visibility, processing, and in-flight job fencing paths are verified. Withdrawal must not delete records or files, and existing deletion and retention decisions remain TBD.
 
 ## 7. Cost controls and planning assumptions
 

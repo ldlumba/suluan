@@ -50,6 +50,18 @@ describe('record access management', () => {
         })
       ).status,
     ).toBe(status)
+    expect(
+      (
+        await app.request(`/access/${recordId}/keywords`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            keywords: ['health'],
+            expectedUpdatedAt: '2026-11-01T10:00:00Z',
+          }),
+        })
+      ).status,
+    ).toBe(status)
     expect(mocks.execute).not.toHaveBeenCalled()
   })
   it.each(['ADMIN', 'REPOSITORY_MANAGER'] as const)(
@@ -109,6 +121,7 @@ describe('record access management', () => {
     ['newest', 'r.created_at desc'],
     ['oldest', 'r.created_at asc'],
     ['program', 'lower(course.name) asc nulls last'],
+    ['access', "when 'PUBLIC' then 0"],
   ])('sorts %s before pagination', async (sort, expected) => {
     mocks.execute.mockResolvedValue({ rows: [] })
     const response = await appFor('ADMIN').request(

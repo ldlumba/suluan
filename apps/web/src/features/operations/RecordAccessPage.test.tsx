@@ -34,6 +34,7 @@ describe('repository access review', () => {
               updatedAt: '2026-11-03T10:00:00Z',
               schoolName: null,
               courseName: null,
+              keywords: ['Existing'],
             },
           ],
           hasMore: false,
@@ -52,6 +53,7 @@ describe('repository access review', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText('Accepted paper')).toBeInTheDocument()
+    expect(screen.getByText('Public')).toHaveClass('text-emerald-900')
     fireEvent.change(screen.getByLabelText('Sort by'), {
       target: { value: 'newest' },
     })
@@ -64,6 +66,31 @@ describe('repository access review', () => {
     expect(
       screen.getByRole('button', { name: 'Change access' }).parentElement,
     ).toHaveClass('space-y-4')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit keywords' }))
+    expect(screen.getByText('Existing')).toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Remove keyword Existing' }),
+    )
+    fireEvent.change(screen.getByLabelText('Keywords (optional, up to 5)'), {
+      target: { value: 'Revised' },
+    })
+    fireEvent.keyDown(screen.getByLabelText('Keywords (optional, up to 5)'), {
+      key: 'Enter',
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save keywords' }))
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/record-access/paper/keywords',
+        'token',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({
+            keywords: ['Revised'],
+            expectedUpdatedAt: '2026-11-03T10:00:00Z',
+          }),
+        }),
+      ),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Change access' }))
     fireEvent.change(screen.getByLabelText('Access'), {
       target: { value: 'RESTRICTED' },
