@@ -212,6 +212,26 @@ describe('NewSubmissionPage catalog UX', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('opens the file picker from the upload area without reopening it on removal', async () => {
+    renderPage()
+    const input = screen.getByLabelText(
+      'Document (PDF, up to 15 MB)',
+    ) as HTMLInputElement
+    const click = vi.spyOn(input, 'click').mockImplementation(() => undefined)
+    fireEvent.click(screen.getByText(/drag and drop your file here/i))
+    expect(click).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Choose file' }))
+    expect(click).toHaveBeenCalledTimes(2)
+    fireEvent.change(input, {
+      target: {
+        files: [new File(['paper'], 'paper.pdf', { type: 'application/pdf' })],
+      },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(click).toHaveBeenCalledTimes(2)
+    click.mockRestore()
+  })
+
   it('shows and dismisses the program hint before selecting a school', async () => {
     renderPage()
     fireEvent.click(screen.getByLabelText('Program'))

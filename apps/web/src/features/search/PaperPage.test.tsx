@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
@@ -13,6 +13,69 @@ vi.mock('@/lib/api', async (original) => ({
 }))
 
 describe('paper page', () => {
+  it('refreshes the count after a signed-in user copies a citation', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { uid: 'u1' },
+      getIdToken: async () => 'token',
+    } as never)
+    const paper = {
+      id: 'paper-3',
+      title: 'Paper',
+      authors: null,
+      authorList: [],
+      publication: null,
+      schoolName: null,
+      courseName: null,
+      year: null,
+      visibility: 'PUBLIC',
+      fullTextStatus: 'READY',
+      keywords: [],
+      citationCopyCount: 1,
+    }
+    vi.mocked(apiFetch).mockImplementation(async (path) => {
+      if (path.startsWith('/api/records/')) return paper
+      if (path.startsWith('/api/bookmarks/')) return { bookmarked: false }
+      return { recorded: true }
+    })
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    })
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <MemoryRouter initialEntries={['/records/paper-3']}>
+          <Routes>
+            <Route path="/records/:id" element={<PaperPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Copy citation' }),
+    )
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(apiFetch)
+          .mock.calls.some(
+            ([path, , init]) =>
+              path === '/api/activity' &&
+              JSON.parse(String(init?.body)).eventType === 'CITATION_COPY',
+          ),
+      ).toBe(true),
+    )
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(apiFetch)
+          .mock.calls.filter(([path]) => path === '/api/records/paper-3')
+          .length,
+      ).toBeGreaterThan(1),
+    )
+  })
   it('omits the keywords section when the paper has no keywords', async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: null,
@@ -66,6 +129,7 @@ describe('paper page', () => {
       visibility: 'PUBLIC',
       fullTextStatus: 'READY',
       keywords: ['Health'],
+      citationCopyCount: 4,
     })
     render(
       <QueryClientProvider
@@ -90,6 +154,9 @@ describe('paper page', () => {
       screen.queryByRole('heading', { name: 'About this record' }),
     ).not.toBeInTheDocument()
     expect(screen.getByText('Health')).toBeInTheDocument()
+    expect(
+      screen.getByText('Citation copies: 4 · Signed-in users, last 90 days'),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add bookmark' })).toHaveClass(
       'h-12',
     )

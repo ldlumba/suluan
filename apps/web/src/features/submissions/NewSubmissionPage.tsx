@@ -435,6 +435,14 @@ export function NewSubmissionPage() {
           <div className="space-y-2">
             <Label htmlFor="file">Document (PDF, up to 15 MB)</Label>
             <div
+              onClick={(e) => {
+                if (
+                  e.target instanceof Element &&
+                  e.target.closest('button, input')
+                )
+                  return
+                fileInputRef.current?.click()
+              }}
               onDragOver={(e) => {
                 e.preventDefault()
                 setIsDragging(true)
@@ -447,7 +455,7 @@ export function NewSubmissionPage() {
                 if (dropped)
                   form.setValue('file', dropped, { shouldValidate: true })
               }}
-              className={`flex min-h-36 flex-col items-center justify-center gap-3 rounded-[8.4px] border-2 border-dashed p-6 text-center transition-colors ${
+              className={`flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-[8.4px] border-2 border-dashed p-6 text-center transition-colors ${
                 isDragging
                   ? 'border-[var(--signal-blue)] bg-[var(--secondary)]'
                   : 'border-[var(--border)] bg-white'

@@ -32,6 +32,7 @@ interface Paper {
   visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
   fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
   keywords: string[]
+  citationCopyCount?: number
 }
 
 export function PaperPage() {
@@ -40,7 +41,7 @@ export function PaperPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const paper = useQuery({
-    queryKey: ['paper', id],
+    queryKey: ['paper', id, user?.uid ?? null],
     enabled: Boolean(id),
     retry: false,
     queryFn: async () =>
@@ -169,6 +170,7 @@ export function PaperPage() {
               year: paper.data.year,
             }}
             publication={paper.data.publication}
+            citationCopyCount={paper.data.citationCopyCount}
             onCitationCopied={() => {
               if (!user || !id) return
               void getIdToken().then((token) => {
@@ -180,7 +182,11 @@ export function PaperPage() {
                     recordId: id,
                     eventType: 'CITATION_COPY',
                   }),
-                }).catch(() => undefined)
+                })
+                  .then(() =>
+                    queryClient.invalidateQueries({ queryKey: ['paper', id] }),
+                  )
+                  .catch(() => undefined)
               })
             }}
           />

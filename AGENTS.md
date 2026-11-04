@@ -184,6 +184,8 @@ work from an earlier one.
 
 ## Maintaining this file
 
+- **Per-paper citation-copy count 2026-11-04:** the paper detail returns a rolling 90-day count of existing authenticated copy events, subject to the same accepted-record visibility gate. It is not an academic citation count; anonymous copies are not tracked, and events retain the existing 90-day cleanup and 24-hour deduplication. No all-time counter or retention extension is implied.
+
 - **Accepted-paper access review 2026-11-03:** owner approved a manager/admin-only accepted-record browser and audited post-acceptance visibility changes with optimistic concurrency. Existing effective visibility and embargo rules apply; public caches can remain stale for up to 30 seconds. Deployment and DB-backed verification must be checked independently. Withdrawal/deletion remain TBD.
 
 - **Manual notification refresh 2026-11-03:** manager/admin dashboards can request an audited retry of up to 50 due, unprocessed submission/decision notifications via the existing queue. Queueing is not delivery confirmation; the consumer's leases protect concurrent processing, but external Gmail delivery remains at-least-once. Deployment status must be verified independently.

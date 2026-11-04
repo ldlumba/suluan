@@ -104,12 +104,14 @@ export function PrivacyPage() {
           </h2>
           <p>
             When you are signed in, SULUAN may record a privacy-limited paper
-            view or citation-copy event using your internal profile and the
-            repository record ID. Events are deduplicated per user, paper, and
-            event type over 24 hours and shown to administrators only as
-            aggregate counts. Public visitors are not tracked by IP address,
-            cookies, fingerprints, or identifiable viewer records. Citation-copy
-            counts describe this activity, not citations made elsewhere.
+            view, citation-copy, or download-start event using your internal
+            profile and the repository record ID. Events are normally
+            deduplicated per user, paper, and event type over 24 hours and
+            removed after 90 days. Administrators see aggregate activity counts;
+            anyone able to see a paper can see its aggregate citation-copy
+            count. Public visitors are not tracked by IP address, cookies,
+            fingerprints, or identifiable viewer records. Citation-copy counts
+            describe this activity, not citations made elsewhere.
           </p>
         </section>
 

@@ -43,10 +43,12 @@ export function CiteSection({
   record,
   publication,
   onCitationCopied,
+  citationCopyCount,
 }: {
   record: CitationRecord
   publication?: CitationPublication | null
   onCitationCopied?: () => void
+  citationCopyCount?: number
 }) {
   const [format, setFormat] = useState<CitationFormat>('apa')
   const [copied, setCopied] = useState(false)
@@ -164,6 +166,11 @@ export function CiteSection({
           </Button>
         )}
       </div>
+      {typeof citationCopyCount === 'number' && (
+        <p className="mt-4 text-sm text-[var(--ink-muted)]">
+          Citation copies: {citationCopyCount} · Signed-in users, last 90 days
+        </p>
+      )}
       <p role="status" aria-live="polite" className="sr-only">
         {copied ? 'Citation copied to clipboard.' : ''}
       </p>

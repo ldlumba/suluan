@@ -419,7 +419,10 @@ export function createApp(
           when j.status = 'FAILED' then 'FAILED'
           else 'PENDING'
         end as "fullTextStatus",
-        coalesce(kw.terms, '{}'::text[]) as keywords
+        coalesce(kw.terms, '{}'::text[]) as keywords,
+        (select count(*)::integer from activity_events a
+          where a.record_id = r.id and a.event_type = 'CITATION_COPY'
+            and a.created_at >= now() - interval '90 days') as "citationCopyCount"
       from research_records r
       join submissions s on s.id = r.submission_id
       left join processing_jobs j on j.record_id = r.id
