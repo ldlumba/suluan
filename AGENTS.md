@@ -185,6 +185,8 @@ work from an earlier one.
 
 ## Maintaining this file
 
+- **Embedding result fencing 2026-11-04:** preparation results atomically consume a valid, unexpired, unused claim before snapshots or vectors can be written; a stale or concurrently consumed claim receives 409. The in-memory PostgreSQL test covers multi-chunk writes and replay, not real Neon concurrency. This is a safeguard toward withdrawal, not a withdrawal implementation; deployment must be verified independently.
+
 - **Per-paper citation-copy count 2026-11-04:** the paper detail returns a rolling 90-day count of existing authenticated copy events, subject to the same accepted-record visibility gate. It is not an academic citation count; anonymous copies are not tracked, and events retain the existing 90-day cleanup and 24-hour deduplication. No all-time counter or retention extension is implied.
 
 - **Accepted-paper access review 2026-11-03:** owner approved a manager/admin-only accepted-record browser and audited post-acceptance visibility changes with optimistic concurrency. Existing effective visibility and embargo rules apply; public caches can remain stale for up to 30 seconds. Deployment and DB-backed verification must be checked independently. Withdrawal/deletion remain TBD.

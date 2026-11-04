@@ -717,8 +717,14 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
         return { ...item, embedding: literal?.literal ?? '' }
       })
       const inserted = await db.execute(sql`
-        with input as (
-          select * from jsonb_to_recordset(${JSON.stringify(fullPayload)}::jsonb)
+        with claimed as (
+          update embedding_claims set used_at = now()
+          where claim_token = ${body.claimToken} and kind = 'prep'
+            and used_at is null and expires_at > now()
+          returning id
+        ), input as (
+          select x.* from claimed
+          cross join jsonb_to_recordset(${JSON.stringify(fullPayload)}::jsonb)
             as x(
               "chunkId" uuid,
               "keywordIndexId" uuid,
@@ -746,9 +752,6 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
             on snapshots.keyword_index_id = input."keywordIndexId"
           on conflict (chunk_id) do nothing
           returning id, chunk_id
-        ), claimed as (
-          update embedding_claims set used_at = now()
-          where claim_token = ${body.claimToken} and used_at is null
         ), audit as (
           insert into audit_events
             (actor_id, action, entity_type, entity_id, context)
@@ -758,9 +761,12 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
           from vectors
           join input on input."chunkId" = vectors.chunk_id
         )
-        select id from vectors
+        select (select count(*)::integer from claimed) as claimed,
+          (select count(*)::integer from vectors) as embedded
       `)
-      return c.json({ embedded: inserted.rows.length })
+      const outcome = inserted.rows[0] as { claimed: number; embedded: number }
+      if (!outcome.claimed) return c.json({ error: 'stale_claim' }, 409)
+      return c.json({ embedded: outcome.embedded })
     },
   )
 
