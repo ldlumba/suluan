@@ -10,6 +10,9 @@ const querySchema = z.object({
   q: z.string().trim().max(200).default(''),
   schoolId: z.string().uuid().optional(),
   courseId: z.string().uuid().optional(),
+  sort: z
+    .enum(['title', 'title_desc', 'newest', 'oldest', 'program'])
+    .default('title'),
   page: z.coerce.number().int().min(1).max(10000).default(1),
 })
 const changeSchema = z
@@ -44,7 +47,14 @@ export function recordAccessRoutes(
     await next()
   })
   app.get('/', zValidator('query', querySchema), async (c) => {
-    const { q, schoolId, courseId, page } = c.req.valid('query')
+    const { q, schoolId, courseId, page, sort } = c.req.valid('query')
+    const ordering = {
+      title: sql`lower(r.title) asc, r.id asc`,
+      title_desc: sql`lower(r.title) desc, r.id asc`,
+      newest: sql`r.created_at desc, r.id asc`,
+      oldest: sql`r.created_at asc, r.id asc`,
+      program: sql`lower(course.name) asc nulls last, lower(r.title) asc, r.id asc`,
+    }[sort]
     const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`
     const rows = await createDb(c.env.DATABASE_URL).execute(sql`
       select r.id, r.title, r.year, r.visibility, r.embargo_until::text as "embargoUntil",
@@ -56,7 +66,7 @@ export function recordAccessRoutes(
       where s.status = 'ACCEPTED' and (${q} = '' or r.title ilike ${pattern})
         and (${schoolId ?? null}::uuid is null or s.school_id = ${schoolId ?? null}::uuid)
         and (${courseId ?? null}::uuid is null or s.course_id = ${courseId ?? null}::uuid)
-      order by lower(r.title), r.id limit 21 offset ${(page - 1) * 20}
+      order by ${ordering} limit 21 offset ${(page - 1) * 20}
     `)
     return c.json({
       items: rows.rows.slice(0, 20),

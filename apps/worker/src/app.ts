@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
-import { Hono, type MiddlewareHandler } from 'hono'
+import { Hono, type Handler, type MiddlewareHandler } from 'hono'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
 import { zValidator } from '@hono/zod-validator'
@@ -16,7 +16,11 @@ import { isAllowedIdentity, parseAllowedOrigins, type Env } from './config'
 import { registerAdminRoutes } from './admin-routes'
 import type { AppContext, Role } from './app-context'
 import { createDb } from './db'
-import { createSubmissionAtomic, recordDecisionAtomic } from './writes'
+import {
+  createDirectSubmissionAtomic,
+  createSubmissionAtomic,
+  recordDecisionAtomic,
+} from './writes'
 import {
   UPLOAD_POLICY,
   buildDownloadFileName,
@@ -379,6 +383,26 @@ export function createApp(
   app.route('/api/bookmarks', bookmarkRoutes(requireAuth))
   app.route('/api/activity', activityRoutes(requireAuth))
 
+  app.get(
+    '/api/search/suggestions',
+    optionalAuth,
+    zValidator('query', z.object({ q: z.string().trim().min(3).max(200) })),
+    async (c) => {
+      const q = c.req.valid('query').q
+      const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`
+      const viewer = viewerRoleFor(c.get('profile')?.role ?? null)
+      const rows = await createDb(c.env.DATABASE_URL).execute(sql`
+      select r.id, r.title from research_records r
+      join submissions s on s.id = r.submission_id
+      where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
+        and r.title ilike ${pattern}
+      order by lower(r.title), r.id limit 5
+    `)
+      c.header('Cache-Control', 'private, no-store')
+      return c.json({ items: rows.rows })
+    },
+  )
+
   /**
    * Public metadata detail for one accepted record. The visibility predicate
    * intentionally matches search and download; an invisible or non-accepted
@@ -545,7 +569,13 @@ export function createApp(
    * before the R2 put. Concurrent first-time races are arbitrated by the
    * unique constraint; the loser deletes its orphaned object best-effort.
    */
-  app.post('/api/submissions', requireAuth, async (c) => {
+  const handleSubmission: Handler<AppContext> = async (c) => {
+    const direct = c.req.path === '/api/submissions/direct'
+    if (
+      direct &&
+      !MANAGERS.includes(c.get('profile').role as (typeof MANAGERS)[number])
+    )
+      return c.json({ error: 'forbidden' }, 403)
     let form: Record<string, string | File | (string | File)[]>
     try {
       form = (await c.req.parseBody()) as Record<
@@ -591,6 +621,17 @@ export function createApp(
       return c.json({ error: 'invalid_fields' }, 400)
     }
     const meta = fields.data
+    const directDecision = direct
+      ? decideSchema.safeParse({
+          submissionId: meta.idempotencyKey,
+          status: 'ACCEPTED',
+          remarks: 'Directly accepted by repository manager',
+          visibility: text('visibility'),
+          embargoUntil: text('embargoUntil'),
+        })
+      : null
+    if (direct && (!directDecision?.success || !directDecision.data.visibility))
+      return c.json({ error: 'invalid_access' }, 400)
     const normalizedTitle = normalizeTitle(meta.title)
 
     // Author keywords arrive as repeated `keywords[]` parts (one term per
@@ -612,6 +653,13 @@ export function createApp(
     if (replay) {
       if (replay.submitterId !== profile.id) {
         return c.json({ error: 'idempotency_conflict' }, 409)
+      }
+      if (direct) {
+        const marker = await db.execute(
+          sql`select 1 from audit_events where action = 'submission.direct_accepted' and entity_type = 'submission' and entity_id = ${replay.id} and actor_id = ${profile.id} limit 1`,
+        )
+        if (replay.status !== 'ACCEPTED' || !marker.rows.length)
+          return c.json({ error: 'idempotency_conflict' }, 409)
       }
       return c.json({ id: replay.id, status: replay.status }, 200)
     }
@@ -695,7 +743,7 @@ export function createApp(
 
     const created = await (async () => {
       try {
-        return await createSubmissionAtomic(db, {
+        const input = {
           submitterId: profile.id,
           idempotencyKey: meta.idempotencyKey,
           title: meta.title,
@@ -709,7 +757,25 @@ export function createApp(
           sizeBytes: validated.sizeBytes,
           submitterEmail: profile.email,
           keywords: preparedKeywords.keywords,
-        })
+        }
+        if (
+          direct &&
+          directDecision?.success &&
+          directDecision.data.visibility
+        ) {
+          return {
+            ...(await createDirectSubmissionAtomic(db, {
+              ...input,
+              visibility: directDecision.data.visibility,
+              embargoUntil:
+                directDecision.data.visibility === 'PUBLIC'
+                  ? null
+                  : (directDecision.data.embargoUntil ?? null),
+            })),
+            directCreated: true,
+          }
+        }
+        return await createSubmissionAtomic(db, input)
       } catch (err) {
         // Lost a concurrent finalize race: the winner's row is the truth.
         // Remove the orphaned object best-effort so retries don't leak R2 keys.
@@ -722,7 +788,18 @@ export function createApp(
         const winner = await db.query.submissions.findFirst({
           where: eq(submissions.idempotencyKey, meta.idempotencyKey),
         })
-        if (winner && winner.submitterId === profile.id) {
+        const directWinner =
+          direct && winner
+            ? await db.execute(
+                sql`select 1 from audit_events where action = 'submission.direct_accepted' and entity_type = 'submission' and entity_id = ${winner.id} and actor_id = ${profile.id} limit 1`,
+              )
+            : null
+        if (
+          winner &&
+          winner.submitterId === profile.id &&
+          (!direct ||
+            (winner.status === 'ACCEPTED' && directWinner?.rows.length))
+        ) {
           return { submissionId: winner.id, outboxId: null as string | null }
         }
         const duplicate = await db.query.submissions.findFirst({
@@ -762,9 +839,14 @@ export function createApp(
         console.error('queue send failed', created.outboxId, err)
       }
     }
-    const status = created.outboxId ? 201 : 200
-    return c.json({ id: created.submissionId, status: 'PENDING' }, status)
-  })
+    const status = created.outboxId || 'directCreated' in created ? 201 : 200
+    return c.json(
+      { id: created.submissionId, status: direct ? 'ACCEPTED' : 'PENDING' },
+      status,
+    )
+  }
+  app.post('/api/submissions', requireAuth, handleSubmission)
+  app.post('/api/submissions/direct', requireAuth, handleSubmission)
 
   /** REO review queue: PENDING submissions with submitter and file context. */
   app.get(

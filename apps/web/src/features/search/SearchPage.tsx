@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { BookOpen, Search, X } from 'lucide-react'
@@ -194,6 +194,40 @@ export function SearchPage() {
     values: { q },
   })
   const formQuery = useWatch({ control: form.control, name: 'q' })
+  const [suggestionQuery, setSuggestionQuery] = useState('')
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+  const [activeSuggestion, setActiveSuggestion] = useState(-1)
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setSuggestionQuery((formQuery ?? '').trim()),
+      350,
+    )
+    return () => window.clearTimeout(timer)
+  }, [formQuery])
+  const suggestions = useQuery({
+    queryKey: [
+      'title-suggestions',
+      profile?.id,
+      profile?.role,
+      suggestionQuery,
+    ],
+    enabled:
+      mode !== 'semantic' &&
+      suggestionsOpen &&
+      suggestionQuery.length >= 3 &&
+      suggestionQuery.length <= 200 &&
+      suggestionQuery === (formQuery ?? '').trim(),
+    retry: false,
+    queryFn: async () =>
+      apiFetch<{ items: { id: string; title: string }[] }>(
+        `/api/search/suggestions?${new URLSearchParams({ q: suggestionQuery })}`,
+        await getIdToken(),
+      ),
+  })
+  const suggestionItems =
+    suggestionQuery === (formQuery ?? '').trim()
+      ? (suggestions.data?.items ?? [])
+      : []
   const semantic = useQuery({
     queryKey: ['semantic-search', profile?.id, profile?.role, q, page],
     enabled:
@@ -348,8 +382,68 @@ export function SearchPage() {
                 id="search-query"
                 className="h-12 pr-10 text-base"
                 placeholder="e.g. reading comprehension, climate change, or public health"
-                {...form.register('q')}
+                {...form.register('q', {
+                  onChange: () => setActiveSuggestion(-1),
+                })}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={suggestionsOpen && suggestionItems.length > 0}
+                aria-controls="title-suggestions"
+                aria-activedescendant={
+                  activeSuggestion >= 0 && suggestionItems[activeSuggestion]
+                    ? `title-suggestion-${activeSuggestion}`
+                    : undefined
+                }
+                onFocus={() => setSuggestionsOpen(true)}
+                onBlur={() => setSuggestionsOpen(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSuggestionsOpen(false)
+                    setActiveSuggestion(-1)
+                  }
+                  if (e.key === 'ArrowDown' && suggestionItems.length) {
+                    e.preventDefault()
+                    setSuggestionsOpen(true)
+                    setActiveSuggestion((i) =>
+                      Math.min(i + 1, suggestionItems.length - 1),
+                    )
+                  }
+                  if (e.key === 'ArrowUp' && suggestionItems.length) {
+                    e.preventDefault()
+                    setActiveSuggestion((i) => Math.max(i - 1, 0))
+                  }
+                  if (
+                    e.key === 'Enter' &&
+                    suggestionsOpen &&
+                    suggestionItems[activeSuggestion]
+                  ) {
+                    e.preventDefault()
+                    navigate(`/records/${suggestionItems[activeSuggestion].id}`)
+                  }
+                }}
               />
+              {suggestionsOpen && suggestionItems.length > 0 && (
+                <ul
+                  id="title-suggestions"
+                  role="listbox"
+                  aria-label="Paper title suggestions"
+                  className="absolute top-full z-20 mt-1 w-full rounded-md border border-border bg-white p-1 shadow-lg"
+                >
+                  {suggestionItems.map((item, index) => (
+                    <li
+                      id={`title-suggestion-${index}`}
+                      role="option"
+                      aria-selected={index === activeSuggestion}
+                      key={item.id}
+                      className={`cursor-pointer rounded px-3 py-2 text-sm ${index === activeSuggestion ? 'bg-[var(--secondary)]' : 'hover:bg-[var(--secondary)]'}`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => navigate(`/records/${item.id}`)}
+                    >
+                      {item.title}
+                    </li>
+                  ))}
+                </ul>
+              )}
               {formQuery && (
                 <Button
                   type="button"

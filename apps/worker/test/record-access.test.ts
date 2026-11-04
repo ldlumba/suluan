@@ -104,4 +104,25 @@ describe('record access management', () => {
     expect(res.status).toBe(400)
     expect(mocks.execute).not.toHaveBeenCalled()
   })
+  it.each([
+    ['title_desc', 'lower(r.title) desc'],
+    ['newest', 'r.created_at desc'],
+    ['oldest', 'r.created_at asc'],
+    ['program', 'lower(course.name) asc nulls last'],
+  ])('sorts %s before pagination', async (sort, expected) => {
+    mocks.execute.mockResolvedValue({ rows: [] })
+    const response = await appFor('ADMIN').request(
+      `/access?sort=${sort}&page=2`,
+    )
+    expect(response.status).toBe(200)
+    const query = new PgDialect().sqlToQuery(mocks.execute.mock.calls[0][0]).sql
+    expect(query).toContain(expected)
+    expect(query).toContain('r.id asc')
+    expect(query).toMatch(/limit 21 offset/)
+  })
+  it('rejects unsupported sort values', async () => {
+    expect(
+      (await appFor('ADMIN').request('/access?sort=unexpected')).status,
+    ).toBe(400)
+  })
 })

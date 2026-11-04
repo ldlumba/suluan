@@ -174,6 +174,12 @@ export function AdminDashboardPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <AdminTool
+            to="/direct-upload"
+            icon={<BookOpenCheck aria-hidden="true" />}
+            title="Direct upload"
+            description="Accept an authorized paper directly with selected access."
+          />
+          <AdminTool
             to="/review"
             icon={<BookOpenCheck aria-hidden="true" />}
             title="Review submissions"

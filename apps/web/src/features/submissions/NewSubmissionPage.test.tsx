@@ -22,7 +22,7 @@ const catalog = [
   },
 ]
 
-function renderPage() {
+function renderPage(direct = false) {
   mockedUseAuth.mockReturnValue({
     user: { email: 'student@ua.edu.ph' },
     profile: { id: 'p1', email: 'student@ua.edu.ph', role: 'USER' },
@@ -50,7 +50,7 @@ function renderPage() {
   render(
     <MemoryRouter>
       <QueryClientProvider client={client}>
-        <NewSubmissionPage />
+        <NewSubmissionPage direct={direct} />
       </QueryClientProvider>
     </MemoryRouter>,
   )
@@ -59,6 +59,26 @@ function renderPage() {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('NewSubmissionPage catalog UX', () => {
+  it('requires confirmation before a direct upload and defaults to managers-only access', async () => {
+    renderPage(true)
+    fireEvent.click(await screen.findByRole('button', { name: 'BS Nursing' }))
+    fireEvent.change(screen.getByLabelText('Title'), {
+      target: { value: 'Authorized paper' },
+    })
+    fireEvent.change(screen.getByLabelText(/Document/), {
+      target: {
+        files: [new File(['paper'], 'paper.pdf', { type: 'application/pdf' })],
+      },
+    })
+    expect(screen.getByLabelText('Paper access')).toHaveValue('RESTRICTED')
+    fireEvent.click(screen.getByRole('button', { name: 'Upload and accept' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Accept this paper?' }),
+    ).toBeInTheDocument()
+    expect(
+      vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'POST'),
+    ).toHaveLength(0)
+  })
   it('shows the compact catalog helper without a year field', async () => {
     renderPage()
 

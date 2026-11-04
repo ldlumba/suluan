@@ -24,6 +24,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "@electric-sql/pglite-pgvector": "^0.0.16",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.3",
     "eslint": "^10.11.0",

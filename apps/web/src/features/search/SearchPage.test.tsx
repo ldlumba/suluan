@@ -50,6 +50,27 @@ const semanticItem = {
 
 describe('keyword search', () => {
   beforeEach(() => vi.clearAllMocks())
+  it('shows title suggestions after typing and supports keyboard navigation', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/search/suggestions'))
+        return { items: [{ id: 'paper-1', title: 'Farm study' }] }
+      if (path === '/api/schools') return []
+      return { items: [], page: 1, hasMore: false }
+    })
+    renderPage('USER', '/search')
+    const input = screen.getByLabelText('Keywords, study title, or author')
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'farm' } })
+    expect(
+      await screen.findByRole('option', { name: 'Farm study' }),
+    ).toBeInTheDocument()
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(input).toHaveAttribute('aria-activedescendant', 'title-suggestion-0')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(
+      screen.queryByRole('option', { name: 'Farm study' }),
+    ).not.toBeInTheDocument()
+  })
   it('sends title scope and keeps title mode when submitting', async () => {
     vi.mocked(apiFetch).mockResolvedValue({
       items: [],

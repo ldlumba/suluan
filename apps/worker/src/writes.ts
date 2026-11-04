@@ -27,6 +27,72 @@ export interface NewSubmissionInput {
   keywords: { term: string; normalized: string }[]
 }
 
+/** Direct acceptance is a single database statement and creates no email outbox. */
+export async function createDirectSubmissionAtomic(
+  db: Db,
+  input: NewSubmissionInput & {
+    visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
+    embargoUntil: string | null
+  },
+): Promise<{ submissionId: string; outboxId: null }> {
+  const keywords = JSON.stringify(
+    input.keywords.map((k, position) => ({ ...k, position })),
+  )
+  const result = await db.execute(sql`
+    with new_submission as (
+      insert into submissions (submitter_id, status, idempotency_key, title, authors, school_id, course_id, normalized_title)
+      values (${input.submitterId}, 'ACCEPTED', ${input.idempotencyKey}, ${input.title}, ${input.authors ?? null}, ${input.schoolId ?? null}, ${input.courseId ?? null}, ${input.normalizedTitle})
+      returning id
+    ), new_file as (
+      insert into submission_files (submission_id, r2_key, file_name, mime_type, size_bytes)
+      select id, ${input.r2Key}, ${input.fileName}, ${input.mimeType}, ${input.sizeBytes} from new_submission
+    ), submission_terms as (
+      insert into submission_keywords (submission_id, term, normalized_name, position)
+      select s.id, k.term, k.normalized, k.position from new_submission s
+      cross join jsonb_to_recordset(${keywords}::jsonb) as k(term text, normalized text, position integer)
+    ), decision as (
+      insert into decisions (submission_id, reviewer_id, status, remarks)
+      select id, ${input.submitterId}, 'ACCEPTED', 'Directly accepted by repository manager' from new_submission
+    ), record as (
+      insert into research_records (submission_id, title, year, visibility, embargo_until)
+      select id, ${input.title}, extract(year from current_date)::integer, ${input.visibility}::record_visibility, ${input.embargoUntil}::date from new_submission
+      returning id, submission_id
+    ), authors as (
+      insert into record_authors (record_id, name, position)
+      select r.id, btrim(a.name), (a.ordinality - 1)::integer from record r
+      cross join lateral regexp_split_to_table(${input.authors ?? null}, E'\\r?\\n') with ordinality as a(name, ordinality)
+      where btrim(a.name) <> ''
+    ), record_file as (
+      insert into record_files (record_id, r2_key, file_name, mime_type)
+      select id, ${input.r2Key}, ${input.fileName}, ${input.mimeType} from record
+    ), terms as (
+      insert into keywords (normalized_name, display_name)
+      select k.normalized, (array_agg(k.term order by k.position))[1]
+      from jsonb_to_recordset(${keywords}::jsonb) as k(term text, normalized text, position integer)
+      group by k.normalized order by k.normalized
+      on conflict (normalized_name) do update set display_name = keywords.display_name
+      returning id, normalized_name
+    ), record_terms as (
+      insert into research_keywords (record_id, keyword_id, position)
+      select r.id, t.id, min(k.position) from record r
+      cross join jsonb_to_recordset(${keywords}::jsonb) as k(term text, normalized text, position integer)
+      join terms t on t.normalized_name = k.normalized group by r.id, t.id
+    ), job as (
+      insert into processing_jobs (record_id) select id from record
+    ), audit as (
+      insert into audit_events (actor_id, action, entity_type, entity_id, context)
+      select ${input.submitterId}, 'submission.direct_accepted', 'submission', id::text,
+        jsonb_build_object('remarks', 'Directly accepted by repository manager', 'visibility', ${input.visibility}::text, 'embargoUntil', ${input.embargoUntil}::text)
+      from new_submission
+    )
+    select id as "submissionId" from new_submission
+  `)
+  return {
+    submissionId: (result.rows[0] as { submissionId: string }).submissionId,
+    outboxId: null,
+  }
+}
+
 export async function createSubmissionAtomic(
   db: Db,
   input: NewSubmissionInput,

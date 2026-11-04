@@ -8,6 +8,14 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,6 +43,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
   empty_file: 'The selected file is empty.',
   missing_file: 'A PDF document is required.',
   invalid_fields: 'Check the title, school, and program and try again.',
+  invalid_access: 'Select a valid access level and a future auto-lift date.',
   invalid_keywords: 'Use at most 5 keywords, each under 100 characters.',
   invalid_form: 'The submission could not be read. Please try again.',
   storage_unavailable:
@@ -49,7 +58,7 @@ const FRIENDLY_ERRORS: Record<string, string> = {
     'The selected program does not belong to the selected school.',
 }
 
-export function NewSubmissionPage() {
+export function NewSubmissionPage({ direct = false }: { direct?: boolean }) {
   const { user, loading, getIdToken } = useAuth()
   const [phase, setPhase] = useState<Phase>('editing')
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -60,6 +69,11 @@ export function NewSubmissionPage() {
   >([])
   const [isDragging, setIsDragging] = useState(false)
   const [programHint, setProgramHint] = useState(false)
+  const [visibility, setVisibility] = useState<
+    'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
+  >('RESTRICTED')
+  const [embargo, setEmbargo] = useState('')
+  const [confirmDirect, setConfirmDirect] = useState(false)
   const programHintRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   // One idempotency key per form attempt: retries reuse it.
@@ -145,11 +159,12 @@ export function NewSubmissionPage() {
           aria-hidden="true"
         />
         <h1 className="display-heading mt-5 text-4xl font-semibold">
-          Submission received
+          {direct ? 'Paper accepted' : 'Submission received'}
         </h1>
         <p className="mt-3 max-w-xl leading-7 text-[var(--ink-muted)]">
-          Your paper is pending REO review. You will be notified of the decision
-          by email.
+          {direct
+            ? 'The paper has been accepted and queued for preparation. No notification email was sent.'
+            : 'Your paper is pending REO review. You will be notified of the decision by email.'}
         </p>
         <div className="mt-7">
           <Link
@@ -186,11 +201,16 @@ export function NewSubmissionPage() {
       if (values.authors) form.append('authors', values.authors)
       form.append('schoolId', values.schoolId)
       form.append('courseId', values.courseId)
+      if (direct) {
+        form.append('visibility', visibility)
+        if (visibility !== 'PUBLIC' && embargo)
+          form.append('embargoUntil', embargo)
+      }
       if (acknowledgeDuplicate) form.append('duplicateAcknowledged', 'true')
       for (const term of values.keywords ?? []) form.append('keywords[]', term)
 
       const created = await apiFetch<{ id: string; status: string }>(
-        '/api/submissions',
+        direct ? '/api/submissions/direct' : '/api/submissions',
         token,
         { method: 'POST', body: form },
       )
@@ -236,16 +256,19 @@ export function NewSubmissionPage() {
           <div>
             <p className="eyebrow text-[var(--impact)]">Research intake</p>
             <h1 className="display-heading mt-2 text-4xl font-semibold">
-              Submit research
+              {direct ? 'Direct upload' : 'Submit research'}
             </h1>
             <p className="mt-3 max-w-xl leading-7 text-[var(--ink-muted)]">
-              Your paper goes to REO review first. Nothing is published until it
-              is accepted.
+              {direct
+                ? 'This paper will be accepted immediately with the selected access. No emails will be sent.'
+                : 'Your paper goes to REO review first. Nothing is published until it is accepted.'}
             </p>
           </div>
         </div>
         <form
-          onSubmit={form.handleSubmit((values) => onSubmit(values))}
+          onSubmit={form.handleSubmit((values) =>
+            direct ? setConfirmDirect(true) : onSubmit(values),
+          )}
           className="space-y-4"
         >
           <div className="space-y-2">
@@ -522,6 +545,41 @@ export function NewSubmissionPage() {
             )}
           </div>
 
+          {direct && (
+            <div className="space-y-2">
+              <Label htmlFor="direct-visibility">Paper access</Label>
+              <select
+                id="direct-visibility"
+                className="h-10 w-full rounded-md border border-input bg-white px-3"
+                value={visibility}
+                onChange={(e) => {
+                  setVisibility(e.target.value as typeof visibility)
+                  setEmbargo('')
+                }}
+              >
+                <option value="RESTRICTED">Managers only</option>
+                <option value="UA_ONLY">University access</option>
+                <option value="PUBLIC">Public</option>
+              </select>
+              {visibility !== 'PUBLIC' && (
+                <div>
+                  <Label htmlFor="direct-embargo">
+                    Auto-lift date (optional)
+                  </Label>
+                  <Input
+                    id="direct-embargo"
+                    type="date"
+                    value={embargo}
+                    onChange={(e) => setEmbargo(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Access becomes public on this date. Leave blank to restrict
+                    indefinitely.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           {submitError && (
             <p role="alert" className="text-sm text-destructive">
               {submitError}
@@ -598,7 +656,11 @@ export function NewSubmissionPage() {
             type="submit"
             disabled={phase === 'uploading' || duplicateWarning !== null}
           >
-            {phase === 'uploading' ? 'Uploading…' : 'Submit for review'}
+            {phase === 'uploading'
+              ? 'Uploading…'
+              : direct
+                ? 'Upload and accept'
+                : 'Submit for review'}
           </Button>
           {submissionId && (
             <p className="text-xs text-muted-foreground">
@@ -606,6 +668,36 @@ export function NewSubmissionPage() {
             </p>
           )}
         </form>
+        <Dialog open={confirmDirect} onOpenChange={setConfirmDirect}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Accept this paper?</DialogTitle>
+              <DialogDescription>
+                This immediately accepts the paper with the selected access. No
+                notification email will be sent. Preparation for search happens
+                afterward.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setConfirmDirect(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setConfirmDirect(false)
+                  void form.handleSubmit((values) => onSubmit(values))()
+                }}
+              >
+                Accept and upload
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </section>
 
       <aside className="border-t-2 border-[var(--archive-gold)] bg-white p-5 lg:sticky lg:top-6 sm:p-6">

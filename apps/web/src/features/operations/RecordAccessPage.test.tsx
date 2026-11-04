@@ -52,6 +52,15 @@ describe('repository access review', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText('Accepted paper')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Sort by'), {
+      target: { value: 'newest' },
+    })
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringContaining('sort=newest'),
+        'token',
+      ),
+    )
     expect(
       screen.getByRole('button', { name: 'Change access' }).parentElement,
     ).toHaveClass('space-y-4')

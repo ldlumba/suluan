@@ -47,6 +47,7 @@ export function RecordAccessPage() {
   const [schoolId, setSchoolId] = useState('')
   const [courseId, setCourseId] = useState('')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('title')
   const [editing, setEditing] = useState<Paper | null>(null)
   const [visibility, setVisibility] = useState<Visibility>('PUBLIC')
   const [embargo, setEmbargo] = useState('')
@@ -55,9 +56,9 @@ export function RecordAccessPage() {
     queryFn: async () => apiFetch<School[]>('/api/schools', await getIdToken()),
   })
   const records = useQuery({
-    queryKey: ['record-access', profile?.id, q, schoolId, courseId, page],
+    queryKey: ['record-access', profile?.id, q, schoolId, courseId, sort, page],
     queryFn: async () => {
-      const params = new URLSearchParams({ q, page: String(page) })
+      const params = new URLSearchParams({ q, sort, page: String(page) })
       if (schoolId) params.set('schoolId', schoolId)
       if (courseId) params.set('courseId', courseId)
       return apiFetch<{ items: Paper[]; hasMore: boolean }>(
@@ -104,13 +105,31 @@ export function RecordAccessPage() {
         </p>
       </header>
       <form
-        className="grid gap-3 sm:grid-cols-3"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
         onSubmit={(e) => {
           e.preventDefault()
           setQ(draft)
           setPage(1)
         }}
       >
+        <div>
+          <Label htmlFor="access-sort">Sort by</Label>
+          <select
+            id="access-sort"
+            className={selectClass}
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value)
+              setPage(1)
+            }}
+          >
+            <option value="title">Title A–Z</option>
+            <option value="title_desc">Title Z–A</option>
+            <option value="newest">Recently accepted</option>
+            <option value="oldest">Oldest accepted</option>
+            <option value="program">Program A–Z</option>
+          </select>
+        </div>
         <div>
           <Label htmlFor="access-search">Paper title</Label>
           <Input

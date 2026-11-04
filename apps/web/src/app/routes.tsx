@@ -92,6 +92,14 @@ export const routes = [
         ),
       },
       {
+        path: '/direct-upload',
+        element: (
+          <ProtectedRoute roles={['ADMIN', 'REPOSITORY_MANAGER']}>
+            <NewSubmissionPage direct />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: '/review',
         element: (
           <ProtectedRoute roles={['ADMIN', 'REPOSITORY_MANAGER']}>
