@@ -71,7 +71,9 @@ export function AssistantPage({ floating = false }: { floating?: boolean }) {
   if (!profile)
     return (
       <section className="mx-auto max-w-2xl space-y-5 p-6">
-        <h1 className="display-heading text-4xl font-semibold">
+        <h1
+          className={`display-heading font-semibold ${floating ? 'text-xl' : 'text-4xl'}`}
+        >
           Sign in to chat with the research assistant
         </h1>
         <p className="leading-7 text-muted-foreground">
@@ -456,7 +458,7 @@ function AssistantConversation({ floating }: { floating: boolean }) {
                     aria-describedby="assistant-allowance assistant-prompt-error"
                     aria-invalid={Boolean(form.formState.errors.prompt)}
                     placeholder="Ask about a paper, finding, or research topic…"
-                    className="max-h-36 min-h-12 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 outline-none placeholder:text-muted-foreground sm:text-base"
+                    className="max-h-36 min-h-12 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-muted-foreground"
                     disabled={composerDisabled}
                     {...form.register('prompt')}
                     ref={(element) => {

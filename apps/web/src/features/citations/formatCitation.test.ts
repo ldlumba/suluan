@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatAPA,
   formatBibTeX,
+  formatMLA,
   formatPublishedAPA,
   formatPublishedBibTeX,
   formatPublishedRIS,
@@ -10,6 +11,37 @@ import {
 } from './formatCitation'
 
 describe('citation formatting from local metadata', () => {
+  it('formats MLA with available local or verified publication metadata', () => {
+    const record = {
+      title: 'A Study',
+      authors: ['Cruz, Ana', 'Santos, Bea'],
+      year: '2026',
+    }
+    expect(formatMLA(record)).toBe(
+      'Cruz, Ana, and Bea Santos. “A Study.” SULUAN Research Repository, University of the Assumption, 2026.',
+    )
+    expect(
+      formatMLA(record, {
+        doi: '10.1234/example',
+        venue: 'Journal',
+        volume: '2',
+        issue: '1',
+        pages: '1-3',
+        year: '2025',
+      }),
+    ).toContain(
+      'Journal, vol. 2, no. 1, 2025, pp. 1-3, https://doi.org/10.1234/example.',
+    )
+    expect(formatMLA({ title: 'Untitled', authors: [], year: null })).toBe(
+      '“Untitled.” SULUAN Research Repository, University of the Assumption.',
+    )
+    expect(
+      formatMLA({
+        ...record,
+        authors: ['Cruz, Ana', 'Santos, Bea', 'Diaz, Carl'],
+      }),
+    ).toContain('Cruz, Ana, et al.')
+  })
   it('parses stored surname-first names into APA initials', () => {
     expect(parseAuthorName('Ronquillo, Aldyne A.')).toMatchObject({
       surname: 'Ronquillo',

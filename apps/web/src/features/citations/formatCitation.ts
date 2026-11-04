@@ -250,11 +250,46 @@ export function formatPublishedRIS(
   return lines.join('\n')
 }
 
-export const CITATION_FORMATS = ['apa', 'bibtex', 'ris'] as const
+function mlaAuthors(authors: string[]): string {
+  const names = authors
+    .map((name) => name.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+  if (names.length === 0) return ''
+  if (names.length >= 3) return `${names[0]}, et al.`
+  if (names.length === 1) return `${names[0]}.`
+  const second = names[1].split(',').map((part) => part.trim())
+  const secondName =
+    second.length === 2 ? `${second[1]} ${second[0]}` : names[1]
+  return `${names[0]}, and ${secondName}.`
+}
+
+/** MLA-style text based only on available metadata, without inferred fields. */
+export function formatMLA(
+  record: CitationRecord,
+  publication?: CitationPublication | null,
+): string {
+  const author = mlaAuthors(record.authors)
+  const title = `“${cleanTitle(record.title)}.”`
+  const details = publication
+    ? [
+        publication.venue?.trim(),
+        publication.volume?.trim() && `vol. ${publication.volume.trim()}`,
+        publication.issue?.trim() && `no. ${publication.issue.trim()}`,
+        publication.year?.trim(),
+        publication.pages?.trim() && `pp. ${publication.pages.trim()}`,
+        `https://doi.org/${publication.doi.trim()}`,
+      ]
+    : [CITATION_PUBLISHER, record.year?.trim()]
+  const tail = details.filter(Boolean).join(', ')
+  return [author, title, tail ? `${tail}.` : ''].filter(Boolean).join(' ')
+}
+
+export const CITATION_FORMATS = ['apa', 'mla', 'bibtex', 'ris'] as const
 export type CitationFormat = (typeof CITATION_FORMATS)[number]
 
 export const CITATION_FILENAMES: Record<CitationFormat, string> = {
   apa: 'citation.txt',
+  mla: 'citation.txt',
   bibtex: 'citation.bib',
   ris: 'citation.ris',
 }
@@ -266,6 +301,8 @@ export function formatCitation(
 ): string {
   if (publication) {
     switch (format) {
+      case 'mla':
+        return formatMLA(record, publication)
       case 'bibtex':
         return formatPublishedBibTeX(record, publication)
       case 'ris':
@@ -276,6 +313,8 @@ export function formatCitation(
     }
   }
   switch (format) {
+    case 'mla':
+      return formatMLA(record)
     case 'bibtex':
       return formatBibTeX(record)
     case 'ris':

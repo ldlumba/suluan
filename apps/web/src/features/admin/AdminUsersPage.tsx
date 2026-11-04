@@ -166,7 +166,7 @@ export function AdminUsersPage() {
               Repository manager, or Administrator roles.
             </li>
             <li>
-              Activate or deactivate courses available for new submissions.
+              Activate or deactivate programs available for new submissions.
             </li>
           </ul>
         </div>

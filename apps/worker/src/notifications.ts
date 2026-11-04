@@ -74,6 +74,20 @@ export async function processOutboxEvent(
   }
 }
 
+export function decisionEmailText(payload: Record<string, string>) {
+  const accepted = payload.status === 'ACCEPTED'
+  return {
+    subject: accepted
+      ? `Your SULUAN submission was accepted: ${payload.title ?? ''}`.trim()
+      : `Your SULUAN submission was returned: ${payload.title ?? ''}`.trim(),
+    body: [
+      `Submission: ${payload.submissionId}`,
+      `Decision: ${accepted ? 'Accepted' : 'Returned'}`,
+      `Remarks: ${payload.remarks ?? ''}`,
+    ].join('\n'),
+  }
+}
+
 async function dispatchNotification(
   db: Db,
   event: { eventType: string; payload: Record<string, string> | null },
@@ -115,25 +129,17 @@ async function dispatchNotification(
         `Title: ${payload.title ?? '(untitled)'}`,
         `Authors: ${details?.authors ?? '(not provided)'}`,
         `School: ${details?.school ?? '(not provided)'}`,
-        `Course: ${details?.course ?? '(not provided)'}`,
+        `Program: ${details?.course ?? '(not provided)'}`,
         `Keywords: ${keywordLine}`,
         `Document: ${documentLine}`,
       ].join('\n'),
       attachment,
     }
   } else if (event.eventType === 'decision.made') {
-    const accepted = payload.status === 'ACCEPTED'
     draft = {
       kind: 'submitter_decision',
       to: payload.submitterEmail ?? null,
-      subject: accepted
-        ? `Your SULUAN submission was accepted: ${payload.title ?? ''}`.trim()
-        : `Update on your SULUAN submission: ${payload.title ?? ''}`.trim(),
-      body: [
-        `Submission: ${payload.submissionId}`,
-        `Decision: ${payload.status}`,
-        `Remarks: ${payload.remarks ?? ''}`,
-      ].join('\n'),
+      ...decisionEmailText(payload),
     }
   }
 

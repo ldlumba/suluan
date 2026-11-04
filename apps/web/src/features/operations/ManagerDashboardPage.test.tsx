@@ -43,7 +43,9 @@ describe('manager dashboard', () => {
       screen.getByRole('link', { name: /Explore research trends/ }),
     ).toHaveAttribute('href', '/graph/analytics')
     expect(
-      screen.queryByRole('link', { name: /Account roles|Course availability/ }),
+      screen.queryByRole('link', {
+        name: /Account roles|Program availability/,
+      }),
     ).not.toBeInTheDocument()
     expect(await screen.findByText('2')).toBeInTheDocument()
     vi.mocked(apiFetch).mockResolvedValueOnce({

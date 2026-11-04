@@ -6,7 +6,6 @@ import {
   type CryptoKey as JoseCryptoKey,
   type JWTVerifyGetKey,
 } from 'jose'
-import { loadRootEnv } from '@suluan/db/scripts/env.mjs'
 import {
   auditEvents,
   courses,
@@ -36,8 +35,6 @@ export const KID = 'test-key-1'
  * dependency. Route tests touching the database skip when DATABASE_URL is
  * absent (same pattern as packages/db).
  */
-
-loadRootEnv()
 
 export async function testCatalog() {
   const [course] = await testDb()

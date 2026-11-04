@@ -441,7 +441,7 @@ export function ReviewQueuePage() {
                   className="min-h-32"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Basis for acceptance or rejection…"
+                  placeholder="Basis for acceptance or return…"
                 />
               </div>
               {/* Visibility applies to acceptance only; rejection is always

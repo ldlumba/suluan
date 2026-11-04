@@ -11,6 +11,7 @@ import {
 
 const FORMATS: { id: CitationFormat; label: string }[] = [
   { id: 'apa', label: 'APA' },
+  { id: 'mla', label: 'MLA' },
   { id: 'bibtex', label: 'BibTeX' },
   { id: 'ris', label: 'RIS' },
 ]
@@ -85,7 +86,7 @@ export function CiteSection({
       <div
         role="group"
         aria-label="Citation format"
-        className="mt-5 inline-flex rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] p-1"
+        className="mt-5 inline-flex max-w-full flex-wrap rounded-[6px] border border-[var(--border)] bg-[var(--secondary)] p-1"
       >
         {FORMATS.map((option) => (
           <button

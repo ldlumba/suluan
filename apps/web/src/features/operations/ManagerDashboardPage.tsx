@@ -78,7 +78,7 @@ export function ManagerDashboardPage() {
             to="/graph/analytics"
             icon={<Network aria-hidden="true" />}
             title="Explore research trends"
-            description="See research topics, courses, and years in the repository."
+            description="See research topics, programs, and years in the repository."
           />
         </div>
       </section>

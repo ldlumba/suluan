@@ -54,7 +54,7 @@ export function HomePage() {
             </h1>
             <p className="mt-8 max-w-2xl text-lg leading-8 text-white/75 sm:text-xl">
               Explore accepted research from the University of the Assumption —
-              by title, author, course, or the ideas inside each paper.
+              by title, author, program, or the ideas inside each paper.
             </p>
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
               <Link
@@ -89,7 +89,7 @@ export function HomePage() {
             {
               name: 'Keyword search',
               description:
-                'Find specific terms in paper titles, authors, course details, and searchable full text. A good place to start when you know the words you need.',
+                'Find specific terms in paper titles, authors, program details, and searchable full text. A good place to start when you know the words you need.',
               example: 'Try “solar panel” or an author’s name.',
               access: 'Available to everyone',
               to: '/search',
@@ -202,7 +202,7 @@ export function HomePage() {
                       {paper.authors || 'Authors not listed'}
                     </p>
                     <p className="mt-1 text-sm leading-6 text-white/55">
-                      {affiliation || 'School and course not listed'}
+                      {affiliation || 'School and program not listed'}
                     </p>
                   </li>
                 )

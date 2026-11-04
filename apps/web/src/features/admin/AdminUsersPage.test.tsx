@@ -41,7 +41,7 @@ describe('account role administration', () => {
       screen.getByText(/assign User, Repository manager, or Administrator/i),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(/activate or deactivate courses/i),
+      screen.getByText(/activate or deactivate programs/i),
     ).toBeInTheDocument()
     expect(
       await screen.findByText('No admitted accounts have signed in yet.'),

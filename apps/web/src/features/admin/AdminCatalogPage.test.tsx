@@ -51,7 +51,7 @@ describe('admin course availability', () => {
       path === '/api/admin/catalog' ? [row] : { ...row, active: false },
     )
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Hide course' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Hide program' }))
 
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(

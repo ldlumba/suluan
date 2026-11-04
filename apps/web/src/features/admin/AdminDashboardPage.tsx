@@ -79,7 +79,7 @@ export function AdminTool({
   return (
     <Link
       to={to}
-      className="group border-t-2 border-[var(--primary)] bg-white p-5 transition-colors hover:bg-[var(--secondary)]"
+      className="group rounded-lg border border-[var(--border)] border-t-2 border-t-[var(--primary)] bg-white p-5 transition duration-150 hover:-translate-y-0.5 hover:bg-[var(--secondary)] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transform-none"
     >
       <div className="flex items-start justify-between gap-4">
         <span className="text-[var(--primary)] [&_svg]:size-5">{icon}</span>
@@ -195,7 +195,7 @@ export function AdminDashboardPage() {
             to="/graph/analytics"
             icon={<Network aria-hidden="true" />}
             title="Explore research trends"
-            description="See research topics, courses, and years in the repository."
+            description="See research topics, programs, and years in the repository."
           />
           <AdminTool
             to="/admin/users"
@@ -206,57 +206,13 @@ export function AdminDashboardPage() {
           <AdminTool
             to="/admin/catalog"
             icon={<GraduationCap aria-hidden="true" />}
-            title="Course availability"
-            description="Control courses available for new submissions."
+            title="Program availability"
+            description="Control programs available for new submissions."
           />
         </div>
       </section>
 
       <NotificationRefresh />
-      <section aria-labelledby="account-overview-heading" className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id="account-overview-heading" className="text-xl font-semibold">
-            Account overview
-          </h2>
-          <Link
-            to="/admin/users"
-            className="inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-4"
-          >
-            Manage roles <ArrowUpRight className="size-4" aria-hidden="true" />
-          </Link>
-        </div>
-        {users.isError ? (
-          <p role="alert" className="text-sm text-[var(--impact-red)]">
-            {users.error instanceof ApiError
-              ? users.error.message
-              : 'Account data is unavailable.'}
-          </p>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Metric
-              label="Admitted accounts"
-              value={users.isPending ? '…' : accounts.length}
-              detail="Profiles with a server-side role"
-            />
-            <Metric
-              label="Managers and admins"
-              value={users.isPending ? '…' : managers}
-              detail="Elevated repository access"
-            />
-            <Metric
-              label="Administrators"
-              value={
-                users.isPending
-                  ? '…'
-                  : accounts.filter((account) => account.role === 'ADMIN')
-                      .length
-              }
-              detail="Protected by last-admin guard"
-            />
-          </div>
-        )}
-      </section>
-
       <section
         aria-labelledby="pipeline-overview-heading"
         className="space-y-4"
@@ -315,6 +271,50 @@ export function AdminDashboardPage() {
                   : `${operations.data?.embeddingQuota.requestsUsed ?? 0}/${operations.data?.embeddingQuota.requestsLimit ?? 0}`
               }
               detail="Current daily quota usage"
+            />
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="account-overview-heading" className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="account-overview-heading" className="text-xl font-semibold">
+            Account overview
+          </h2>
+          <Link
+            to="/admin/users"
+            className="inline-flex items-center gap-1 text-sm font-semibold underline underline-offset-4"
+          >
+            Manage roles <ArrowUpRight className="size-4" aria-hidden="true" />
+          </Link>
+        </div>
+        {users.isError ? (
+          <p role="alert" className="text-sm text-[var(--impact-red)]">
+            {users.error instanceof ApiError
+              ? users.error.message
+              : 'Account data is unavailable.'}
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Metric
+              label="Admitted accounts"
+              value={users.isPending ? '…' : accounts.length}
+              detail="Profiles with a server-side role"
+            />
+            <Metric
+              label="Managers and admins"
+              value={users.isPending ? '…' : managers}
+              detail="Elevated repository access"
+            />
+            <Metric
+              label="Administrators"
+              value={
+                users.isPending
+                  ? '…'
+                  : accounts.filter((account) => account.role === 'ADMIN')
+                      .length
+              }
+              detail="Protected by last-admin guard"
             />
           </div>
         )}

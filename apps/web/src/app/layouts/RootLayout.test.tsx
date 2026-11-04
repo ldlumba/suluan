@@ -36,7 +36,7 @@ describe('administrator navigation', () => {
       screen.queryByRole('menuitem', { name: 'Admin dashboard' }),
     ).not.toBeInTheDocument()
     expect(
-      screen.queryByRole('menuitem', { name: 'Course availability' }),
+      screen.queryByRole('menuitem', { name: 'Program availability' }),
     ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('menuitem', { name: 'Review queue' }),

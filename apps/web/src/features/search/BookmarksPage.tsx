@@ -99,7 +99,7 @@ export function BookmarksPage() {
               {(paper.schoolName || paper.courseName) && (
                 <p className="mt-1 text-sm text-[var(--ink-muted)]">
                   {paper.schoolName || 'School not listed'} ·{' '}
-                  {paper.courseName || 'Course not listed'}
+                  {paper.courseName || 'Program not listed'}
                 </p>
               )}
             </li>

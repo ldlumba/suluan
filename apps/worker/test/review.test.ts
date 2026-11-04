@@ -594,7 +594,7 @@ needsDb('review workflow', () => {
     expect(delivered?.body).toContain('Submitter: author@ua.edu.ph')
     expect(delivered?.body).toContain('Authors: Author One')
     expect(delivered?.body).toContain(`School: ${catalog.schoolName}`)
-    expect(delivered?.body).toContain(`Course: ${catalog.courseName}`)
+    expect(delivered?.body).toContain(`Program: ${catalog.courseName}`)
     expect(delivered?.body).toContain('Document: paper.pdf (attached)')
     expect(delivered?.attachment).toMatchObject({
       fileName: 'paper.pdf',

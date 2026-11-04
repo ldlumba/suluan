@@ -27,7 +27,7 @@ const SORT_OPTIONS = [
   { value: 'title', label: 'Title A–Z' },
   { value: 'newest', label: 'Newest' },
   { value: 'oldest', label: 'Oldest' },
-  { value: 'course', label: 'Course A–Z' },
+  { value: 'course', label: 'Program A–Z' },
 ] as const
 type SearchSort = (typeof SORT_OPTIONS)[number]['value']
 
@@ -321,7 +321,7 @@ export function SearchPage() {
                 ? 'Explore accepted research through meaning and exact terms together. Results clearly distinguish confident, broader, and keyword-only connections.'
                 : mode === 'title'
                   ? 'Find accepted papers using words in their titles only.'
-                  : 'Search accepted papers by title, author, year, course, keywords, and prepared full text.'}
+                  : 'Search accepted papers by title, author, year, program, keywords, and prepared full text.'}
             </p>
           </div>
         </div>
@@ -492,14 +492,14 @@ export function SearchPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="search-course">Course</Label>
+                  <Label htmlFor="search-course">Program</Label>
                   <Select
                     value={courseId || 'all'}
                     onValueChange={(value) =>
                       updateFilter('courseId', value === 'all' ? '' : value)
                     }
                     items={[
-                      { value: 'all', label: 'All courses' },
+                      { value: 'all', label: 'All programs' },
                       ...availableCourses.map((course) => ({
                         value: course.id,
                         label: course.label,
@@ -513,7 +513,7 @@ export function SearchPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent align="start">
-                      <SelectItem value="all">All courses</SelectItem>
+                      <SelectItem value="all">All programs</SelectItem>
                       {availableCourses.map((course) => (
                         <SelectItem key={course.id} value={course.id}>
                           {course.label}
@@ -527,7 +527,7 @@ export function SearchPage() {
                     role="alert"
                     className="basis-full text-sm text-destructive"
                   >
-                    School and course filters could not be loaded.
+                    School and program filters could not be loaded.
                   </p>
                 )}
                 <div className="space-y-2">

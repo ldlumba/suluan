@@ -20,6 +20,8 @@ describe('cite section', () => {
       screen.getByRole('heading', { name: 'Cite now' }),
     ).toBeInTheDocument()
     expect(screen.getByText(/Ronquillo, A. A. \(2026\)/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'MLA' }))
+    expect(screen.getByText(/Ronquillo, Aldyne A\./)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'BibTeX' }))
     expect(
       screen.getByText(/@misc\{ronquillo2026aidtrack,/),

@@ -74,7 +74,7 @@ export function EmptyConversation() {
 export function UserMessage({ text }: { text: string }) {
   return (
     <div className="flex items-start justify-end gap-3">
-      <div className="max-w-[85%] rounded-[8px] rounded-tr-[3px] bg-[var(--primary)] px-4 py-3 text-sm leading-6 text-white sm:max-w-[72%] sm:text-base">
+      <div className="max-w-[85%] rounded-[8px] rounded-tr-[3px] bg-[var(--primary)] px-3 py-2 text-sm leading-5 text-white sm:max-w-[85%]">
         <p className="whitespace-pre-wrap break-words">{text}</p>
       </div>
       <Avatar />
@@ -125,10 +125,10 @@ export function AssistantMessage({
       <article
         id={`assistant-answer-${index}`}
         tabIndex={-1}
-        className="min-w-0 max-w-[92%] scroll-mt-24 sm:max-w-[82%]"
+        className="min-w-0 max-w-[92%] scroll-mt-24"
         aria-label="Assistant answer"
       >
-        <div className="rounded-[8px] rounded-tl-[3px] border border-border bg-white px-4 py-3.5 sm:px-5">
+        <div className="rounded-[8px] rounded-tl-[3px] border border-border bg-white px-3 py-3">
           <div className="mb-3 flex gap-2.5 border-b border-border pb-3">
             <ModeIcon
               className="mt-0.5 size-4 shrink-0 text-[var(--primary)]"
@@ -147,7 +147,7 @@ export function AssistantMessage({
             {turn.answer.paragraphs.map((paragraph, paragraphIndex) => (
               <p
                 key={paragraphIndex}
-                className="whitespace-pre-wrap break-words text-sm leading-6 sm:text-base sm:leading-7"
+                className="whitespace-pre-wrap break-words text-sm leading-5"
               >
                 {paragraph.text}{' '}
                 {paragraph.citations.map((id) => (

@@ -60,9 +60,9 @@ export function PrivacyPage() {
             Submissions and reviews
           </h2>
           <p>
-            Papers you submit — title, authors, school, course, keywords, and
+            Papers you submit — title, authors, school, program, keywords, and
             the uploaded file — are retained for Research and Extension Office
-            review, including rejected submissions, which stay in a review-only
+            review, including returned submissions, which stay in a review-only
             archive and are never published, indexed, or used as AI evidence.
             Accepted papers become repository records with the visibility you
             and the reviewer agree on. Decision notices are sent to your sign-in

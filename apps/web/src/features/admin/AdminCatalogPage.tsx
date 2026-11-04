@@ -47,7 +47,7 @@ export function AdminCatalogPage() {
   if (loading) return <p role="status">Checking access…</p>
   if (!user) return <p>Sign in to manage the institutional catalog.</p>
   if (profile?.role !== 'ADMIN')
-    return <p>Only administrators can manage course availability.</p>
+    return <p>Only administrators can manage program availability.</p>
   if (
     [catalog.error, toggle.error].some(
       (error) => error instanceof ApiError && error.status === 403,
@@ -75,12 +75,12 @@ export function AdminCatalogPage() {
               aria-hidden="true"
             />
             <h1 className="display-heading text-4xl font-semibold">
-              Course availability
+              Program availability
             </h1>
           </div>
           <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-muted)]">
-            Hidden courses disappear from new submission forms. Existing papers
-            keep their original course and remain searchable.
+            Hidden programs disappear from new submission forms. Existing papers
+            keep their original program and remain searchable.
           </p>
         </div>
         <Button
@@ -96,22 +96,22 @@ export function AdminCatalogPage() {
         </Button>
       </header>
 
-      {catalog.isPending && <p role="status">Loading courses…</p>}
+      {catalog.isPending && <p role="status">Loading programs…</p>}
       {catalog.isError && (
         <p role="alert" className="text-destructive">
-          The course catalog could not be loaded.
+          The program catalog could not be loaded.
         </p>
       )}
       {toggle.isError && (
         <p role="alert" className="text-destructive">
           {toggle.error instanceof ApiError
             ? toggle.error.message
-            : 'The course could not be updated.'}
+            : 'The program could not be updated.'}
         </p>
       )}
       {catalog.isSuccess && catalog.data.length === 0 && (
         <div className="border-t-2 border-[var(--primary)] bg-white p-6">
-          <p className="font-semibold">No courses are configured.</p>
+          <p className="font-semibold">No programs are configured.</p>
           <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
             Additions to the institutional catalog still require a governed
             database migration.
@@ -155,7 +155,7 @@ export function AdminCatalogPage() {
                     disabled={toggle.isPending}
                     onClick={() => toggle.mutate(course)}
                   >
-                    {course.active ? 'Hide course' : 'Restore course'}
+                    {course.active ? 'Hide program' : 'Restore program'}
                   </Button>
                 </li>
               ))}

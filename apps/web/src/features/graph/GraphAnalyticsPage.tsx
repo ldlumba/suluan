@@ -49,7 +49,7 @@ interface AggregateResponse {
 
 const GROUPS: { value: GroupBy; label: string }[] = [
   { value: 'keyword', label: 'Author keywords' },
-  { value: 'course', label: 'Courses' },
+  { value: 'course', label: 'Programs' },
   { value: 'year', label: 'Repository years' },
 ]
 

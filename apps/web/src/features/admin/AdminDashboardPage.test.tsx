@@ -75,10 +75,22 @@ describe('AdminDashboardPage', () => {
       '/admin/users',
     )
     expect(
-      screen.getByRole('link', { name: /Course availability/ }),
+      screen.getByRole('link', { name: /Program availability/ }),
     ).toHaveAttribute('href', '/admin/catalog')
     expect(
       screen.getByRole('button', { name: 'Refresh notifications' }),
     ).toBeInTheDocument()
+    const headings = [
+      'Administration tools',
+      'Paper preparation',
+      'Account overview',
+      'Authenticated activity',
+    ].map((name) => screen.getByRole('heading', { name }))
+    for (let i = 0; i < headings.length - 1; i++) {
+      expect(
+        headings[i].compareDocumentPosition(headings[i + 1]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
   })
 })

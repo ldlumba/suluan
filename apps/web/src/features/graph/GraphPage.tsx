@@ -199,7 +199,7 @@ export function GraphPage() {
               </h2>
               <p className="mt-4 max-w-2xl leading-7 text-white/75">
                 See how accepted research connects through authors, keywords,
-                courses, schools, and years. Choose a recent paper below or
+                programs, schools, and years. Choose a recent paper below or
                 search the full repository.
               </p>
               <Link
@@ -315,7 +315,7 @@ export function GraphPage() {
                   className="inline-block size-2 rounded-full"
                   style={{ backgroundColor: COLORS[type] }}
                 />
-                {type}
+                {type === 'course' ? 'program' : type}
               </span>
             ))}
           </div>

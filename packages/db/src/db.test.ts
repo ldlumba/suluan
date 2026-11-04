@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Client } from 'pg'
-import { loadRootEnv } from '../scripts/env.mjs'
 
-loadRootEnv()
 // No DATABASE_URL (fresh clone, CI without secrets) → skip, don't fail.
 // `npm run check` must stay green before Stage 1 credentials exist.
 const connectionString = process.env.DATABASE_URL

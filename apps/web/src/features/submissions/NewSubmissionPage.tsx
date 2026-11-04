@@ -527,7 +527,7 @@ export function NewSubmissionPage() {
             >
               <p className="font-semibold">Possible duplicate title</p>
               <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">
-                {duplicateWarning} A rejected submission does not block a
+                {duplicateWarning} A returned submission does not block a
                 corrected resubmission.
               </p>
               {publicMatches.length > 0 && (

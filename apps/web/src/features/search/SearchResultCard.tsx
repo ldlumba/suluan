@@ -77,7 +77,7 @@ export function SearchResultCard({
       {(item.schoolName || item.courseName) && (
         <p className="text-sm text-[var(--ink-muted)]">
           {item.schoolName || 'School not listed'} ·{' '}
-          {item.courseName || 'Course not listed'}
+          {item.courseName || 'Program not listed'}
         </p>
       )}
       {keywords.length > 0 && (
