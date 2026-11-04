@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config'
+import { configureTestDatabase } from '../../packages/db/scripts/test-db-safety.mjs'
 
-/** Database integration tests run only when an explicit DATABASE_URL is supplied. */
+configureTestDatabase(process.env)
+
+/** Database tests require an explicitly configured isolated local test database. */
 export default defineConfig({
   test: {
     testTimeout: 30_000,

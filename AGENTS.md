@@ -1,5 +1,12 @@
 # AGENTS.md — SULUAN
 
+## Critical: production database and test safety
+
+- **2026-11-04 incident:** Worker tests implicitly loaded the root `.env` production connection; integration tests deleted `embedding_usage` rows and production was restored to the 19:50 Asia/Manila recovery point. Never assume a check is read-only or that an `.env` points to development. Do not run destructive integration suites against production, or recreate retired environments, for any reason.
+- Normal `npm run check` must be credential-free. Worker and database Vitest configs discard `DATABASE_URL` and only accept `SULUAN_TEST_DATABASE_URL` targeting localhost/loopback with a database name ending `_test`. Even a loopback connection can be a tunnel: independently verify it is a disposable isolated test database and get owner approval before using it. Never point a local proxy at production. Remote integration test targets are prohibited by this safeguard.
+- Before any database-affecting test, script, migration, cleanup or live operation: identify its actual target and write scope, verify isolation and backup/recovery, and obtain explicit approval for production writes. Production read-only investigations must use read-only transactions and return no secrets or private content. Never disable safeguards merely to make tests pass. Record skips honestly.
+- The production embedding Scheduler triggers were paused during incident recovery; verify their current state and obtain owner approval before resuming or otherwise changing production schedules. A database rollback does not roll back R2, queues, Gmail or provider activity.
+
 ## First read
 
 - `SULUAN_ARCHITECTURE_V1_CONTEXT.md` (repo root) is the authoritative baseline for architecture, workflow, access, and security decisions. Read it before any schema, auth, workflow, or infra work.
@@ -40,7 +47,7 @@ Read `docs/architecture/suluan-v1-frontend-handoff.md` before frontend work, alo
   - `npm run db:promote-admin -- <email>` — **dev only**: grants ADMIN to an existing profile by email. Never a production mechanism.
   - `npm run db:bootstrap-admin:production -- ...` — one-time production first-admin path; requires `SULUAN_ENVIRONMENT=production`, exact direct-host confirmation, and the exact confirmation phrase. It refuses a second bootstrap and writes an audit event atomically. Subsequent role changes use the ADMIN-only UI/API.
   - `npm run db:seed:dev` — compatibility verification only: confirms migration 0008 supplied the 4-school/24-course catalog; it no longer inserts SAMPLE rows.
-  - The db integration test skips automatically when `.env`/`DATABASE_URL` is absent, so `npm run check` stays green on credential-less clones.
+  - Database integration tests skip unless `SULUAN_TEST_DATABASE_URL` explicitly identifies an isolated loopback database ending in `_test`; ordinary `DATABASE_URL` and root `.env` are ignored by Vitest. Never tunnel that local connection to production.
 - Worker (`apps/worker`, Hono; decisions recorded in the context doc):
   - `npm run dev:worker` — local API on http://localhost:8787. Reads `apps/worker/.dev.vars` (copy from `.dev.vars.example`; git-ignored) — NOT the root `.env`. Use the pooled Neon endpoint + real `FIREBASE_PROJECT_ID` there.
   - Browser CORS is exact-origin allowlisted via `ALLOWED_ORIGINS` (committed default `http://localhost:5173` in `wrangler.toml`; production overrides via dashboard, never `"*"`). Missing ACAO on a preflight means the origin isn't listed — not an auth failure.
