@@ -70,13 +70,20 @@ describe('AdminDashboardPage', () => {
     expect(
       screen.getByRole('link', { name: /Explore research trends/ }),
     ).toHaveAttribute('href', '/graph/analytics')
-    expect(screen.getByRole('link', { name: /Account roles/ })).toHaveAttribute(
-      'href',
-      '/admin/users',
-    )
     expect(
-      screen.getByRole('link', { name: /Program availability/ }),
+      screen.getByRole('link', { name: /Manage account roles/ }),
+    ).toHaveAttribute('href', '/admin/users')
+    expect(
+      screen.getByRole('link', { name: /Manage programs/ }),
     ).toHaveAttribute('href', '/admin/catalog')
+    expect(screen.getByRole('link', { name: /Manage papers/ })).toHaveAttribute(
+      'href',
+      '/access-review',
+    )
+    expect(screen.getByText(/withdraw or reinstate papers/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Upload and accept a paper/ }),
+    ).toHaveAttribute('href', '/direct-upload')
     expect(
       screen.getByRole('button', { name: 'Refresh notifications' }),
     ).toBeInTheDocument()
@@ -84,7 +91,7 @@ describe('AdminDashboardPage', () => {
       'Administration tools',
       'Paper preparation',
       'Account overview',
-      'Authenticated activity',
+      'Activity from signed-in users',
     ].map((name) => screen.getByRole('heading', { name }))
     for (let i = 0; i < headings.length - 1; i++) {
       expect(

@@ -156,8 +156,8 @@ export function AdminDashboardPage() {
               Admin dashboard
             </h1>
             <p className="mt-3 max-w-3xl leading-7 text-[var(--ink-muted)]">
-              See account activity and the progress of papers in the repository.
-              Use the tools below to manage your work.
+              Review submissions, manage accepted papers and accounts, and check
+              how papers are being prepared for search.
             </p>
           </div>
         </div>
@@ -176,44 +176,44 @@ export function AdminDashboardPage() {
           <AdminTool
             to="/direct-upload"
             icon={<BookOpenCheck aria-hidden="true" />}
-            title="Direct upload"
-            description="Accept an authorized paper directly with selected access."
+            title="Upload and accept a paper"
+            description="Add an authorized paper directly to the repository and choose who can access it."
           />
           <AdminTool
             to="/review"
             icon={<BookOpenCheck aria-hidden="true" />}
             title="Review submissions"
-            description="Read submitted papers and record your decisions."
+            description="Read submitted papers and accept or reject them with remarks."
           />
           <AdminTool
             to="/operations"
             icon={<CloudCog aria-hidden="true" />}
             title="Prepare papers for search"
-            description="Check paper processing and start preparation when needed."
+            description="Check progress and start preparing accepted papers for keyword and semantic search."
           />
           <AdminTool
             to="/access-review"
             icon={<ShieldCheck aria-hidden="true" />}
-            title="Review paper access"
-            description="Check accepted papers and change who can access them."
+            title="Manage papers"
+            description="Find accepted papers, change access or keywords, and withdraw or reinstate papers."
           />
           <AdminTool
             to="/graph/analytics"
             icon={<Network aria-hidden="true" />}
             title="Explore research trends"
-            description="See research topics, programs, and years in the repository."
+            description="See research topics and how papers are distributed across programs and years."
           />
           <AdminTool
             to="/admin/users"
             icon={<UserCog aria-hidden="true" />}
-            title="Account roles"
-            description="Choose who can review papers or manage the repository."
+            title="Manage account roles"
+            description="View accounts and assign user, repository manager, or administrator roles."
           />
           <AdminTool
             to="/admin/catalog"
             icon={<GraduationCap aria-hidden="true" />}
-            title="Program availability"
-            description="Control programs available for new submissions."
+            title="Manage programs"
+            description="Show or hide programs in the form for new submissions."
           />
         </div>
       </section>
@@ -249,9 +249,9 @@ export function AdminDashboardPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric
-              label="Needs attention"
+              label="Waiting or failed"
               value={operations.isPending ? '…' : (needsAttention ?? 0)}
-              detail="Papers waiting for preparation or needing a retry"
+              detail="Papers waiting for preparation or needing a retry after a failure"
             />
             <Metric
               label="Awaiting search preparation"
@@ -261,13 +261,17 @@ export function AdminDashboardPage() {
               detail="Papers not yet ready for keyword search"
             />
             <Metric
-              label="Sections awaiting semantic preparation"
+              label="Sections awaiting semantic search"
               value={
                 operations.isPending
                   ? '…'
                   : (pipeline?.missingEmbeddingChunks ?? 0)
               }
-              detail={`${pipeline?.missingEmbeddingRecords ?? 0} papers need semantic search preparation`}
+              detail={
+                pipeline
+                  ? `${pipeline.missingEmbeddingRecords} papers need semantic search preparation`
+                  : 'Papers needing semantic search preparation'
+              }
             />
             <Metric
               label="Semantic preparation requests"
@@ -276,7 +280,7 @@ export function AdminDashboardPage() {
                   ? '…'
                   : `${operations.data?.embeddingQuota.requestsUsed ?? 0}/${operations.data?.embeddingQuota.requestsLimit ?? 0}`
               }
-              detail="Current daily quota usage"
+              detail="Requests used out of the daily limit (UTC)"
             />
           </div>
         )}
@@ -303,14 +307,14 @@ export function AdminDashboardPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-3">
             <Metric
-              label="Admitted accounts"
+              label="Accounts shown"
               value={users.isPending ? '…' : accounts.length}
-              detail="Profiles with a server-side role"
+              detail="Up to 500 account profiles"
             />
             <Metric
               label="Managers and admins"
               value={users.isPending ? '…' : managers}
-              detail="Elevated repository access"
+              detail="Among the accounts shown"
             />
             <Metric
               label="Administrators"
@@ -320,7 +324,7 @@ export function AdminDashboardPage() {
                   : accounts.filter((account) => account.role === 'ADMIN')
                       .length
               }
-              detail="Protected by last-admin guard"
+              detail="Among the accounts shown; the last admin cannot lose admin access"
             />
           </div>
         )}
@@ -332,11 +336,12 @@ export function AdminDashboardPage() {
       >
         <div>
           <h2 id="activity-overview-heading" className="text-xl font-semibold">
-            Authenticated activity
+            Activity from signed-in users
           </h2>
           <p className="mt-1 text-sm text-[var(--ink-muted)]">
-            Aggregate events from the last 90 days. Public visitors are not
-            tracked.
+            Activity from the last 90 days. Signed-out visitors are not tracked.
+            Repeated actions by the same user on the same paper are counted at
+            most once every 24 hours.
           </p>
         </div>
         {activity.isError ? (
@@ -350,28 +355,32 @@ export function AdminDashboardPage() {
               value={
                 activity.isPending ? '…' : (activity.data?.paperViews ?? 0)
               }
-              detail={`${activity.data?.viewers ?? 0} authenticated viewers`}
+              detail={
+                activity.data
+                  ? `${activity.data.viewers} signed-in viewers`
+                  : 'Signed-in viewers'
+              }
             />
             <Metric
               label="Papers viewed"
               value={
                 activity.isPending ? '…' : (activity.data?.viewedPapers ?? 0)
               }
-              detail="Distinct visible records"
+              detail="Different papers viewed"
             />
             <Metric
-              label="Citation-copy count"
+              label="Citations copied"
               value={
                 activity.isPending ? '…' : (activity.data?.citationCopies ?? 0)
               }
-              detail="Deduplicated per user and paper"
+              detail="Copy actions, not academic citations"
             />
             <Metric
               label="Download starts"
               value={
                 activity.isPending ? '…' : (activity.data?.downloadStarts ?? 0)
               }
-              detail="Authorized starts, not completion"
+              detail="Downloads started; completion is not tracked"
             />
           </div>
         )}
@@ -384,9 +393,8 @@ export function AdminDashboardPage() {
             aria-hidden="true"
           />
           <p>
-            Dashboard metrics are aggregate operational counts. Detailed account
-            changes and pipeline launches remain available only in their
-            authorized management views.
+            These are summary counts. Open the tools above to manage accounts
+            and paper preparation.
           </p>
         </div>
       </section>
