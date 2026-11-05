@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -51,20 +51,44 @@ const accessColors: Record<Visibility, string> = {
 export function RecordAccessPage() {
   const { getIdToken, profile } = useAuth()
   const client = useQueryClient()
-  const [draft, setDraft] = useState('')
-  const [q, setQ] = useState('')
-  const [schoolId, setSchoolId] = useState('')
-  const [courseId, setCourseId] = useState('')
-  const [page, setPage] = useState(1)
-  const [sort, setSort] = useState('title')
-  const [recordState, setRecordState] = useState<'active' | 'withdrawn'>(
-    'active',
-  )
+  const location = useLocation()
+  const navigate = useNavigate()
+  const filters = (location.state?.accessReviewFilters ?? {}) as Record<
+    string,
+    string
+  >
+  const q = (filters.q ?? '').slice(0, 200)
+  const schoolId = filters.schoolId ?? ''
+  const courseId = filters.courseId ?? ''
+  const pageValue = Number(filters.page)
+  const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1
+  const sortValue = filters.sort ?? ''
+  const sort = [
+    'title',
+    'title_desc',
+    'newest',
+    'oldest',
+    'program',
+    'access',
+  ].includes(sortValue)
+    ? sortValue
+    : 'title'
+  const recordState = filters.state === 'withdrawn' ? 'withdrawn' : 'active'
+  function updateFilters(changes: Record<string, string>) {
+    void navigate(location.pathname + location.search + location.hash, {
+      replace: true,
+      state: {
+        ...location.state,
+        accessReviewFilters: { ...filters, ...changes },
+      },
+    })
+  }
   const [lifecyclePaper, setLifecyclePaper] = useState<Paper | null>(null)
   const [reason, setReason] = useState('')
   const [editing, setEditing] = useState<Paper | null>(null)
   const [keywordPaper, setKeywordPaper] = useState<Paper | null>(null)
   const [keywords, setKeywords] = useState<string[]>([])
+  const [confirmKeywords, setConfirmKeywords] = useState(false)
   const [visibility, setVisibility] = useState<Visibility>('PUBLIC')
   const [reinstateVisibility, setReinstateVisibility] = useState<
     Visibility | ''
@@ -134,6 +158,7 @@ export function RecordAccessPage() {
       ),
     onSuccess: () => {
       setKeywordPaper(null)
+      setConfirmKeywords(false)
       void client.invalidateQueries({ queryKey: ['record-access'] })
       void client.invalidateQueries({ queryKey: ['paper'] })
       void client.invalidateQueries({ queryKey: ['keyword-search'] })
@@ -198,8 +223,10 @@ export function RecordAccessPage() {
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
         onSubmit={(e) => {
           e.preventDefault()
-          setQ(draft)
-          setPage(1)
+          updateFilters({
+            q: String(new FormData(e.currentTarget).get('q') ?? '').trim(),
+            page: '',
+          })
         }}
       >
         <div>
@@ -209,8 +236,7 @@ export function RecordAccessPage() {
             className={selectClass}
             value={recordState}
             onChange={(e) => {
-              setRecordState(e.target.value as 'active' | 'withdrawn')
-              setPage(1)
+              updateFilters({ state: e.target.value, page: '' })
             }}
           >
             <option value="active">Active papers</option>
@@ -224,8 +250,7 @@ export function RecordAccessPage() {
             className={selectClass}
             value={sort}
             onChange={(e) => {
-              setSort(e.target.value)
-              setPage(1)
+              updateFilters({ sort: e.target.value, page: '' })
             }}
           >
             <option value="title">Title A–Z</option>
@@ -240,8 +265,9 @@ export function RecordAccessPage() {
           <Label htmlFor="access-search">Paper title</Label>
           <Input
             id="access-search"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            key={q}
+            name="q"
+            defaultValue={q}
             maxLength={200}
           />
         </div>
@@ -252,9 +278,11 @@ export function RecordAccessPage() {
             className={selectClass}
             value={schoolId}
             onChange={(e) => {
-              setSchoolId(e.target.value)
-              setCourseId('')
-              setPage(1)
+              updateFilters({
+                schoolId: e.target.value,
+                courseId: '',
+                page: '',
+              })
             }}
           >
             <option value="">All schools</option>
@@ -273,8 +301,7 @@ export function RecordAccessPage() {
             value={courseId}
             disabled={!schoolId}
             onChange={(e) => {
-              setCourseId(e.target.value)
-              setPage(1)
+              updateFilters({ courseId: e.target.value, page: '' })
             }}
           >
             <option value="">All programs</option>
@@ -362,6 +389,7 @@ export function RecordAccessPage() {
                   onClick={() => {
                     setKeywordPaper(paper)
                     setKeywords(paper.keywords ?? [])
+                    setConfirmKeywords(false)
                     changeKeywords.reset()
                   }}
                 >
@@ -402,7 +430,7 @@ export function RecordAccessPage() {
           <p className="text-sm text-muted-foreground">
             {lifecyclePaper?.withdrawnAt
               ? 'Choose access for the reinstated paper. No email is sent.'
-              : 'The record and file are retained, but the paper leaves discovery and new processing. Already-running work may finish externally but its results will be rejected. Public cached metadata may remain for 30 seconds and downloads for up to 5 minutes; previously downloaded copies cannot be recalled. No email is sent.'}
+              : 'The paper and its file will be kept, but people will no longer find or download it through SULUAN. The paper will not be processed while withdrawn, and results from work already underway will not be saved. It may take up to 30 seconds for paper details and 5 minutes for downloads to disappear. Copies already downloaded cannot be taken back. No email will be sent.'}
           </p>
           {lifecyclePaper?.withdrawnAt && (
             <div className="space-y-2">
@@ -486,33 +514,54 @@ export function RecordAccessPage() {
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit author keywords</DialogTitle>
+            <DialogTitle>
+              {confirmKeywords
+                ? 'Confirm keyword changes'
+                : 'Edit author keywords'}
+            </DialogTitle>
             <DialogDescription>
               {keywordPaper?.title}. Changes are audited and do not replace the
               submission or file.
             </DialogDescription>
           </DialogHeader>
-          <KeywordInput
-            id="record-keywords"
-            value={keywords}
-            onChange={setKeywords}
-          />
+          {confirmKeywords ? (
+            <p className="text-sm">
+              Save these keywords for this paper?{' '}
+              {keywords.length
+                ? keywords.join(', ')
+                : 'All keywords will be removed.'}
+            </p>
+          ) : (
+            <KeywordInput
+              id="record-keywords"
+              value={keywords}
+              onChange={setKeywords}
+            />
+          )}
           {changeKeywords.isError && (
             <p role="alert">Could not save keywords. Refresh and try again.</p>
           )}
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setKeywordPaper(null)}
+              onClick={() =>
+                confirmKeywords
+                  ? setConfirmKeywords(false)
+                  : setKeywordPaper(null)
+              }
               disabled={changeKeywords.isPending}
             >
-              Cancel
+              {confirmKeywords ? 'Back to editing' : 'Cancel'}
             </Button>
             <Button
-              onClick={() => changeKeywords.mutate()}
+              onClick={() =>
+                confirmKeywords
+                  ? changeKeywords.mutate()
+                  : setConfirmKeywords(true)
+              }
               disabled={changeKeywords.isPending}
             >
-              Save keywords
+              {confirmKeywords ? 'Confirm and save' : 'Save keywords'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -521,7 +570,9 @@ export function RecordAccessPage() {
         <Button
           variant="outline"
           disabled={page === 1}
-          onClick={() => setPage(page - 1)}
+          onClick={() =>
+            updateFilters({ page: page > 2 ? String(page - 1) : '' })
+          }
         >
           Previous
         </Button>
@@ -529,7 +580,7 @@ export function RecordAccessPage() {
         <Button
           variant="outline"
           disabled={!records.data?.hasMore}
-          onClick={() => setPage(page + 1)}
+          onClick={() => updateFilters({ page: String(page + 1) })}
         >
           Next
         </Button>

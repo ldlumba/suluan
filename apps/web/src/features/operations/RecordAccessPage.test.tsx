@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
 import { apiFetch } from '@/lib/api'
@@ -143,6 +143,20 @@ describe('repository access review', () => {
       key: 'Enter',
     })
     fireEvent.click(screen.getByRole('button', { name: 'Save keywords' }))
+    expect(screen.getByText('Confirm keyword changes')).toBeInTheDocument()
+    expect(
+      vi
+        .mocked(apiFetch)
+        .mock.calls.some(
+          ([path, , options]) =>
+            path === '/api/record-access/paper/keywords' &&
+            options?.method === 'PATCH',
+        ),
+    ).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Back to editing' }))
+    expect(screen.getByText('Revised')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save keywords' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and save' }))
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
         '/api/record-access/paper/keywords',
@@ -173,6 +187,69 @@ describe('repository access review', () => {
             expectedUpdatedAt: '2026-11-03T10:00:00Z',
           }),
         }),
+      ),
+    )
+  })
+  it('restores sorting and filters after opening a paper and going back', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      profile: { id: 'manager' },
+      getIdToken: async () => 'token',
+    } as never)
+    vi.mocked(apiFetch).mockImplementation(async (path: string) =>
+      path === '/api/schools'
+        ? []
+        : {
+            items: [
+              {
+                id: 'paper',
+                title: 'Accepted paper',
+                year: 2026,
+                visibility: 'PUBLIC',
+                effectiveVisibility: 'PUBLIC',
+                embargoUntil: null,
+                updatedAt: '2026-11-03T10:00:00Z',
+                schoolName: null,
+                courseName: null,
+                keywords: [],
+                withdrawnAt: null,
+              },
+            ],
+            hasMore: false,
+          },
+    )
+    function PaperPage() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate(-1)}>Browser back</button>
+    }
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <MemoryRouter initialEntries={['/access-review']}>
+          <Routes>
+            <Route path="/access-review" element={<RecordAccessPage />} />
+            <Route path="/records/:id" element={<PaperPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.change(await screen.findByLabelText('Sort by'), {
+      target: { value: 'newest' },
+    })
+    fireEvent.change(screen.getByLabelText('Paper title'), {
+      target: { value: 'Accepted' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    fireEvent.click(await screen.findByRole('link', { name: 'Accepted paper' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Browser back' }))
+    expect(await screen.findByLabelText('Sort by')).toHaveValue('newest')
+    expect(screen.getByLabelText('Paper title')).toHaveValue('Accepted')
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/q=Accepted.*sort=newest/),
+        'token',
       ),
     )
   })
