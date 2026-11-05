@@ -38,8 +38,10 @@ describe('effectiveVisibility', () => {
   const fragments = (viewer: 'PUBLIC' | 'UA_USER' | 'MANAGER') =>
     JSON.stringify(effectiveVisibility(viewer, 'r').rowVisible.queryChunks)
 
-  it('gives managers an unconditional pass', () => {
-    expect(fragments('MANAGER')).toContain('true')
+  it('allows managers access only to active records', () => {
+    expect(text(effectiveVisibility('MANAGER', 'r').rowVisible)).toBe(
+      '(r.withdrawn_at is null)',
+    )
   })
 
   it('keeps RESTRICTED away from UA users unless an embargo elapsed', () => {
@@ -56,10 +58,10 @@ describe('effectiveVisibility', () => {
     // 2. The anonymous predicate must consider an ELAPSED embargo on a
     //    restricted record, or auto-lift never becomes publicly visible.
     expect(text(effectiveVisibility('PUBLIC', 'r').rowVisible)).toBe(
-      `((r.visibility = 'PUBLIC' and not (r.embargo_until is not null and r.embargo_until > current_date)) or (r.visibility <> 'PUBLIC' and (r.embargo_until is not null and r.embargo_until <= current_date)))`,
+      `((r.withdrawn_at is null) and ((r.visibility = 'PUBLIC' and not (r.embargo_until is not null and r.embargo_until > current_date)) or (r.visibility <> 'PUBLIC' and (r.embargo_until is not null and r.embargo_until <= current_date))))`,
     )
     expect(text(effectiveVisibility('UA_USER', 'r').rowVisible)).toBe(
-      `(r.visibility <> 'RESTRICTED' or (r.embargo_until is not null and r.embargo_until <= current_date))`,
+      `((r.withdrawn_at is null) and (r.visibility <> 'RESTRICTED' or (r.embargo_until is not null and r.embargo_until <= current_date)))`,
     )
   })
 

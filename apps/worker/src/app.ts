@@ -513,7 +513,7 @@ export function createApp(
         coalesce(kw.terms, '{}'::text[]) as keywords
       from submissions s
       left join decisions d on d.submission_id = s.id
-      left join research_records r on r.submission_id = s.id
+      left join research_records r on r.submission_id = s.id and r.withdrawn_at is null
       left join lateral (
         select array_agg(k.term order by k.position, k.id) as terms
         from submission_keywords k where k.submission_id = s.id
@@ -1056,6 +1056,10 @@ export function createApp(
       if (!submission || submission.files.length === 0) {
         return c.json({ error: 'not_found' }, 404)
       }
+      const withdrawn = await db.execute(
+        sql`select 1 from research_records where submission_id = ${submission.id} and withdrawn_at is not null limit 1`,
+      )
+      if (withdrawn.rows.length) return c.json({ error: 'not_found' }, 404)
       const file = submission.files[0]
       return streamR2Object(
         c.env,

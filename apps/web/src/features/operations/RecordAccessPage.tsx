@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 import { NotFoundPage } from '@/app/pages/NotFoundPage'
@@ -29,6 +30,7 @@ interface Paper {
   schoolName: string | null
   courseName: string | null
   keywords: string[]
+  withdrawnAt: string | null
 }
 interface School {
   id: string
@@ -55,19 +57,41 @@ export function RecordAccessPage() {
   const [courseId, setCourseId] = useState('')
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState('title')
+  const [recordState, setRecordState] = useState<'active' | 'withdrawn'>(
+    'active',
+  )
+  const [lifecyclePaper, setLifecyclePaper] = useState<Paper | null>(null)
+  const [reason, setReason] = useState('')
   const [editing, setEditing] = useState<Paper | null>(null)
   const [keywordPaper, setKeywordPaper] = useState<Paper | null>(null)
   const [keywords, setKeywords] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Visibility>('PUBLIC')
+  const [reinstateVisibility, setReinstateVisibility] = useState<
+    Visibility | ''
+  >('')
   const [embargo, setEmbargo] = useState('')
   const catalog = useQuery({
     queryKey: ['schools'],
     queryFn: async () => apiFetch<School[]>('/api/schools', await getIdToken()),
   })
   const records = useQuery({
-    queryKey: ['record-access', profile?.id, q, schoolId, courseId, sort, page],
+    queryKey: [
+      'record-access',
+      profile?.id,
+      q,
+      schoolId,
+      courseId,
+      sort,
+      recordState,
+      page,
+    ],
     queryFn: async () => {
-      const params = new URLSearchParams({ q, sort, page: String(page) })
+      const params = new URLSearchParams({
+        q,
+        sort,
+        state: recordState,
+        page: String(page),
+      })
       if (schoolId) params.set('schoolId', schoolId)
       if (courseId) params.set('courseId', courseId)
       return apiFetch<{ items: Paper[]; hasMore: boolean }>(
@@ -118,10 +142,43 @@ export function RecordAccessPage() {
       void client.invalidateQueries({ queryKey: ['graph-counts'] })
     },
   })
+  const lifecycle = useMutation({
+    mutationFn: async () =>
+      apiFetch(
+        `/api/record-access/${lifecyclePaper!.id}/lifecycle`,
+        await getIdToken(),
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(
+            lifecyclePaper?.withdrawnAt
+              ? {
+                  action: 'reinstate',
+                  reason: reason.trim(),
+                  expectedUpdatedAt: lifecyclePaper.updatedAt,
+                  visibility: reinstateVisibility,
+                  embargoUntil:
+                    reinstateVisibility === 'PUBLIC' || !embargo
+                      ? null
+                      : embargo,
+                }
+              : {
+                  action: 'withdraw',
+                  reason: reason.trim(),
+                  expectedUpdatedAt: lifecyclePaper!.updatedAt,
+                },
+          ),
+        },
+      ),
+    onSuccess: () => {
+      setLifecyclePaper(null)
+      void client.invalidateQueries()
+    },
+  })
   const selectClass =
     'h-9 w-full rounded-md border border-input bg-white px-3 text-sm'
   if (
-    [records.error, change.error, changeKeywords.error].some(
+    [records.error, change.error, changeKeywords.error, lifecycle.error].some(
       (error) => error instanceof ApiError && error.status === 403,
     )
   )
@@ -145,6 +202,21 @@ export function RecordAccessPage() {
           setPage(1)
         }}
       >
+        <div>
+          <Label htmlFor="record-state">Record status</Label>
+          <select
+            id="record-state"
+            className={selectClass}
+            value={recordState}
+            onChange={(e) => {
+              setRecordState(e.target.value as 'active' | 'withdrawn')
+              setPage(1)
+            }}
+          >
+            <option value="active">Active papers</option>
+            <option value="withdrawn">Withdrawn papers</option>
+          </select>
+        </div>
         <div>
           <Label htmlFor="access-sort">Sort by</Label>
           <select
@@ -233,53 +305,179 @@ export function RecordAccessPage() {
           >
             <div className="space-y-4">
               <div>
-                <Link
-                  to={`/records/${paper.id}`}
-                  className="text-lg font-semibold underline"
-                >
-                  {paper.title}
-                </Link>
+                {paper.withdrawnAt ? (
+                  <strong className="text-lg">{paper.title}</strong>
+                ) : (
+                  <Link
+                    to={`/records/${paper.id}`}
+                    className="text-lg font-semibold underline"
+                  >
+                    {paper.title}
+                  </Link>
+                )}
                 <p className="mt-1 text-sm text-[var(--ink-muted)]">
                   {paper.year} · {paper.schoolName ?? 'School not listed'} ·{' '}
                   {paper.courseName ?? 'Program not listed'}
                 </p>
                 <p className="mt-2 text-sm">
-                  Current access:{' '}
+                  {paper.withdrawnAt
+                    ? 'Withdrawn · Previously selected access: '
+                    : 'Current access: '}
                   <strong
-                    className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${accessColors[paper.effectiveVisibility]}`}
+                    className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${accessColors[paper.withdrawnAt ? paper.visibility : paper.effectiveVisibility]}`}
                   >
-                    {labels[paper.effectiveVisibility]}
+                    {
+                      labels[
+                        paper.withdrawnAt
+                          ? paper.visibility
+                          : paper.effectiveVisibility
+                      ]
+                    }
                   </strong>
                   {paper.embargoUntil && (
-                    <> · Auto-lift: {paper.embargoUntil}</>
+                    <>
+                      {' '}
+                      · {paper.withdrawnAt ? 'Previous auto-lift' : 'Auto-lift'}
+                      : {paper.embargoUntil}
+                    </>
                   )}
                 </p>
               </div>
+              {!paper.withdrawnAt && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(paper)
+                    setVisibility(paper.visibility)
+                    setEmbargo(paper.embargoUntil ?? '')
+                    change.reset()
+                  }}
+                >
+                  Change access
+                </Button>
+              )}
+              {!paper.withdrawnAt && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setKeywordPaper(paper)
+                    setKeywords(paper.keywords ?? [])
+                    changeKeywords.reset()
+                  }}
+                >
+                  Edit keywords
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => {
-                  setEditing(paper)
-                  setVisibility(paper.visibility)
-                  setEmbargo(paper.embargoUntil ?? '')
-                  change.reset()
+                  setLifecyclePaper(paper)
+                  setReason('')
+                  setReinstateVisibility('')
+                  setEmbargo('')
+                  lifecycle.reset()
                 }}
               >
-                Change access
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setKeywordPaper(paper)
-                  setKeywords(paper.keywords ?? [])
-                  changeKeywords.reset()
-                }}
-              >
-                Edit keywords
+                {paper.withdrawnAt ? 'Reinstate paper' : 'Withdraw paper'}
               </Button>
             </div>
           </article>
         ))}
       </div>
+      <Dialog
+        open={lifecyclePaper !== null}
+        onOpenChange={(open) => {
+          if (!open && !lifecycle.isPending) setLifecyclePaper(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {lifecyclePaper?.withdrawnAt
+                ? 'Reinstate paper'
+                : 'Withdraw paper'}
+            </DialogTitle>
+            <DialogDescription>{lifecyclePaper?.title}</DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {lifecyclePaper?.withdrawnAt
+              ? 'Choose access for the reinstated paper. No email is sent.'
+              : 'The record and file are retained, but the paper leaves discovery and new processing. Already-running work may finish externally but its results will be rejected. Public cached metadata may remain for 30 seconds and downloads for up to 5 minutes; previously downloaded copies cannot be recalled. No email is sent.'}
+          </p>
+          {lifecyclePaper?.withdrawnAt && (
+            <div className="space-y-2">
+              <Label htmlFor="reinstate-access">
+                Access after reinstatement
+              </Label>
+              <select
+                id="reinstate-access"
+                className={selectClass}
+                value={reinstateVisibility}
+                onChange={(e) => {
+                  setReinstateVisibility(e.target.value as Visibility | '')
+                  setEmbargo('')
+                }}
+              >
+                <option value="" disabled>
+                  Select access
+                </option>
+                <option value="RESTRICTED">Managers only</option>
+                <option value="UA_ONLY">University access</option>
+                <option value="PUBLIC">Public</option>
+              </select>
+              {reinstateVisibility && reinstateVisibility !== 'PUBLIC' && (
+                <div>
+                  <Label htmlFor="reinstate-embargo">
+                    Auto-lift date (optional)
+                  </Label>
+                  <Input
+                    id="reinstate-embargo"
+                    type="date"
+                    value={embargo}
+                    onChange={(e) => setEmbargo(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          <div>
+            <Label htmlFor="lifecycle-reason">Reason (required)</Label>
+            <Textarea
+              id="lifecycle-reason"
+              maxLength={2000}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+          {lifecycle.isError && (
+            <p role="alert">
+              Could not update the paper. Refresh and try again.
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLifecyclePaper(null)}
+              disabled={lifecycle.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={lifecyclePaper?.withdrawnAt ? 'default' : 'destructive'}
+              onClick={() => lifecycle.mutate()}
+              disabled={
+                !reason.trim() ||
+                lifecycle.isPending ||
+                Boolean(lifecyclePaper?.withdrawnAt && !reinstateVisibility)
+              }
+            >
+              {lifecyclePaper?.withdrawnAt
+                ? 'Confirm reinstatement'
+                : 'Confirm withdrawal'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={keywordPaper !== null}
         onOpenChange={(open) => {

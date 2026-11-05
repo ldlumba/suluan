@@ -197,7 +197,7 @@ export async function sweepDoiEnrichment(
     ? sql`and r.title ilike ${`%${options.titleFilter}%`}`
     : sql``
   const rows = await db.execute(sql`
-    select r.id, r.title, r.year,
+    select r.id, r.title, r.year, r.lifecycle_version as "lifecycleVersion",
       coalesce(author_list.names,
         (select array_agg(trimmed order by ord)
          from (select trim(line) as trimmed, ord
@@ -211,7 +211,7 @@ export async function sweepDoiEnrichment(
       select array_agg(a.name order by a.position, a.id) as names
       from record_authors a where a.record_id = r.id
     ) author_list on true
-    where r.doi_checked_at is null
+    where r.withdrawn_at is null and r.doi_checked_at is null
     ${titleClause}
     order by r.created_at
     limit ${options.limit}
@@ -221,6 +221,7 @@ export async function sweepDoiEnrichment(
     id: string
     title: string
     year: number | null
+    lifecycleVersion: number
     authors: string[] | null
   }[]) {
     const record = {
@@ -242,11 +243,11 @@ export async function sweepDoiEnrichment(
             volume = ${hit.volume}, issue = ${hit.issue}, pages = ${hit.pages},
             pub_year = ${hit.year}, doi_source = ${DOI_SOURCE},
             doi_checked_at = now()
-          where id = ${row.id}::uuid`)
+          where id = ${row.id}::uuid and withdrawn_at is null and lifecycle_version = ${row.lifecycleVersion}`)
       } else {
         await db.execute(sql`
           update research_records set doi_checked_at = now()
-          where id = ${row.id}::uuid`)
+          where id = ${row.id}::uuid and withdrawn_at is null and lifecycle_version = ${row.lifecycleVersion}`)
       }
     } catch {
       // External lookup failed: leave unchecked for a later sweep run.

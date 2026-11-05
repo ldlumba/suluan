@@ -66,7 +66,7 @@ export function repositoryOperationRoutes(
           )::integer as "unindexedRecords",
           count(distinct k.record_id) filter (where e.id is null)::integer as "missingEmbeddingRecords",
           count(d.id) filter (where e.id is null)::integer as "missingEmbeddingChunks"
-        from processing_jobs p
+        from processing_jobs p join research_records r on r.id = p.record_id and r.withdrawn_at is null
         left join keyword_indexes k on k.record_id = p.record_id
           and k.extraction_claim_token = p.claim_token
           and k.chunker_version = ${CHUNKER_VERSION}
@@ -171,7 +171,7 @@ export function repositoryOperationRoutes(
               select 1 from processing_jobs p
               join research_records r on r.id = p.record_id
               join submissions s on s.id = r.submission_id
-              where s.status = 'ACCEPTED' and (
+              where s.status = 'ACCEPTED' and r.withdrawn_at is null and (
                 p.status = 'QUEUED' or
                 (p.status = 'PROCESSING' and p.lease_until < now())
               )
@@ -183,7 +183,7 @@ export function repositoryOperationRoutes(
               join document_chunks d on d.index_id = k.id
               join research_records r on r.id = k.record_id
               join submissions s on s.id = r.submission_id
-              where s.status = 'ACCEPTED' and k.chunker_version = ${CHUNKER_VERSION}
+              where s.status = 'ACCEPTED' and r.withdrawn_at is null and k.chunker_version = ${CHUNKER_VERSION}
                 and not exists (select 1 from document_embeddings e where e.chunk_id = d.id)
             ) and not exists (
               select 1 from embedding_claims

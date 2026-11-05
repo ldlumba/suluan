@@ -64,18 +64,19 @@ export function effectiveVisibility(
   // which silently excludes every row instead of including it.
   const embargoed = sql`(${t('embargo_until')} is not null and ${t('embargo_until')} > current_date)`
   const elapsed = sql`(${t('embargo_until')} is not null and ${t('embargo_until')} <= current_date)`
-  if (viewer === 'MANAGER') return { rowVisible: sql`true` }
+  const active = sql`(${t('withdrawn_at')} is null)`
+  if (viewer === 'MANAGER') return { rowVisible: active }
   if (viewer === 'UA_USER') {
     return {
-      rowVisible: sql`(${t('visibility')} <> 'RESTRICTED' or ${elapsed})`,
+      rowVisible: sql`(${active} and (${t('visibility')} <> 'RESTRICTED' or ${elapsed}))`,
     }
   }
   // Match on the EFFECTIVE level, not the stored column: an elapsed embargo
   // lifts UA_ONLY/RESTRICTED to public, so those rows must become visible here.
   return {
-    rowVisible: sql`((${t('visibility')} = 'PUBLIC' and not ${embargoed}) or (
+    rowVisible: sql`(${active} and ((${t('visibility')} = 'PUBLIC' and not ${embargoed}) or (
       ${t('visibility')} <> 'PUBLIC' and ${elapsed}
-    ))`,
+    )))`,
   }
 }
 

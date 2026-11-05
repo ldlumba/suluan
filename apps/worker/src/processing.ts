@@ -58,7 +58,7 @@ export function processingRoutes(authorize: MiddlewareHandler<AppContext>) {
         r.title, r.submission_id as "submissionId"
       from processing_jobs j join research_records r on r.id = j.record_id
       join submissions s on s.id = r.submission_id
-      where s.status = 'ACCEPTED' order by j.created_at limit 100
+      where s.status = 'ACCEPTED' and r.withdrawn_at is null order by j.created_at limit 100
     `)
     return c.json(rows.rows)
   })
@@ -66,13 +66,18 @@ export function processingRoutes(authorize: MiddlewareHandler<AppContext>) {
     const db = createDb(c.env.DATABASE_URL)
     const token = crypto.randomUUID()
     const rows = await db.execute(sql`
-      with claimed as (
+      with active as materialized (
+        select r.id from research_records r join submissions s on s.id = r.submission_id
+        join processing_jobs j on j.record_id = r.id
+        where j.id = ${c.req.valid('param').id} and s.status = 'ACCEPTED' and r.withdrawn_at is null
+        for update of r
+      ), claimed as (
         update processing_jobs j set status = 'PROCESSING', attempts = attempts + 1,
           claim_token = ${token}, lease_until = now() + interval '10 minutes',
           error_code = null, updated_at = now()
-        from research_records r, submissions s
+        from research_records r, submissions s, active a
         where j.id = ${c.req.valid('param').id} and j.record_id = r.id
-          and s.id = r.submission_id and s.status = 'ACCEPTED'
+          and s.id = r.submission_id and s.status = 'ACCEPTED' and a.id = r.id
           and (j.status = 'QUEUED' or
             (j.status = 'PROCESSING' and j.lease_until < now()))
         returning j.id, r.submission_id
@@ -96,13 +101,16 @@ export function processingRoutes(authorize: MiddlewareHandler<AppContext>) {
         body.status === 'EXTRACTED' ? JSON.stringify(body.result) : null
       const errorCode = body.status === 'FAILED' ? body.errorCode : null
       const rows = await db.execute(sql`
-        with finished as (
+        with active as materialized (
+          select r.id from research_records r join processing_jobs j on j.record_id = r.id
+          where j.id = ${c.req.valid('param').id} and r.withdrawn_at is null for update of r
+        ), finished as (
           update processing_jobs j set status = ${body.status}, result = ${result}::jsonb,
             error_code = ${errorCode}, lease_until = null, updated_at = now()
-          from research_records r, submissions s
+          from research_records r, submissions s, active a
           where j.id = ${c.req.valid('param').id} and j.claim_token = ${body.claimToken}
             and j.status = 'PROCESSING' and j.lease_until > now()
-            and j.record_id = r.id and s.id = r.submission_id and s.status = 'ACCEPTED'
+            and j.record_id = r.id and s.id = r.submission_id and s.status = 'ACCEPTED' and a.id = r.id
           returning j.id
         ), audit as (
           insert into audit_events (actor_id, action, entity_type, entity_id)
@@ -114,10 +122,11 @@ export function processingRoutes(authorize: MiddlewareHandler<AppContext>) {
       // Repeated delivery of the identical result is harmless. A stale token
       // cannot overwrite a newer attempt, even after that attempt finishes.
       const replay = await db.execute(sql`
-        select id from processing_jobs where id = ${c.req.valid('param').id}
-          and claim_token = ${body.claimToken} and status = ${body.status}
-          and result is not distinct from ${result}::jsonb
-          and error_code is not distinct from ${errorCode}::text
+        select j.id from processing_jobs j join research_records r on r.id = j.record_id
+        where j.id = ${c.req.valid('param').id} and r.withdrawn_at is null
+          and j.claim_token = ${body.claimToken} and j.status = ${body.status}
+          and j.result is not distinct from ${result}::jsonb
+          and j.error_code is not distinct from ${errorCode}::text
       `)
       return replay.rows.length
         ? c.json({ status: body.status })
@@ -132,7 +141,7 @@ export function processingRoutes(authorize: MiddlewareHandler<AppContext>) {
           lease_until = null, error_code = null, updated_at = now()
         from research_records r, submissions s
         where j.id = ${c.req.valid('param').id} and j.status = 'FAILED'
-          and j.record_id = r.id and s.id = r.submission_id and s.status = 'ACCEPTED'
+          and j.record_id = r.id and s.id = r.submission_id and s.status = 'ACCEPTED' and r.withdrawn_at is null
         returning j.id
       ), audit as (
         insert into audit_events (actor_id, action, entity_type, entity_id)
@@ -170,18 +179,19 @@ export function serviceProcessingRoutes(
         select j.id from processing_jobs j
         join research_records r on r.id = j.record_id
         join submissions s on s.id = r.submission_id
-        where s.status = 'ACCEPTED'
+        where s.status = 'ACCEPTED' and r.withdrawn_at is null
           and (${jobId}::uuid is null or j.id = ${jobId}::uuid)
           and (j.status = 'QUEUED' or
             (j.status = 'PROCESSING' and j.lease_until < now()))
         order by j.created_at, j.id
-        for update of j skip locked limit 1
+        for update of r skip locked limit 1
       ), claimed as (
         update processing_jobs j set status = 'PROCESSING', attempts = attempts + 1,
           claim_token = ${token}, lease_until = now() + interval '10 minutes',
           error_code = null, updated_at = now()
         from candidate c, research_records r
         where j.id = c.id and j.record_id = r.id
+          and (j.status = 'QUEUED' or (j.status = 'PROCESSING' and j.lease_until < now()))
         returning j.id, r.submission_id
       ), audit as (
         insert into audit_events
@@ -209,7 +219,7 @@ export function serviceProcessingRoutes(
         where j.id = ${c.req.valid('param').id}
           and j.claim_token = ${c.req.valid('query').claimToken}
           and j.status = 'PROCESSING' and j.lease_until > now()
-          and s.status = 'ACCEPTED'
+          and s.status = 'ACCEPTED' and r.withdrawn_at is null
         limit 1
       `)
       if (!found.rows.length) return c.json({ error: 'stale_claim' }, 409)
@@ -241,16 +251,19 @@ export function serviceProcessingRoutes(
       const errorCode = body.status === 'FAILED' ? body.errorCode : null
       const service = c.get('serviceIdentity').email
       const rows = await db.execute(sql`
-        with finished as (
+        with active as materialized (
+          select r.id from research_records r join processing_jobs j on j.record_id = r.id
+          where j.id = ${c.req.valid('param').id} and r.withdrawn_at is null for update of r
+        ), finished as (
           update processing_jobs j set status = ${body.status},
             result = ${result}::jsonb, error_code = ${errorCode},
             lease_until = null, updated_at = now()
-          from research_records r, submissions s
+          from research_records r, submissions s, active a
           where j.id = ${c.req.valid('param').id}
             and j.claim_token = ${body.claimToken}
             and j.status = 'PROCESSING' and j.lease_until > now()
             and j.record_id = r.id and s.id = r.submission_id
-            and s.status = 'ACCEPTED'
+            and s.status = 'ACCEPTED' and a.id = r.id
           returning j.id
         ), audit as (
           insert into audit_events
@@ -263,10 +276,11 @@ export function serviceProcessingRoutes(
       `)
       if (rows.rows.length) return c.json({ status: body.status })
       const replay = await db.execute(sql`
-        select id from processing_jobs where id = ${c.req.valid('param').id}
-          and claim_token = ${body.claimToken} and status = ${body.status}
-          and result is not distinct from ${result}::jsonb
-          and error_code is not distinct from ${errorCode}::text
+        select j.id from processing_jobs j join research_records r on r.id = j.record_id
+        where j.id = ${c.req.valid('param').id} and r.withdrawn_at is null
+          and j.claim_token = ${body.claimToken} and j.status = ${body.status}
+          and j.result is not distinct from ${result}::jsonb
+          and j.error_code is not distinct from ${errorCode}::text
       `)
       return replay.rows.length
         ? c.json({ status: body.status })

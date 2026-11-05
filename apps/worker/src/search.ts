@@ -87,10 +87,10 @@ export async function indexExtractedRecords(
   { actorId, context, limit, recordId }: IndexActor,
 ) {
   const candidates = await db.execute(sql`
-    select r.id, j.claim_token as "claimToken", j.result
+    select r.id, r.lifecycle_version as "lifecycleVersion", j.claim_token as "claimToken", j.result
     from research_records r join submissions s on s.id = r.submission_id
     join processing_jobs j on j.record_id = r.id
-    where s.status = 'ACCEPTED' and j.status = 'EXTRACTED'
+    where s.status = 'ACCEPTED' and r.withdrawn_at is null and j.status = 'EXTRACTED'
       and (${recordId ?? null}::uuid is null or r.id = ${recordId ?? null}::uuid)
       and j.claim_token is not null and not exists (
         select 1 from keyword_indexes i where i.record_id = r.id
@@ -105,11 +105,14 @@ export async function indexExtractedRecords(
     const chunks = chunkText(source.text)
     if (!chunks.length) continue
     const result = await db.execute(sql`
-      with snapshot as (
+      with active as materialized (
+        select id from research_records where id = ${row.id}::uuid and withdrawn_at is null
+          and lifecycle_version = ${row.lifecycleVersion}::integer for update
+      ), snapshot as (
         insert into keyword_indexes
           (record_id, extraction_claim_token, chunker_version, source_sha256)
         select r.id, j.claim_token, ${CHUNKER_VERSION}, ${source.sha256}
-        from research_records r join submissions s on s.id = r.submission_id
+        from research_records r join active a on a.id = r.id join submissions s on s.id = r.submission_id
         join processing_jobs j on j.record_id = r.id
         where r.id = ${row.id} and s.status = 'ACCEPTED' and j.status = 'EXTRACTED'
           and j.claim_token = ${row.claimToken}
@@ -693,13 +696,13 @@ export function searchRoutes(
       }
       const db = createDb(c.env.DATABASE_URL)
       const candidates = await db.execute(sql`
-        select k.id as keyword_index_id, k.record_id, k.source_sha256,
+        select k.id as keyword_index_id, k.record_id, k.source_sha256, r.lifecycle_version,
           d.id as chunk_id, d.content
         from keyword_indexes k
         join document_chunks d on d.index_id = k.id
         join research_records r on r.id = k.record_id
         join submissions s on s.id = r.submission_id
-        where s.status = 'ACCEPTED' and k.chunker_version = ${CHUNKER_VERSION}
+        where s.status = 'ACCEPTED' and r.withdrawn_at is null and k.chunker_version = ${CHUNKER_VERSION}
           and (${recordId ?? null}::uuid is null or k.record_id = ${recordId ?? null}::uuid)
           and not exists (
             select 1 from document_embeddings e where e.chunk_id = d.id
@@ -715,6 +718,7 @@ export function searchRoutes(
         keyword_index_id: string
         record_id: string
         source_sha256: string
+        lifecycle_version: number
         chunk_id: string
         content: string
       }[]
@@ -781,19 +785,27 @@ export function searchRoutes(
         keywordIndexId: row.keyword_index_id,
         recordId: row.record_id,
         sourceSha256: row.source_sha256,
+        lifecycleVersion: row.lifecycle_version,
         chunkId: row.chunk_id,
         embedding: toVectorLiteral(vectors[offset]),
       }))
       const inserted = await db.execute(sql`
-        with input as (
+        with raw_input as materialized (
           select * from jsonb_to_recordset(${JSON.stringify(payload)}::jsonb)
             as x(
               "keywordIndexId" uuid,
               "recordId" uuid,
               "sourceSha256" text,
               "chunkId" uuid,
+              "lifecycleVersion" integer,
               embedding text
             )
+        ), active as materialized (
+          select r.id, r.lifecycle_version from research_records r
+          where r.withdrawn_at is null and exists (select 1 from raw_input i where i."recordId" = r.id and i."lifecycleVersion" = r.lifecycle_version)
+          order by r.id for update of r
+        ), input as (
+          select i.* from raw_input i join active a on a.id = i."recordId" and a.lifecycle_version = i."lifecycleVersion"
         ), snapshots as (
           insert into semantic_indexes
             (keyword_index_id, model, dimensions, chunker_version,

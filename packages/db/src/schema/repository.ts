@@ -61,6 +61,9 @@ export const researchRecords = pgTable('research_records', {
    * The date only applies to UA_ONLY/RESTRICTED; PUBLIC is already public.
    */
   embargoUntil: date('embargo_until'),
+  /** Withdrawal is separate from acceptance; lifecycle fences stale work. */
+  withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
+  lifecycleVersion: integer('lifecycle_version').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),

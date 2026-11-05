@@ -13,6 +13,71 @@ vi.mock('@/lib/api', async (original) => ({
 }))
 
 describe('repository access review', () => {
+  it('requires a reason to withdraw and sends the current version', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      profile: { id: 'manager' },
+      getIdToken: async () => 'token',
+    } as never)
+    vi.mocked(apiFetch).mockImplementation(
+      async (path: string, _token, options) => {
+        if (options?.method === 'PATCH') return { ok: true }
+        if (path === '/api/schools') return []
+        return {
+          items: [
+            {
+              id: 'paper',
+              title: 'Paper',
+              year: 2026,
+              visibility: 'PUBLIC',
+              effectiveVisibility: 'PUBLIC',
+              embargoUntil: null,
+              updatedAt: '2026-11-03T10:00:00Z',
+              schoolName: null,
+              courseName: null,
+              keywords: [],
+              withdrawnAt: null,
+            },
+          ],
+          hasMore: false,
+        }
+      },
+    )
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <MemoryRouter>
+          <RecordAccessPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Withdraw paper' }),
+    )
+    expect(
+      screen.getByRole('button', { name: 'Confirm withdrawal' }),
+    ).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Reason (required)'), {
+      target: { value: 'Accidental acceptance' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm withdrawal' }))
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/record-access/paper/lifecycle',
+        'token',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({
+            action: 'withdraw',
+            reason: 'Accidental acceptance',
+            expectedUpdatedAt: '2026-11-03T10:00:00Z',
+          }),
+        }),
+      ),
+    )
+  })
   it('lists accepted papers and saves a fenced access change', async () => {
     vi.mocked(useAuth).mockReturnValue({
       profile: { id: 'manager' },

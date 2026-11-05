@@ -213,6 +213,29 @@ try {
     failures.push('research_records.year')
   }
 
+  const { rows: lifecycleColumns } = await client.query(`
+    select column_name, data_type, is_nullable from information_schema.columns
+    where table_schema = 'public' and table_name = 'research_records'
+      and column_name in ('withdrawn_at', 'lifecycle_version')
+  `)
+  if (
+    lifecycleColumns.some(
+      (c) =>
+        c.column_name === 'withdrawn_at' &&
+        c.data_type === 'timestamp with time zone',
+    ) &&
+    lifecycleColumns.some(
+      (c) =>
+        c.column_name === 'lifecycle_version' &&
+        c.data_type === 'integer' &&
+        c.is_nullable === 'NO',
+    )
+  ) {
+    console.log('ok   withdrawal lifecycle columns')
+  } else {
+    failures.push('withdrawal lifecycle columns')
+  }
+
   const { rows: catalog } = await client.query(
     `select count(distinct s.id)::int as schools, count(c.id)::int as courses
      from schools s join courses c on c.school_id = s.id

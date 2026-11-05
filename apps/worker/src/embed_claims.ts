@@ -85,6 +85,7 @@ interface ClaimItem {
   keywordIndexId: string
   recordId: string
   sourceSha256: string
+  lifecycleVersion: number
   content: string
 }
 
@@ -112,7 +113,7 @@ async function evaluationCorpus(db: Db) {
       and si.model = ${EMBEDDING_MODEL}
       and si.dimensions = ${EMBEDDING_DIMS}
       and si.chunker_version = ${CHUNKER_VERSION}
-    where s.status = 'ACCEPTED'
+    where s.status = 'ACCEPTED' and r.withdrawn_at is null
       and k.chunker_version = ${CHUNKER_VERSION}
     group by k.record_id, k.source_sha256
     order by k.record_id
@@ -132,7 +133,7 @@ async function evaluationCorpus(db: Db) {
     from processing_jobs p
     join research_records r on r.id = p.record_id
     join submissions s on s.id = r.submission_id
-    where s.status = 'ACCEPTED' and p.status = 'EXTRACTED'
+    where s.status = 'ACCEPTED' and r.withdrawn_at is null and p.status = 'EXTRACTED'
       and not exists (
         select 1 from keyword_indexes k
         join document_chunks d on d.index_id = k.id
@@ -580,13 +581,13 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
     `)
     if (active.rows.length) return c.body(null, 204)
     const candidates = await db.execute(sql`
-      select k.id as keyword_index_id, k.record_id, k.source_sha256,
+      select k.id as keyword_index_id, k.record_id, k.source_sha256, r.lifecycle_version,
         d.id as chunk_id, d.content
       from keyword_indexes k
       join document_chunks d on d.index_id = k.id
       join research_records r on r.id = k.record_id
       join submissions s on s.id = r.submission_id
-      where s.status = 'ACCEPTED' and k.chunker_version = ${CHUNKER_VERSION}
+      where s.status = 'ACCEPTED' and r.withdrawn_at is null and k.chunker_version = ${CHUNKER_VERSION}
         and (${recordId ?? null}::uuid is null or k.record_id = ${recordId ?? null}::uuid)
         and not exists (
           select 1 from document_embeddings e where e.chunk_id = d.id
@@ -599,6 +600,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       keyword_index_id: string
       record_id: string
       source_sha256: string
+      lifecycle_version: number
       chunk_id: string
       content: string
     }[]
@@ -630,6 +632,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       keywordIndexId: row.keyword_index_id,
       recordId: row.record_id,
       sourceSha256: row.source_sha256,
+      lifecycleVersion: row.lifecycle_version,
       content: row.content,
     }))
     // Chunk text travels only in the claim response (Job memory). The stored
@@ -639,14 +642,24 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       keywordIndexId: item.keywordIndexId,
       recordId: item.recordId,
       sourceSha256: item.sourceSha256,
+      lifecycleVersion: item.lifecycleVersion,
     }))
     let inserted
     try {
       inserted = await db.execute(sql`
+        with active as materialized (
+          select r.id, r.lifecycle_version from research_records r
+          where r.withdrawn_at is null and exists (
+            select 1 from jsonb_to_recordset(${JSON.stringify(stored)}::jsonb)
+              as x("recordId" uuid, "lifecycleVersion" integer)
+            where x."recordId" = r.id and x."lifecycleVersion" = r.lifecycle_version
+          ) order by r.id for update of r
+        )
         insert into embedding_claims
           (claim_token, kind, inputs, payload, expires_at)
-        values (${claimToken}, 'prep', ${items.length},
-          ${JSON.stringify(stored)}::jsonb, now() + interval '10 minutes')
+        select ${claimToken}, 'prep', ${items.length},
+          ${JSON.stringify(stored)}::jsonb, now() + interval '10 minutes'
+        where (select count(*) from active) = ${new Set(items.map((i) => i.recordId)).size}
         returning id as "claimId"
       `)
     } catch (error) {
@@ -660,6 +673,7 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
       if (raced.rows.length) return c.body(null, 204)
       throw error
     }
+    if (!inserted.rows.length) return c.body(null, 204)
     const claimId = (inserted.rows[0] as { claimId: string }).claimId
     return c.json({
       claimId,
@@ -717,21 +731,25 @@ export function serviceEmbedRoutes(authorize: MiddlewareHandler<AppContext>) {
         return { ...item, embedding: literal?.literal ?? '' }
       })
       const inserted = await db.execute(sql`
-        with claimed as (
+        with raw_input as materialized (
+          select * from jsonb_to_recordset(${JSON.stringify(fullPayload)}::jsonb)
+            as x("chunkId" uuid, "keywordIndexId" uuid, "recordId" uuid,
+              "sourceSha256" text, "lifecycleVersion" integer, embedding text)
+        ), active as materialized (
+          select r.id, r.lifecycle_version from research_records r
+          where r.withdrawn_at is null and exists (
+            select 1 from raw_input i where i."recordId" = r.id
+              and coalesce(i."lifecycleVersion", 0) = r.lifecycle_version
+          ) order by r.id for update of r
+        ), claimed as (
           update embedding_claims set used_at = now()
           where claim_token = ${body.claimToken} and kind = 'prep'
             and used_at is null and expires_at > now()
+            and (select count(*) from active) = (select count(distinct "recordId") from raw_input)
+            and not exists (select 1 from raw_input i left join active a on a.id = i."recordId" and a.lifecycle_version = coalesce(i."lifecycleVersion", 0) where a.id is null)
           returning id
         ), input as (
-          select x.* from claimed
-          cross join jsonb_to_recordset(${JSON.stringify(fullPayload)}::jsonb)
-            as x(
-              "chunkId" uuid,
-              "keywordIndexId" uuid,
-              "recordId" uuid,
-              "sourceSha256" text,
-              embedding text
-            )
+          select x.* from claimed cross join raw_input x
         ), snapshots as (
           insert into semantic_indexes
             (keyword_index_id, model, dimensions, chunker_version,

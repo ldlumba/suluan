@@ -185,6 +185,8 @@ work from an earlier one.
 
 ## Maintaining this file
 
+- **Withdrawal and reinstatement 2026-11-04:** manager/admin-only audited reason-required lifecycle, no automatic email, retains accepted record and file. Migration 0022 adds independent withdrawal state and lifecycle-version fencing for stale work. Active visibility, discovery, processing and embedding paths exclude withdrawn records; management lists them separately and reinstatement requires explicit access. Cached anonymous metadata can persist 30 seconds and downloads 300 seconds; already-started external requests cannot be recalled. In-memory PostgreSQL tests cover representative denial, reinstatement and stale results, but do not establish real Neon concurrency or deployment. Never apply migration or deploy without separately authorized production procedure.
+
 - **Embedding result fencing 2026-11-04:** preparation results atomically consume a valid, unexpired, unused claim before snapshots or vectors can be written; a stale or concurrently consumed claim receives 409. The in-memory PostgreSQL test covers multi-chunk writes and replay, not real Neon concurrency. This is a safeguard toward withdrawal, not a withdrawal implementation; deployment must be verified independently.
 
 - **Per-paper citation-copy count 2026-11-04:** the paper detail returns a rolling 90-day count of existing authenticated copy events, subject to the same accepted-record visibility gate. It is not an academic citation count; anonymous copies are not tracked, and events retain the existing 90-day cleanup and 24-hour deduplication. No all-time counter or retention extension is implied.
