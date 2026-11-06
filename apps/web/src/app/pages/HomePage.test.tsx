@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
@@ -73,10 +73,45 @@ describe('repository home page', () => {
     renderPage()
 
     expect(
-      await screen.findByText(/temporarily unavailable/i),
+      await screen.findByText(
+        'Newly accepted papers are temporarily unavailable.',
+      ),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: /Explore the repository/i }),
     ).toBeInTheDocument()
+  })
+
+  it('loads only the chosen program using the visibility-aware search', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path) => {
+      if (path === '/api/schools')
+        return [
+          {
+            id: 'school',
+            name: 'School',
+            courses: [{ id: 'program', name: 'Program' }],
+          },
+        ]
+      if (path.includes('courseId=program'))
+        return {
+          items: [{ id: 'chosen', title: 'Program paper', authors: null }],
+        }
+      return { items: [] }
+    })
+    renderPage()
+    await screen.findByRole('option', { name: 'Program' })
+    fireEvent.change(screen.getByLabelText('Program'), {
+      target: { value: 'program' },
+    })
+    expect(
+      await screen.findByRole('link', { name: 'Program paper' }),
+    ).toHaveAttribute('href', '/records/chosen')
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/search/records?q=&page=1&sort=newest&courseId=program',
+      null,
+    )
+    expect(
+      screen.getByRole('link', { name: 'See all papers in this program' }),
+    ).toHaveAttribute('href', '/search?sort=newest&courseId=program')
   })
 })

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
@@ -53,18 +53,35 @@ describe('knowledge graph discovery', () => {
           label: 'Related paper',
           recordId: '22222222-2222-4222-8222-222222222222',
         },
+        { id: 'keyword:health', type: 'keyword', label: 'Health' },
       ],
-      edges: [],
+      edges: [
+        {
+          id: 'center-keyword',
+          source: 'paper:11111111-1111-4111-8111-111111111111',
+          target: 'keyword:health',
+          type: 'TAGGED_WITH',
+        },
+        {
+          id: 'related-keyword',
+          source: 'paper:22222222-2222-4222-8222-222222222222',
+          target: 'keyword:health',
+          type: 'TAGGED_WITH',
+        },
+      ],
     } as never)
     renderPage()
 
-    expect((await screen.findAllByText('Center paper')).length).toBeGreaterThan(
-      0,
-    )
+    expect(await screen.findByText('Related papers')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Related paper' })).toHaveAttribute(
       'href',
       '/graph?record=22222222-2222-4222-8222-222222222222',
     )
+    expect(screen.getByText('Shared keyword: Health')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Graph view' }))
+    expect(
+      screen.getByLabelText('Interactive research relationship graph'),
+    ).toBeInTheDocument()
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
         '/api/graph/neighborhood?type=paper&id=11111111-1111-4111-8111-111111111111&depth=2',

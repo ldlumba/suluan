@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { CiteSection } from '@/features/citations/CiteSection'
 import { apiDownload, apiFetch, ApiError } from '@/lib/api'
@@ -16,6 +16,7 @@ import { useAuth } from '@/features/auth/useAuth'
 interface Paper {
   id: string
   title: string
+  abstract?: string | null
   authors: string | null
   authorList: string[]
   publication: {
@@ -37,9 +38,30 @@ interface Paper {
 
 export function PaperPage() {
   const { id } = useParams<{ id: string }>()
+  return <PaperDetail key={id} />
+}
+
+function PaperDetail() {
+  const { id } = useParams<{ id: string }>()
   const { getIdToken, user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [readerUrl, setReaderUrl] = useState<string | null>(null)
+  const [readerError, setReaderError] = useState('')
+  const [readerLoading, setReaderLoading] = useState(false)
+  const readerGeneration = useRef(0)
+  useEffect(
+    () => () => {
+      readerGeneration.current += 1
+    },
+    [id],
+  )
+  useEffect(
+    () => () => {
+      if (readerUrl) URL.revokeObjectURL(readerUrl)
+    },
+    [readerUrl],
+  )
   const paper = useQuery({
     queryKey: ['paper', id, user?.uid ?? null],
     enabled: Boolean(id),
@@ -109,6 +131,32 @@ export function PaperPage() {
     }
   }
 
+  async function openReader() {
+    if (!id || readerLoading) return
+    setReaderError('')
+    setReaderLoading(true)
+    const generation = readerGeneration.current
+    try {
+      const file = await apiDownload(
+        `/api/records/${id}/download`,
+        await getIdToken(),
+      )
+      if (generation !== readerGeneration.current) return
+      if (file.blob.type.split(';')[0].toLowerCase() !== 'application/pdf') {
+        setReaderError(
+          'This file cannot be read here. Please download it instead.',
+        )
+        return
+      }
+      setReaderUrl(URL.createObjectURL(file.blob))
+    } catch {
+      if (generation === readerGeneration.current)
+        setReaderError('The paper could not be opened. Please try again.')
+    } finally {
+      if (generation === readerGeneration.current) setReaderLoading(false)
+    }
+  }
+
   if (paper.isPending) return <p role="status">Loading paper…</p>
   if (paper.isError) {
     const notFound =
@@ -163,6 +211,14 @@ export function PaperPage() {
       </div>
       <div className="grid gap-10 py-10 md:grid-cols-[1fr_16rem]">
         <div>
+          <section className="mb-8" aria-labelledby="abstract-heading">
+            <h2 id="abstract-heading" className="text-xl font-semibold">
+              Abstract
+            </h2>
+            <p className="mt-3 whitespace-pre-wrap leading-7">
+              {paper.data.abstract || 'Abstract not available.'}
+            </p>
+          </section>
           <CiteSection
             record={{
               title: paper.data.title,
@@ -239,6 +295,19 @@ export function PaperPage() {
             </p>
           )}
           <Button
+            variant="outline"
+            className="h-12 w-full justify-center gap-2 text-base"
+            disabled={readerLoading}
+            onClick={() => void openReader()}
+          >
+            {readerLoading ? 'Opening paper…' : 'Read paper'}
+          </Button>
+          {readerError && (
+            <p role="alert" className="text-sm text-[var(--impact-red)]">
+              {readerError}
+            </p>
+          )}
+          <Button
             className="h-12 w-full justify-center gap-2 bg-[var(--primary)] text-base hover:bg-[var(--accent)]"
             onClick={() => void download()}
           >
@@ -256,6 +325,26 @@ export function PaperPage() {
           </Link>
         </aside>
       </div>
+      {readerUrl && (
+        <section className="border-t py-8" aria-labelledby="reader-heading">
+          <div className="flex items-center justify-between gap-4">
+            <h2 id="reader-heading" className="text-2xl font-semibold">
+              Read paper
+            </h2>
+            <Button variant="outline" onClick={() => setReaderUrl(null)}>
+              Close reader
+            </Button>
+          </div>
+          <p className="my-3 text-sm text-muted-foreground">
+            If the document does not display, download it to read it.
+          </p>
+          <iframe
+            title="Paper PDF viewer"
+            src={readerUrl}
+            className="h-[75vh] w-full border"
+          />
+        </section>
+      )}
     </article>
   )
 }

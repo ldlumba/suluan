@@ -3,16 +3,70 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
-import { apiFetch } from '@/lib/api'
+import { apiDownload, apiFetch } from '@/lib/api'
 import { PaperPage } from './PaperPage'
 
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: vi.fn() }))
 vi.mock('@/lib/api', async (original) => ({
   ...(await original<object>()),
   apiFetch: vi.fn(),
+  apiDownload: vi.fn(),
 }))
 
 describe('paper page', () => {
+  it('opens authorized PDF bytes in the reader and releases them on close', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      getIdToken: async () => null,
+    } as never)
+    vi.mocked(apiFetch).mockResolvedValue({
+      id: 'paper',
+      title: 'Paper',
+      authors: null,
+      authorList: [],
+      publication: null,
+      schoolName: null,
+      courseName: null,
+      year: null,
+      visibility: 'PUBLIC',
+      fullTextStatus: 'READY',
+      keywords: [],
+    })
+    vi.mocked(apiDownload).mockResolvedValue({
+      blob: new Blob(['pdf'], { type: 'application/pdf' }),
+      fileName: 'paper.pdf',
+    })
+    const create = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:paper')
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <MemoryRouter initialEntries={['/records/paper']}>
+          <Routes>
+            <Route path="/records/:id" element={<PaperPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Read paper' }))
+    expect(await screen.findByTitle('Paper PDF viewer')).toHaveAttribute(
+      'src',
+      'blob:paper',
+    )
+    expect(apiDownload).toHaveBeenCalledWith(
+      '/api/records/paper/download',
+      null,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Close reader' }))
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith('blob:paper'))
+    create.mockRestore()
+    revoke.mockRestore()
+  })
   it('refreshes the count after a signed-in user copies a citation', async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: { uid: 'u1' },

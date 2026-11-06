@@ -1,0 +1,1 @@
+ALTER TABLE "research_records" ADD COLUMN "abstract_approved_at" timestamp with time zone;

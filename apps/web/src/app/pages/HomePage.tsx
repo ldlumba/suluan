@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowUpRight, Search } from 'lucide-react'
 import { Link } from 'react-router'
+import { useState } from 'react'
 import { useAuth } from '@/features/auth/useAuth'
 import { apiFetch } from '@/lib/api'
 
@@ -10,16 +11,39 @@ interface RecentPaper {
   authors: string | null
   schoolName: string | null
   courseName: string | null
+  abstractPreview?: string | null
 }
 
 interface RecentPapersResponse {
   items: RecentPaper[]
+}
+interface School {
+  id: string
+  name: string
+  courses: { id: string; name: string }[]
 }
 
 const RECENT_PAPER_COUNT = 6
 
 export function HomePage() {
   const { profile, loading, getIdToken } = useAuth()
+  const [programId, setProgramId] = useState('')
+  const catalog = useQuery({
+    queryKey: ['schools'],
+    enabled: !loading,
+    retry: false,
+    queryFn: async () => apiFetch<School[]>('/api/schools', await getIdToken()),
+  })
+  const programPapers = useQuery({
+    queryKey: ['home-program-papers', profile?.id, profile?.role, programId],
+    enabled: !loading && Boolean(programId),
+    retry: false,
+    queryFn: async () =>
+      apiFetch<RecentPapersResponse>(
+        `/api/search/records?q=&page=1&sort=newest&courseId=${encodeURIComponent(programId)}`,
+        await getIdToken(),
+      ),
+  })
   const recentPapers = useQuery({
     queryKey: ['home-recent-papers', profile?.id, profile?.role],
     enabled: !loading,
@@ -74,6 +98,103 @@ export function HomePage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section
+        className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8"
+        aria-labelledby="browse-program-heading"
+      >
+        <h2
+          id="browse-program-heading"
+          className="display-heading text-4xl font-semibold"
+        >
+          Browse by program
+        </h2>
+        <p className="mt-4 text-[var(--ink-muted)]">
+          Choose a program to explore its most recently accepted papers.
+        </p>
+        <label
+          htmlFor="home-program"
+          className="mt-6 block text-sm font-semibold"
+        >
+          Program
+        </label>
+        <select
+          id="home-program"
+          value={programId}
+          onChange={(e) => setProgramId(e.target.value)}
+          className="mt-2 w-full max-w-xl rounded-md border border-input bg-white p-3"
+        >
+          <option value="">Select a program</option>
+          {Array.isArray(catalog.data) &&
+            catalog.data.map((school) => (
+              <optgroup key={school.id} label={school.name}>
+                {school.courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+        </select>
+        {catalog.isError && (
+          <p role="status" className="mt-4">
+            Programs are temporarily unavailable.
+          </p>
+        )}
+        {programId && programPapers.isLoading && (
+          <p role="status" className="mt-4">
+            Loading papers…
+          </p>
+        )}
+        {programId && programPapers.isError && (
+          <p role="status" className="mt-4">
+            Papers are temporarily unavailable.
+          </p>
+        )}
+        {programId && programPapers.data?.items.length === 0 && (
+          <p className="mt-4">No papers are available for this program.</p>
+        )}
+        {programId &&
+          programPapers.data &&
+          programPapers.data.items.length > 0 && (
+            <>
+              <ul
+                aria-label="Recent papers in the selected program"
+                tabIndex={0}
+                className="mt-6 flex gap-4 overflow-x-auto pb-4"
+              >
+                {programPapers.data.items.map((paper) => (
+                  <li
+                    key={paper.id}
+                    className="w-72 shrink-0 border-t-2 border-[var(--primary)] bg-white p-5"
+                  >
+                    <Link
+                      className="font-semibold underline"
+                      to={`/records/${encodeURIComponent(paper.id)}`}
+                    >
+                      {paper.title}
+                    </Link>
+                    {paper.abstractPreview && (
+                      <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">
+                        <strong>Abstract: </strong>
+                        {paper.abstractPreview}
+                      </p>
+                    )}
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {paper.authors || 'Authors not listed'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                className="inline-block font-semibold underline"
+                to={`/search?sort=newest&courseId=${encodeURIComponent(programId)}`}
+              >
+                See all papers in this program
+              </Link>
+            </>
+          )}
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">

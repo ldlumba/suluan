@@ -19,7 +19,6 @@ import yaml
 MAX_BYTES = 30 * 1024 * 1024
 SUPPORTED_SUFFIXES = {
     ".pdf": "application/pdf",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 MANIFEST_KEYS = {"title", "authors", "school", "course"}
 USER_AGENT = "Mozilla/5.0 (compatible; SULUAN-Legacy-Importer/1.0)"
@@ -285,7 +284,7 @@ def build_plan(root, api_base, catalog, strict=False):
     documents = [
         path
         for path in root.rglob("*")
-        if path.is_file() and path.suffix.casefold() in {*SUPPORTED_SUFFIXES, ".doc"}
+        if path.is_file() and path.suffix.casefold() in {*SUPPORTED_SUFFIXES, ".doc", ".docx"}
     ]
     manifest_map = {}
     document_map = {}
@@ -335,9 +334,9 @@ def build_plan(root, api_base, catalog, strict=False):
             errors.append(f"{label}: expected one document, found {names}")
             continue
         document_path = document_paths[0]
-        if document_path.suffix.casefold() == ".doc":
+        if document_path.suffix.casefold() in {".doc", ".docx"}:
             errors.append(
-                f"{document_path.relative_to(root)}: legacy .doc is unsupported; convert it to .docx"
+                f"{document_path.relative_to(root)}: legacy {document_path.suffix.casefold()} is unsupported; convert it to PDF"
             )
             continue
         try:

@@ -93,12 +93,14 @@ course: BS Tourism Management
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.write_pair(root, stem="legacy", suffix=".doc")
+            self.write_pair(root, stem="word", suffix=".docx")
             (root / "orphan.pdf").write_bytes(b"paper")
             items, errors, _, skipped = build_plan(
                 root, "https://worker.example", catalog()
             )
             self.assertEqual(items, [])
             self.assertTrue(any("legacy .doc is unsupported" in error for error in errors))
+            self.assertTrue(any("legacy .docx is unsupported" in error for error in errors))
             self.assertEqual(skipped[0]["document"], "orphan.pdf")
             self.assertEqual(skipped[0]["reason"], "no manifest (out of import scope)")
 

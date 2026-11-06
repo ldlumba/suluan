@@ -162,6 +162,13 @@
       "when": 1793802887565,
       "tag": "0022_orange_toad_men",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793926528770,
+      "tag": "0023_bored_william_stryker",
+      "breakpoints": true
     }
   ]
 }

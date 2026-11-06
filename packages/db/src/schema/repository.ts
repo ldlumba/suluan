@@ -36,6 +36,8 @@ export const researchRecords = pgTable('research_records', {
     .references(() => submissions.id),
   title: text('title').notNull(),
   abstract: text('abstract'),
+  /** Null until a manager explicitly approves the abstract. */
+  abstractApprovedAt: timestamp('abstract_approved_at', { withTimezone: true }),
   /** Calendar year when REO accepted the paper into the repository. */
   year: integer('year').notNull(),
   /**

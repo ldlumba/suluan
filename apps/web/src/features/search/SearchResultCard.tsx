@@ -11,6 +11,7 @@ export interface SearchItem {
   year: string | null
   keywords?: string[] | null
   snippet: string | null
+  abstractPreview?: string | null
   fullTextStatus: 'READY' | 'PENDING' | 'FAILED'
   visibility: 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
   matchType?: 'semantic' | 'exploratory' | 'keyword'
@@ -99,6 +100,12 @@ export function SearchResultCard({
         </>
       )}
       {/* Extracted text is untrusted: React text rendering only, never HTML. */}
+      {item.abstractPreview && (
+        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-[var(--ink-muted)]">
+          <strong>Abstract preview: </strong>
+          {item.abstractPreview}
+        </p>
+      )}
       {item.fullTextStatus === 'READY' && item.snippet && (
         <p className="whitespace-pre-wrap break-words border-l-2 border-[var(--border)] pl-4 text-sm leading-6 text-[var(--ink-muted)]">
           {item.snippet}

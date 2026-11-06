@@ -218,6 +218,19 @@ try {
     where table_schema = 'public' and table_name = 'research_records'
       and column_name in ('withdrawn_at', 'lifecycle_version')
   `)
+  const { rows: abstractColumns } = await client.query(`
+    select data_type, is_nullable from information_schema.columns
+    where table_schema = 'public' and table_name = 'research_records'
+      and column_name = 'abstract_approved_at'
+  `)
+  if (
+    abstractColumns[0]?.data_type !== 'timestamp with time zone' ||
+    abstractColumns[0]?.is_nullable !== 'YES'
+  ) {
+    failures.push('research_records.abstract_approved_at')
+  } else {
+    console.log('ok   abstract approval column')
+  }
   if (
     lifecycleColumns.some(
       (c) =>

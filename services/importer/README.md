@@ -15,14 +15,14 @@ papers/
   tourism-awareness.md
   tourism-awareness.pdf
   nursing-outcomes.md
-  nursing-outcomes.docx
+  nursing-outcomes.pdf
 ```
 
 Copy `services/importer/manifest-template.md` as the starting point for each
 paper, then rename it to match the document stem.
 
-PDF and DOCX are accepted up to 30 MiB. Legacy `.doc` files are reported and
-must be converted to DOCX before import. Subfolders are supported. A manifest is
+PDF files are accepted up to 30 MiB. `.doc` and `.docx` files are reported and
+must be converted to PDF before import. Subfolders are supported. A manifest is
 the opt-in marker: documents without one are listed as skipped and do not block
 the run. A filename containing `[NO TITLE]` (case-insensitive) is always skipped,
 even if a manifest exists. An unmatched Markdown file is a warning and is ignored.

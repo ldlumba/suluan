@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { buildDownloadFileName } from '../src/uploads'
+import { buildDownloadFileName, validateUploadFile } from '../src/uploads'
+
+describe('new upload policy', () => {
+  it('accepts PDF and rejects DOCX even with an empty browser MIME type', () => {
+    expect(
+      validateUploadFile(
+        new File(['pdf'], 'paper.pdf', { type: 'application/pdf' }),
+      ),
+    ).toMatchObject({ mimeType: 'application/pdf' })
+    expect(
+      validateUploadFile(
+        new File(['docx'], 'paper.docx', {
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        }),
+      ),
+    ).toBe('unsupported_file_type')
+    expect(validateUploadFile(new File(['docx'], 'paper.docx'))).toBe(
+      'unsupported_file_type',
+    )
+  })
+})
 
 /**
  * Manager-download naming: the study title becomes the file name, the

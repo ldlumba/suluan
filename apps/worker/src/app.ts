@@ -419,6 +419,7 @@ export function createApp(
       const authAttempted = Boolean(c.req.header('authorization'))
       const rows = await db.execute(sql`
       select r.id, r.title, r.year::text as year,
+        case when r.abstract_approved_at is not null then r.abstract else null end as abstract,
         coalesce(authors.names, s.authors) as authors,
         r.doi, r.venue, r.volume, r.issue, r.pages,
         r.pub_year::text as "pubYear",

@@ -1,19 +1,14 @@
 /**
- * Current v1 upload policy, recorded 2026-10-01 (Architecture v1 §12).
- * PDF/DOCX only, 30 MB maximum, private `suluan-dev` bucket, no automatic
+ * New uploads are PDF-only (owner decision 2026-11-06), 30 MB maximum; existing
+ * DOCX files remain downloadable. Private R2 storage; no automatic
  * rejected-file deletion. These are implementation defaults, not permanent
  * policy.
  */
 export const UPLOAD_POLICY = {
   maxSizeBytes: 30 * 1024 * 1024,
-  allowedMimeTypes: [
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ],
+  allowedMimeTypes: ['application/pdf'],
   extensionForMime: {
     'application/pdf': 'pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-      'docx',
   } as Record<string, string>,
   /** Server-owned key prefix. Client-supplied keys are never trusted. */
   keyPrefix: 'intake/',
@@ -42,7 +37,7 @@ export function extensionMatchesMime(
 
 /**
  * Infer a MIME type from the file extension when the browser sends an
- * empty content type (some OS/browser combos do for DOCX). Returns null
+ * empty content type. Returns null
  * when the extension is not one we accept.
  */
 export function inferMimeFromFileName(fileName: string): string | null {
