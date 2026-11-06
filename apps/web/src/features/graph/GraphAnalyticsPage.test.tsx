@@ -74,8 +74,8 @@ describe('graph aggregate analytics', () => {
       screen.getByRole('link', { name: 'Machine Learning' }),
     ).toHaveAttribute('href', '/search?keyword=Machine%20Learning')
     expect(
-      screen.getByText(/Machine Learning \+ Agriculture/),
-    ).toHaveTextContent('2 papers')
+      screen.queryByText(/Machine Learning \+ Agriculture/),
+    ).not.toBeInTheDocument()
     expect(screen.getByTestId('aggregate-chart')).toBeInTheDocument()
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
