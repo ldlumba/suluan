@@ -71,7 +71,7 @@ export function NewSubmissionPage({ direct = false }: { direct?: boolean }) {
   const [programHint, setProgramHint] = useState(false)
   const [visibility, setVisibility] = useState<
     'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
-  >('RESTRICTED')
+  >('PUBLIC')
   const [embargo, setEmbargo] = useState('')
   const [confirmDirect, setConfirmDirect] = useState(false)
   const programHintRef = useRef<HTMLDivElement>(null)

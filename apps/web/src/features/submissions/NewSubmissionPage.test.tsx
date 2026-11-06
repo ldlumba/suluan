@@ -59,7 +59,7 @@ function renderPage(direct = false) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('NewSubmissionPage catalog UX', () => {
-  it('requires confirmation before a direct upload and defaults to managers-only access', async () => {
+  it('requires confirmation before a direct upload and defaults to public access', async () => {
     renderPage(true)
     fireEvent.click(await screen.findByRole('button', { name: 'BS Nursing' }))
     fireEvent.change(screen.getByLabelText('Title'), {
@@ -70,7 +70,7 @@ describe('NewSubmissionPage catalog UX', () => {
         files: [new File(['paper'], 'paper.pdf', { type: 'application/pdf' })],
       },
     })
-    expect(screen.getByLabelText('Paper access')).toHaveValue('RESTRICTED')
+    expect(screen.getByLabelText('Paper access')).toHaveValue('PUBLIC')
     fireEvent.click(screen.getByRole('button', { name: 'Upload and accept' }))
     expect(
       await screen.findByRole('dialog', { name: 'Accept this paper?' }),

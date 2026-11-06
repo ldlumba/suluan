@@ -23,6 +23,7 @@ describe('AdminDashboardPage', () => {
     } as never)
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
       if (path === '/api/admin/users') return []
+      if (path === '/api/review/queue') return []
       if (path === '/api/admin/activity') {
         return {
           paperViews: 0,
@@ -50,6 +51,51 @@ describe('AdminDashboardPage', () => {
         dispatcherConfigured: true,
       }
     })
+  })
+
+  it('shows accessible attention indicators for pending review and preparation', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/review/queue') return [{ id: 'pending' }]
+      if (path === '/api/admin/users') return []
+      if (path === '/api/admin/activity')
+        return {
+          paperViews: 0,
+          citationCopies: 0,
+          downloadStarts: 0,
+          viewers: 0,
+          viewedPapers: 0,
+        }
+      return {
+        pipeline: {
+          queuedExtraction: 1,
+          processingExtraction: 0,
+          failedExtraction: 0,
+          unindexedRecords: 0,
+          missingEmbeddingRecords: 0,
+          missingEmbeddingChunks: 0,
+        },
+        embeddingQuota: {
+          requestsUsed: 0,
+          requestsLimit: 20,
+          inputsUsed: 0,
+          inputsLimit: 2000,
+        },
+        dispatcherConfigured: true,
+      }
+    })
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <AdminDashboardPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(
+      await screen.findByText('Submissions awaiting review'),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByText('Papers awaiting preparation'),
+    ).toBeInTheDocument()
   })
 
   it('is the central entry point for privileged workspaces', () => {

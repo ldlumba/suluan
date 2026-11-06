@@ -407,28 +407,27 @@ export function GraphPage() {
               {papers
                 .filter((paper) => !paper.center)
                 .map((paper) => (
-                  <li key={paper.id} className="py-3 first:pt-0">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      <Link
-                        className="font-medium text-[var(--primary)] underline-offset-4 hover:underline"
-                        to={`/graph?record=${encodeURIComponent(paper.recordId ?? '')}`}
-                      >
-                        {paper.label}
-                      </Link>
-                      {paper.recordId && (
-                        <Link
-                          className="underline"
-                          to={`/records/${encodeURIComponent(paper.recordId)}`}
-                        >
-                          Open paper
-                        </Link>
-                      )}
-                    </div>
+                  <li key={paper.id} className="py-5 first:pt-0">
+                    <Link
+                      className="font-medium text-[var(--primary)] underline-offset-4 hover:underline"
+                      to={`/graph?record=${encodeURIComponent(paper.recordId ?? '')}`}
+                    >
+                      {paper.label}
+                    </Link>
                     {sharedDetails(paper).map((detail) => (
                       <p key={detail} className="mt-1 text-muted-foreground">
                         {detail}
                       </p>
                     ))}
+                    {paper.recordId && (
+                      <Link
+                        className="mt-3 inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--primary)] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        to={`/records/${encodeURIComponent(paper.recordId)}`}
+                      >
+                        Open paper{' '}
+                        <ArrowUpRight className="size-4" aria-hidden="true" />
+                      </Link>
+                    )}
                   </li>
                 ))}
             </ul>

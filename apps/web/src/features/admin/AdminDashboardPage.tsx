@@ -70,11 +70,13 @@ export function AdminTool({
   icon,
   title,
   description,
+  attention,
 }: {
   to: string
   icon: ReactNode
   title: string
   description: string
+  attention?: string
 }) {
   return (
     <Link
@@ -88,7 +90,18 @@ export function AdminTool({
           aria-hidden="true"
         />
       </div>
-      <h3 className="mt-4 font-semibold">{title}</h3>
+      <h3 className="mt-4 flex items-center gap-2 font-semibold">
+        {title}
+        {attention && (
+          <>
+            <span
+              aria-hidden="true"
+              className="size-2.5 shrink-0 rounded-full bg-red-600"
+            />
+            <span className="sr-only">{attention}</span>
+          </>
+        )}
+      </h3>
       <p className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
         {description}
       </p>
@@ -121,6 +134,13 @@ export function AdminDashboardPage() {
     retry: false,
     queryFn: async () =>
       apiFetch<ActivitySummary>('/api/admin/activity', await getIdToken()),
+  })
+  const reviewQueue = useQuery({
+    queryKey: ['review-queue'],
+    enabled: profile?.role === 'ADMIN',
+    retry: false,
+    queryFn: async () =>
+      apiFetch<unknown[]>('/api/review/queue', await getIdToken()),
   })
 
   if (loading) return <p role="status">Checking access…</p>
@@ -183,12 +203,26 @@ export function AdminDashboardPage() {
             to="/review"
             icon={<BookOpenCheck aria-hidden="true" />}
             title="Review submissions"
+            attention={
+              reviewQueue.data?.length
+                ? 'Submissions awaiting review'
+                : undefined
+            }
             description="Read submitted papers and accept or reject them with remarks."
           />
           <AdminTool
             to="/operations"
             icon={<CloudCog aria-hidden="true" />}
             title="Prepare papers for search"
+            attention={
+              pipeline &&
+              (pipeline.queuedExtraction ||
+                pipeline.failedExtraction ||
+                pipeline.unindexedRecords ||
+                pipeline.missingEmbeddingChunks)
+                ? 'Papers awaiting preparation'
+                : undefined
+            }
             description="Check progress and start preparing accepted papers for keyword and semantic search."
           />
           <AdminTool
@@ -216,6 +250,11 @@ export function AdminDashboardPage() {
             description="Show or hide programs in the form for new submissions."
           />
         </div>
+        {reviewQueue.isError && (
+          <p role="status" className="text-sm text-[var(--ink-muted)]">
+            Submission review status is unavailable.
+          </p>
+        )}
       </section>
 
       <NotificationRefresh />

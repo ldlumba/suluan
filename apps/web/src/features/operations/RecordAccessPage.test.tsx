@@ -118,6 +118,11 @@ describe('repository access review', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText('Accepted paper')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Paper title'), {
+      target: { value: 'unfinished draft' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(screen.getByLabelText('Paper title')).toHaveValue('')
     expect(
       screen.queryByRole('button', { name: /abstract/i }),
     ).not.toBeInTheDocument()
@@ -133,7 +138,7 @@ describe('repository access review', () => {
     )
     expect(
       screen.getByRole('button', { name: 'Change access' }).parentElement,
-    ).toHaveClass('space-y-4')
+    ).toHaveClass('gap-2')
     fireEvent.click(screen.getByRole('button', { name: 'Edit keywords' }))
     expect(screen.getByText('Existing')).toBeInTheDocument()
     fireEvent.click(

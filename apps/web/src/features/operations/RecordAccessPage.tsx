@@ -74,6 +74,7 @@ export function RecordAccessPage() {
     ? sortValue
     : 'title'
   const recordState = filters.state === 'withdrawn' ? 'withdrawn' : 'active'
+  const [resetKey, setResetKey] = useState(0)
   function updateFilters(changes: Record<string, string>) {
     void navigate(location.pathname + location.search + location.hash, {
       replace: true,
@@ -265,7 +266,7 @@ export function RecordAccessPage() {
           <Label htmlFor="access-search">Paper title</Label>
           <Input
             id="access-search"
-            key={q}
+            key={`${q}:${resetKey}`}
             name="q"
             defaultValue={q}
             maxLength={200}
@@ -314,7 +315,26 @@ export function RecordAccessPage() {
               ))}
           </select>
         </div>
-        <Button type="submit">Search</Button>
+        <div className="flex flex-wrap items-end gap-3 self-end lg:col-span-3">
+          <Button type="submit">Search</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setResetKey((value) => value + 1)
+              updateFilters({
+                q: '',
+                schoolId: '',
+                courseId: '',
+                state: '',
+                sort: '',
+                page: '',
+              })
+            }}
+          >
+            Clear filters
+          </Button>
+        </div>
       </form>
       {catalog.isError && (
         <p role="alert">School and program filters are unavailable.</p>
@@ -370,44 +390,46 @@ export function RecordAccessPage() {
                   )}
                 </p>
               </div>
-              {!paper.withdrawnAt && (
+              <div className="flex flex-wrap gap-2">
+                {!paper.withdrawnAt && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditing(paper)
+                      setVisibility(paper.visibility)
+                      setEmbargo(paper.embargoUntil ?? '')
+                      change.reset()
+                    }}
+                  >
+                    Change access
+                  </Button>
+                )}
+                {!paper.withdrawnAt && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setKeywordPaper(paper)
+                      setKeywords(paper.keywords ?? [])
+                      setConfirmKeywords(false)
+                      changeKeywords.reset()
+                    }}
+                  >
+                    Edit keywords
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setEditing(paper)
-                    setVisibility(paper.visibility)
-                    setEmbargo(paper.embargoUntil ?? '')
-                    change.reset()
+                    setLifecyclePaper(paper)
+                    setReason('')
+                    setReinstateVisibility('')
+                    setEmbargo('')
+                    lifecycle.reset()
                   }}
                 >
-                  Change access
+                  {paper.withdrawnAt ? 'Reinstate paper' : 'Withdraw paper'}
                 </Button>
-              )}
-              {!paper.withdrawnAt && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setKeywordPaper(paper)
-                    setKeywords(paper.keywords ?? [])
-                    setConfirmKeywords(false)
-                    changeKeywords.reset()
-                  }}
-                >
-                  Edit keywords
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setLifecyclePaper(paper)
-                  setReason('')
-                  setReinstateVisibility('')
-                  setEmbargo('')
-                  lifecycle.reset()
-                }}
-              >
-                {paper.withdrawnAt ? 'Reinstate paper' : 'Withdraw paper'}
-              </Button>
+              </div>
             </div>
           </article>
         ))}

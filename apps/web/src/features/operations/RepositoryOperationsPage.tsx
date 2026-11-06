@@ -137,8 +137,9 @@ export function RepositoryOperationsPage() {
             </h1>
           </div>
           <p className="mt-3 max-w-3xl leading-7 text-[var(--ink-muted)]">
-            Advance accepted papers without waiting for the three-hour fallback.
-            Each action is bounded, audited, and safe to refresh after launch.
+            Prepare accepted papers now instead of waiting for scheduled
+            processing. Each action is bounded, audited, and safe to refresh
+            after launch.
           </p>
         </div>
         <Button

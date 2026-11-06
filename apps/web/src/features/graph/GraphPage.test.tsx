@@ -78,6 +78,17 @@ describe('knowledge graph discovery', () => {
       '/graph?record=22222222-2222-4222-8222-222222222222',
     )
     expect(screen.getByText('Shared keyword: Health')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open paper' })).toHaveAttribute(
+      'href',
+      '/records/22222222-2222-4222-8222-222222222222',
+    )
+    expect(
+      screen
+        .getByRole('link', { name: 'Related paper' })
+        .compareDocumentPosition(
+          screen.getByRole('link', { name: 'Open paper' }),
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(
       screen.getByLabelText('Interactive research relationship graph'),
     ).toBeInTheDocument()

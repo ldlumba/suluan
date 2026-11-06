@@ -195,31 +195,6 @@ export function GraphAnalyticsPage() {
                 )}
               </>
             )}
-
-            {groupBy === 'keyword' && counts.data.pairs.length > 0 && (
-              <section aria-labelledby="keyword-pairs-heading">
-                <h2 id="keyword-pairs-heading" className="font-semibold">
-                  Top co-occurring author keywords
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Each count is the number of visible papers tagged with both
-                  terms; it is not semantic similarity.
-                </p>
-                <ol className="mt-3 space-y-2 text-sm">
-                  {counts.data.pairs.map((pair) => (
-                    <li key={`${pair.firstId}:${pair.secondId}`}>
-                      {pair.firstLabel} + {pair.secondLabel} — {pair.count}{' '}
-                      {pair.count === 1 ? 'paper' : 'papers'}
-                    </li>
-                  ))}
-                </ol>
-                {counts.data.pairsHaveMore && (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Showing the top {counts.data.limit} keyword pairs.
-                  </p>
-                )}
-              </section>
-            )}
           </>
         )}
       </div>
