@@ -205,6 +205,7 @@ export function SearchPage() {
   const courseId = params.get('courseId') ?? ''
   const yearFrom = params.get('yearFrom') ?? ''
   const yearTo = params.get('yearTo') ?? ''
+  const [filterReset, setFilterReset] = useState(0)
   const keepKeyword: Record<string, string> = {
     ...(keywordFilter ? { keyword: keywordFilter } : {}),
     ...(mode === 'title' ? { mode: 'title', scope: 'title' } : {}),
@@ -241,6 +242,20 @@ export function SearchPage() {
     if (value) next.set(name, value)
     else next.delete(name)
     if (name === 'schoolId') next.delete('courseId')
+    setParams(next)
+  }
+  function clearFilters() {
+    const next = new URLSearchParams(params)
+    for (const name of [
+      'schoolId',
+      'courseId',
+      'yearFrom',
+      'yearTo',
+      'keyword',
+    ])
+      next.delete(name)
+    next.set('page', '1')
+    setFilterReset((value) => value + 1)
     setParams(next)
   }
   const manager =
@@ -610,7 +625,6 @@ export function SearchPage() {
           </div>
           {mode !== 'semantic' && (
             <div className="space-y-4 border-t border-[var(--border)] pt-5">
-              <p className="text-sm font-semibold">Filter results</p>
               <div className="flex flex-wrap items-end gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="search-sort">Sort papers</Label>
@@ -709,23 +723,32 @@ export function SearchPage() {
                   </p>
                 )}
                 <YearFilter
-                  key={`from:${yearFrom}`}
+                  key={`from:${yearFrom}:${filterReset}`}
                   id="search-year-from"
                   label="Since year"
                   initial={yearFrom}
                   onApply={(value) => updateFilter('yearFrom', value)}
                 />
                 <YearFilter
-                  key={`to:${yearTo}`}
+                  key={`to:${yearTo}:${filterReset}`}
                   id="search-year-to"
                   label="Through year"
                   initial={yearTo}
                   onApply={(value) => updateFilter('yearTo', value)}
                 />
                 <KeywordFilter
+                  key={filterReset}
                   initial={keywordFilter}
                   onApply={(next) => updateFilter('keyword', next)}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="ml-auto"
+                  onClick={clearFilters}
+                >
+                  Clear filters
+                </Button>
               </div>
             </div>
           )}

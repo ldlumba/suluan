@@ -334,12 +334,11 @@ function PaperDetail() {
           if (!open) closeReader()
         }}
       >
-        <DialogContent className="flex h-[90dvh] max-h-[90dvh] flex-col sm:max-w-5xl">
+        <DialogContent className="flex h-[96dvh] max-h-[96dvh] w-[96vw] max-w-none flex-col sm:max-w-[96vw]">
           <DialogHeader className="pr-10">
             <DialogTitle>Read paper</DialogTitle>
-            <DialogDescription>
-              {paper.data.title}. If the document does not display, download it
-              to read it.
+            <DialogDescription className="sr-only">
+              {paper.data.title}
             </DialogDescription>
           </DialogHeader>
           {readerLoading && <p role="status">Opening paper…</p>}
@@ -355,7 +354,10 @@ function PaperDetail() {
               className="min-h-0 w-full flex-1 border"
             />
           )}
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              If the document does not display, download it to read it.
+            </p>
             <Button variant="outline" onClick={closeReader}>
               Close reader
             </Button>

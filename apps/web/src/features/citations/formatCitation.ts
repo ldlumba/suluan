@@ -284,14 +284,49 @@ export function formatMLA(
   return [author, title, tail ? `${tail}.` : ''].filter(Boolean).join(' ')
 }
 
-export const CITATION_FORMATS = ['apa', 'mla', 'bibtex', 'ris'] as const
+/** IEEE-style reference using only supplied metadata. */
+export function formatIEEE(
+  record: CitationRecord,
+  publication?: CitationPublication | null,
+): string {
+  const authors = record.authors
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => {
+      const parsed = parseAuthorName(name)
+      if (parsed.verbatim) return name
+      return [parsed.initials, parsed.surname, parsed.suffix]
+        .filter(Boolean)
+        .join(' ')
+    })
+  const author =
+    authors.length > 1
+      ? `${authors.slice(0, -1).join(', ')} and ${authors.at(-1)}`
+      : (authors[0] ?? '')
+  const details = publication
+    ? [
+        publication.venue?.trim(),
+        publication.volume?.trim() && `vol. ${publication.volume.trim()}`,
+        publication.issue?.trim() && `no. ${publication.issue.trim()}`,
+        publication.pages?.trim() && `pp. ${publication.pages.trim()}`,
+        publication.year?.trim(),
+        `doi: ${publication.doi.trim()}`,
+      ]
+    : [CITATION_PUBLISHER, record.year?.trim()]
+  return (
+    [author, `“${cleanTitle(record.title)}”`, ...details]
+      .filter(Boolean)
+      .join(', ') + '.'
+  )
+}
+
+export const CITATION_FORMATS = ['apa', 'mla', 'ieee'] as const
 export type CitationFormat = (typeof CITATION_FORMATS)[number]
 
 export const CITATION_FILENAMES: Record<CitationFormat, string> = {
   apa: 'citation.txt',
   mla: 'citation.txt',
-  bibtex: 'citation.bib',
-  ris: 'citation.ris',
+  ieee: 'citation.txt',
 }
 
 export function formatCitation(
@@ -303,10 +338,8 @@ export function formatCitation(
     switch (format) {
       case 'mla':
         return formatMLA(record, publication)
-      case 'bibtex':
-        return formatPublishedBibTeX(record, publication)
-      case 'ris':
-        return formatPublishedRIS(record, publication)
+      case 'ieee':
+        return formatIEEE(record, publication)
       case 'apa':
       default:
         return formatPublishedAPA(record, publication)
@@ -315,10 +348,8 @@ export function formatCitation(
   switch (format) {
     case 'mla':
       return formatMLA(record)
-    case 'bibtex':
-      return formatBibTeX(record)
-    case 'ris':
-      return formatRIS(record)
+    case 'ieee':
+      return formatIEEE(record)
     case 'apa':
     default:
       return formatAPA(record)

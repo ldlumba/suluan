@@ -22,12 +22,14 @@ describe('cite section', () => {
     expect(screen.getByText(/Ronquillo, A. A. \(2026\)/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'MLA' }))
     expect(screen.getByText(/Ronquillo, Aldyne A\./)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'BibTeX' }))
+    fireEvent.click(screen.getByRole('button', { name: 'IEEE' }))
+    expect(screen.getByText(/A. A. Ronquillo, “AidTrack”/)).toBeInTheDocument()
     expect(
-      screen.getByText(/@misc\{ronquillo2026aidtrack,/),
-    ).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'RIS' }))
-    expect(screen.getByText(/TY - UNPB/)).toBeInTheDocument()
+      screen.queryByRole('button', { name: 'BibTeX' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'RIS' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByText(/No verified external publication/),
     ).not.toBeInTheDocument()
@@ -61,5 +63,11 @@ describe('cite section', () => {
     expect(screen.getByText('Published version')).toBeInTheDocument()
     expect(screen.getByText('Repository record')).toBeInTheDocument()
     expect(screen.getByText(/Test Journal, 8\(3\)/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'IEEE' }))
+    expect(
+      screen.getByText(
+        /Test Journal, vol. 8, no. 3, pp. 1-10, 2026, doi: 10.1\/x/,
+      ),
+    ).toBeInTheDocument()
   })
 })

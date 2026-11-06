@@ -107,6 +107,37 @@ describe('keyword search', () => {
       ),
     )
   })
+  it('clears selected filters and unfinished input while preserving query and sort', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path: string) =>
+      path === '/api/schools' ? [] : { items: [], page: 1, hasMore: false },
+    )
+    renderPage(
+      'USER',
+      '/search?q=mental&sort=title&keyword=safety&yearFrom=2025&yearTo=2026',
+    )
+    fireEvent.change(screen.getByLabelText('Since year'), {
+      target: { value: '20' },
+    })
+    fireEvent.change(
+      screen.getByLabelText('Filter by author keyword (exact match)'),
+      { target: { value: 'draft' } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(screen.getByLabelText('Since year')).toHaveValue(null)
+    expect(screen.getByLabelText('Through year')).toHaveValue(null)
+    expect(
+      screen.getByLabelText('Filter by author keyword (exact match)'),
+    ).toHaveValue('')
+    expect(
+      screen.getByLabelText('Keywords, study title, or author'),
+    ).toHaveValue('mental')
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/search/records?q=mental&page=1&sort=title',
+        'test-token',
+      ),
+    )
+  })
   it('suggests search terms and submits the selected term instead of opening a paper', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
       if (path.startsWith('/api/search/term-suggestions'))

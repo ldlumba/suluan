@@ -9,10 +9,8 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { ArrowUpRight, Search } from 'lucide-react'
-import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { buttonVariants } from '@/components/ui/button'
-import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 
@@ -143,7 +141,6 @@ function flowEdges(edges: GraphEdge[]): Edge[] {
 }
 
 export function GraphPage() {
-  const [view, setView] = useState<'list' | 'graph'>('list')
   const [params] = useSearchParams()
   const recordId = params.get('record') ?? ''
   const navigate = useNavigate()
@@ -341,22 +338,6 @@ export function GraphPage() {
               Exploring connections for <strong>{center.label}</strong>
             </p>
           )}
-          <div className="flex gap-2" aria-label="Relationship view">
-            <Button
-              variant={view === 'list' ? 'default' : 'outline'}
-              aria-pressed={view === 'list'}
-              onClick={() => setView('list')}
-            >
-              List view
-            </Button>
-            <Button
-              variant={view === 'graph' ? 'default' : 'outline'}
-              aria-pressed={view === 'graph'}
-              onClick={() => setView('graph')}
-            >
-              Graph view
-            </Button>
-          </div>
           <p className="text-sm text-muted-foreground">
             These connections are based on shared authors, keywords, or
             programs—not citations.
@@ -367,95 +348,91 @@ export function GraphPage() {
               paper to continue.
             </p>
           )}
-          {view === 'graph' && (
-            <>
-              <div className="flex flex-wrap gap-x-5 gap-y-2 border-b border-[var(--border)] pb-4 text-xs text-muted-foreground">
-                {(Object.keys(COLORS) as GraphNodeType[]).map((type) => (
-                  <span
-                    key={type}
-                    className="flex items-center gap-1.5 capitalize"
-                  >
-                    <span
-                      className="inline-block size-2 rounded-full"
-                      style={{ backgroundColor: COLORS[type] }}
-                    />
-                    {type === 'course' ? 'program' : type}
-                  </span>
-                ))}
-              </div>
-              <div
-                className="h-[36rem] overflow-hidden border border-[var(--border)] bg-white"
-                aria-label="Interactive research relationship graph"
-              >
-                <ReactFlow
-                  nodes={flowNodes(graph.data.nodes)}
-                  edges={flowEdges(graph.data.edges)}
-                  fitView
-                  minZoom={0.2}
-                  maxZoom={1.8}
-                  onNodeClick={(_, node) => {
-                    const item = node.data.graphNode as GraphNode
-                    if (item.type === 'paper' && item.recordId)
-                      navigate(
-                        `/graph?record=${encodeURIComponent(item.recordId)}`,
-                      )
-                    if (item.type === 'keyword' && item.normalizedName)
-                      navigate(
-                        `/search?keyword=${encodeURIComponent(item.normalizedName)}`,
-                      )
-                  }}
+          <>
+            <div className="flex flex-wrap gap-x-5 gap-y-2 border-b border-[var(--border)] pb-4 text-xs text-muted-foreground">
+              {(Object.keys(COLORS) as GraphNodeType[]).map((type) => (
+                <span
+                  key={type}
+                  className="flex items-center gap-1.5 capitalize"
                 >
-                  <Background />
-                  <Controls />
-                </ReactFlow>
-              </div>
-            </>
-          )}
-          {view === 'list' && (
-            <section
-              aria-labelledby="related-papers-heading"
-              className="grid gap-4 border-t border-[var(--border)] pt-6 md:grid-cols-[15rem_1fr]"
+                  <span
+                    className="inline-block size-2 rounded-full"
+                    style={{ backgroundColor: COLORS[type] }}
+                  />
+                  {type === 'course' ? 'program' : type}
+                </span>
+              ))}
+            </div>
+            <div
+              className="h-[36rem] overflow-hidden border border-[var(--border)] bg-white"
+              aria-label="Interactive research relationship graph"
             >
-              <h2
-                id="related-papers-heading"
-                className="display-heading text-xl font-semibold"
+              <ReactFlow
+                nodes={flowNodes(graph.data.nodes)}
+                edges={flowEdges(graph.data.edges)}
+                fitView
+                minZoom={0.2}
+                maxZoom={1.8}
+                onNodeClick={(_, node) => {
+                  const item = node.data.graphNode as GraphNode
+                  if (item.type === 'paper' && item.recordId)
+                    navigate(
+                      `/graph?record=${encodeURIComponent(item.recordId)}`,
+                    )
+                  if (item.type === 'keyword' && item.normalizedName)
+                    navigate(
+                      `/search?keyword=${encodeURIComponent(item.normalizedName)}`,
+                    )
+                }}
               >
-                Related papers
-              </h2>
-              <ul className="divide-y divide-[var(--border)] text-sm">
-                {papers.filter((paper) => !paper.center).length === 0 && (
-                  <li>No related papers found.</li>
-                )}
-                {papers
-                  .filter((paper) => !paper.center)
-                  .map((paper) => (
-                    <li key={paper.id} className="py-3 first:pt-0">
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <Background />
+                <Controls />
+              </ReactFlow>
+            </div>
+          </>
+          <section
+            aria-labelledby="related-papers-heading"
+            className="grid gap-4 border-t border-[var(--border)] pt-6 md:grid-cols-[15rem_1fr]"
+          >
+            <h2
+              id="related-papers-heading"
+              className="display-heading text-xl font-semibold"
+            >
+              Related papers
+            </h2>
+            <ul className="divide-y divide-[var(--border)] text-sm">
+              {papers.filter((paper) => !paper.center).length === 0 && (
+                <li>No related papers found.</li>
+              )}
+              {papers
+                .filter((paper) => !paper.center)
+                .map((paper) => (
+                  <li key={paper.id} className="py-3 first:pt-0">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <Link
+                        className="font-medium text-[var(--primary)] underline-offset-4 hover:underline"
+                        to={`/graph?record=${encodeURIComponent(paper.recordId ?? '')}`}
+                      >
+                        {paper.label}
+                      </Link>
+                      {paper.recordId && (
                         <Link
-                          className="font-medium text-[var(--primary)] underline-offset-4 hover:underline"
-                          to={`/graph?record=${encodeURIComponent(paper.recordId ?? '')}`}
+                          className="underline"
+                          to={`/records/${encodeURIComponent(paper.recordId)}`}
                         >
-                          {paper.label}
+                          Open paper
                         </Link>
-                        {paper.recordId && (
-                          <Link
-                            className="underline"
-                            to={`/records/${encodeURIComponent(paper.recordId)}`}
-                          >
-                            Open paper
-                          </Link>
-                        )}
-                      </div>
-                      {sharedDetails(paper).map((detail) => (
-                        <p key={detail} className="mt-1 text-muted-foreground">
-                          {detail}
-                        </p>
-                      ))}
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          )}
+                      )}
+                    </div>
+                    {sharedDetails(paper).map((detail) => (
+                      <p key={detail} className="mt-1 text-muted-foreground">
+                        {detail}
+                      </p>
+                    ))}
+                  </li>
+                ))}
+            </ul>
+          </section>
         </div>
       )}
     </section>

@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { Check, Copy, Download } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  CITATION_FILENAMES,
   formatCitation,
   type CitationFormat,
   type CitationPublication,
@@ -12,8 +11,7 @@ import {
 const FORMATS: { id: CitationFormat; label: string }[] = [
   { id: 'apa', label: 'APA' },
   { id: 'mla', label: 'MLA' },
-  { id: 'bibtex', label: 'BibTeX' },
-  { id: 'ris', label: 'RIS' },
+  { id: 'ieee', label: 'IEEE' },
 ]
 
 async function copyText(text: string): Promise<boolean> {
@@ -57,19 +55,6 @@ export function CiteSection({
     : null
   const repository = formatCitation(record, format)
   const citation = published ?? repository
-
-  async function download() {
-    const blob = new Blob([citation], {
-      type:
-        format === 'ris' ? 'application/x-research-info-systems' : 'text/plain',
-    })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = CITATION_FILENAMES[format]
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
 
   return (
     <section
@@ -155,16 +140,6 @@ export function CiteSection({
           )}
           {copied ? 'Copied' : 'Copy citation'}
         </Button>
-        {(format === 'bibtex' || format === 'ris') && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void download()}
-          >
-            <Download className="size-4" aria-hidden="true" />
-            Download .{format === 'bibtex' ? 'bib' : 'ris'}
-          </Button>
-        )}
       </div>
       {typeof citationCopyCount === 'number' && (
         <p className="mt-4 text-sm text-[var(--ink-muted)]">

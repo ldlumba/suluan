@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/useAuth'
@@ -78,10 +78,15 @@ describe('knowledge graph discovery', () => {
       '/graph?record=22222222-2222-4222-8222-222222222222',
     )
     expect(screen.getByText('Shared keyword: Health')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Graph view' }))
     expect(
       screen.getByLabelText('Interactive research relationship graph'),
     ).toBeInTheDocument()
+    expect(
+      screen
+        .getByLabelText('Interactive research relationship graph')
+        .compareDocumentPosition(screen.getByText('Related papers')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
         '/api/graph/neighborhood?type=paper&id=11111111-1111-4111-8111-111111111111&depth=2',
