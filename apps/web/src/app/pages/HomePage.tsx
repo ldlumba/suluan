@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowUpRight, Search } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUpRight, Search } from 'lucide-react'
 import { Link } from 'react-router'
-import { useState } from 'react'
+import { useRef } from 'react'
 import { useAuth } from '@/features/auth/useAuth'
 import { apiFetch } from '@/lib/api'
 
@@ -16,30 +16,23 @@ interface RecentPaper {
 interface RecentPapersResponse {
   items: RecentPaper[]
 }
-interface School {
-  id: string
-  name: string
-  courses: { id: string; name: string }[]
+interface ProgramPaper extends RecentPaper {
+  courseId: string
+  courseName: string
+  year: string | null
 }
 
 const RECENT_PAPER_COUNT = 6
 
 export function HomePage() {
   const { profile, loading, getIdToken } = useAuth()
-  const [programId, setProgramId] = useState('')
-  const catalog = useQuery({
-    queryKey: ['schools'],
+  const programPapers = useQuery({
+    queryKey: ['home-program-highlights', profile?.id, profile?.role],
     enabled: !loading,
     retry: false,
-    queryFn: async () => apiFetch<School[]>('/api/schools', await getIdToken()),
-  })
-  const programPapers = useQuery({
-    queryKey: ['home-program-papers', profile?.id, profile?.role, programId],
-    enabled: !loading && Boolean(programId),
-    retry: false,
     queryFn: async () =>
-      apiFetch<RecentPapersResponse>(
-        `/api/search/records?q=&page=1&sort=newest&courseId=${encodeURIComponent(programId)}`,
+      apiFetch<{ items: ProgramPaper[] }>(
+        '/api/search/program-highlights',
         await getIdToken(),
       ),
   })
@@ -99,97 +92,6 @@ export function HomePage() {
         </div>
       </section>
 
-      <section
-        className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8"
-        aria-labelledby="browse-program-heading"
-      >
-        <h2
-          id="browse-program-heading"
-          className="display-heading text-4xl font-semibold"
-        >
-          Browse by program
-        </h2>
-        <p className="mt-4 text-[var(--ink-muted)]">
-          Choose a program to explore its most recently accepted papers.
-        </p>
-        <label
-          htmlFor="home-program"
-          className="mt-6 block text-sm font-semibold"
-        >
-          Program
-        </label>
-        <select
-          id="home-program"
-          value={programId}
-          onChange={(e) => setProgramId(e.target.value)}
-          className="mt-2 w-full max-w-xl rounded-md border border-input bg-white p-3"
-        >
-          <option value="">Select a program</option>
-          {Array.isArray(catalog.data) &&
-            catalog.data.map((school) => (
-              <optgroup key={school.id} label={school.name}>
-                {school.courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-        </select>
-        {catalog.isError && (
-          <p role="status" className="mt-4">
-            Programs are temporarily unavailable.
-          </p>
-        )}
-        {programId && programPapers.isLoading && (
-          <p role="status" className="mt-4">
-            Loading papers…
-          </p>
-        )}
-        {programId && programPapers.isError && (
-          <p role="status" className="mt-4">
-            Papers are temporarily unavailable.
-          </p>
-        )}
-        {programId && programPapers.data?.items.length === 0 && (
-          <p className="mt-4">No papers are available for this program.</p>
-        )}
-        {programId &&
-          programPapers.data &&
-          programPapers.data.items.length > 0 && (
-            <>
-              <ul
-                aria-label="Recent papers in the selected program"
-                tabIndex={0}
-                className="mt-6 flex gap-4 overflow-x-auto pb-4"
-              >
-                {programPapers.data.items.map((paper) => (
-                  <li
-                    key={paper.id}
-                    className="w-72 shrink-0 border-t-2 border-[var(--primary)] bg-white p-5"
-                  >
-                    <Link
-                      className="font-semibold underline"
-                      to={`/records/${encodeURIComponent(paper.id)}`}
-                    >
-                      {paper.title}
-                    </Link>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {paper.authors || 'Authors not listed'}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                className="inline-block font-semibold underline"
-                to={`/search?sort=newest&courseId=${encodeURIComponent(programId)}`}
-              >
-                See all papers in this program
-              </Link>
-            </>
-          )}
-      </section>
-
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <h2 className="display-heading max-w-2xl text-4xl font-semibold leading-tight sm:text-5xl">
           Three ways to find research.
@@ -227,7 +129,7 @@ export function HomePage() {
           ].map((method) => (
             <div
               key={method.to}
-              className="flex flex-col border-t-2 border-[var(--primary)] pt-5"
+              className="group flex flex-col border-t-2 border-[var(--primary)] pt-5 transition-colors duration-200 hover:border-[var(--accent)] focus-within:border-[var(--accent)]"
             >
               <h3 className="text-xl font-bold">{method.name}</h3>
               <p className="mt-3 leading-7 text-[var(--ink-muted)]">
@@ -245,7 +147,10 @@ export function HomePage() {
                   className="inline-flex min-h-11 items-center gap-2 font-semibold text-[var(--primary)] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--signal-blue)]"
                 >
                   {method.name}
-                  <ArrowUpRight className="size-4" aria-hidden="true" />
+                  <ArrowUpRight
+                    className="size-4 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5"
+                    aria-hidden="true"
+                  />
                 </Link>
               </div>
             </div>
@@ -299,7 +204,7 @@ export function HomePage() {
                 return (
                   <li
                     key={paper.id}
-                    className="group border-b border-white/20 py-7 lg:min-h-56"
+                    className="group border-b border-white/20 py-7 transition-colors duration-200 hover:border-[var(--highlight)] focus-within:border-[var(--highlight)] lg:min-h-56"
                   >
                     <p className="font-mono text-xs text-white/45">
                       {String(index + 1).padStart(2, '0')}
@@ -326,7 +231,13 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[var(--secondary)] px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <ProgramCarousel
+        papers={programPapers.data?.items}
+        loading={loading || programPapers.isLoading}
+        error={programPapers.isError}
+      />
+
+      <section className="bg-white px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
         <div className="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="eyebrow text-[var(--primary)]">
@@ -345,5 +256,146 @@ export function HomePage() {
         </div>
       </section>
     </div>
+  )
+}
+
+function ProgramCarousel({
+  papers,
+  loading,
+  error,
+}: {
+  papers: ProgramPaper[] | undefined
+  loading: boolean
+  error: boolean
+}) {
+  const rail = useRef<HTMLUListElement>(null)
+  function move(direction: -1 | 1) {
+    const element = rail.current
+    if (!element) return
+    const cardWidth =
+      element.firstElementChild?.getBoundingClientRect().width ?? 0
+    const gap =
+      Number.parseFloat(window.getComputedStyle(element).columnGap) || 20
+    element.scrollBy({
+      left: direction * (cardWidth ? cardWidth + gap : 320),
+      behavior: 'auto',
+    })
+  }
+  return (
+    <section
+      className="bg-[var(--secondary)] px-4 py-16 sm:px-6 lg:px-8 lg:py-24"
+      aria-labelledby="browse-program-heading"
+      aria-roledescription="carousel"
+    >
+      <div className="mx-auto max-w-7xl">
+        <p className="eyebrow text-[var(--impact)]">Explore the collection</p>
+        <h2
+          id="browse-program-heading"
+          className="display-heading mt-3 text-4xl font-semibold leading-tight sm:text-5xl"
+        >
+          Browse by program.
+        </h2>
+        <p className="mt-4 max-w-2xl leading-7 text-[var(--ink-muted)]">
+          Discover a recently accepted paper from each program. Use the arrows
+          or swipe to explore.
+        </p>
+        {loading && (
+          <p role="status" className="py-10 text-[var(--ink-muted)]">
+            Loading program papers…
+          </p>
+        )}
+        {error && (
+          <p role="status" className="py-10 text-[var(--ink-muted)]">
+            Program papers are temporarily unavailable.
+          </p>
+        )}
+        {papers?.length === 0 && (
+          <p className="py-10 text-[var(--ink-muted)]">
+            No program papers are available yet.
+          </p>
+        )}
+        {papers && papers.length > 0 && (
+          <>
+            <ul
+              id="program-paper-rail"
+              ref={rail}
+              aria-label="Recently accepted papers by program"
+              tabIndex={0}
+              className="mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-safe:scroll-smooth motion-reduce:scroll-auto"
+            >
+              {papers.map((paper, index) => (
+                <li
+                  key={paper.courseId}
+                  className="group flex min-h-72 w-[min(85vw,22rem)] shrink-0 snap-start flex-col border-t-2 border-[var(--primary)] bg-white p-6 transition-[border-color,box-shadow] duration-200 hover:border-[var(--accent)] hover:shadow-md focus-within:border-[var(--accent)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <p className="eyebrow text-[var(--impact)]">
+                      {paper.courseName}
+                    </p>
+                    <span className="font-mono text-xs text-[var(--ink-muted)]">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <h3 className="display-heading mt-5 text-2xl font-semibold leading-tight">
+                    <Link
+                      className="transition-colors hover:text-[var(--primary)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                      to={`/records/${encodeURIComponent(paper.id)}`}
+                    >
+                      {paper.title}
+                    </Link>
+                  </h3>
+                  <p className="mt-4 text-sm leading-6 text-[var(--ink-muted)]">
+                    {paper.authors || 'Authors not listed'}
+                  </p>
+                  <p className="mt-2 text-sm text-[var(--ink-muted)]">
+                    {[paper.schoolName, paper.year].filter(Boolean).join(' · ')}
+                  </p>
+                  <Link
+                    className="mt-auto inline-flex min-h-11 items-center gap-2 pt-5 text-sm font-semibold text-[var(--primary)] underline-offset-4 hover:underline"
+                    to={`/search?sort=newest&courseId=${encodeURIComponent(paper.courseId)}`}
+                  >
+                    More from this program{' '}
+                    <ArrowUpRight
+                      className="size-4 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5"
+                      aria-hidden="true"
+                    />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {papers.length > 1 && (
+              <div className="mt-6 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-5">
+                <p className="text-sm text-[var(--ink-muted)]">
+                  Explore more programs
+                </p>
+                <div
+                  className="flex items-center gap-2"
+                  aria-label="Browse program papers controls"
+                >
+                  <button
+                    type="button"
+                    aria-label="Previous program papers"
+                    aria-controls="program-paper-rail"
+                    onClick={() => move(-1)}
+                    className="grid size-11 place-items-center rounded-full border border-[var(--primary)] text-[var(--primary)] transition-colors hover:bg-[var(--primary)] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    <ArrowLeft className="size-5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next program papers"
+                    aria-controls="program-paper-rail"
+                    onClick={() => move(1)}
+                    className="grid size-11 place-items-center rounded-full bg-[var(--primary)] text-white transition-colors hover:bg-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    <ArrowRight className="size-5" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </section>
   )
 }

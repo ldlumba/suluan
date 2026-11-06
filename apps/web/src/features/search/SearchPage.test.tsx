@@ -50,10 +50,67 @@ const semanticItem = {
 
 describe('keyword search', () => {
   beforeEach(() => vi.clearAllMocks())
-  it('shows title suggestions after typing and supports keyboard navigation', async () => {
+  it('refreshes results immediately when program and year filters change', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
-      if (path.startsWith('/api/search/suggestions'))
-        return { items: [{ id: 'paper-1', title: 'Farm study' }] }
+      if (path === '/api/schools')
+        return [
+          {
+            id: 'school',
+            name: 'School',
+            courses: [
+              { id: 'tourism', name: 'Tourism' },
+              { id: 'psychology', name: 'Psychology' },
+            ],
+          },
+        ]
+      if (path.includes('courseId=psychology'))
+        return {
+          items: [{ ...semanticItem, id: 'psych', title: 'Psychology paper' }],
+          page: 1,
+          hasMore: false,
+        }
+      if (path.includes('courseId=tourism'))
+        return {
+          items: [{ ...semanticItem, id: 'tour', title: 'Tourism paper' }],
+          page: 1,
+          hasMore: false,
+        }
+      return {
+        items: [{ ...semanticItem, title: 'Unfiltered paper' }],
+        page: 1,
+        hasMore: false,
+      }
+    })
+    renderPage('USER', '/search?q=mental+health')
+    expect(await screen.findByText('Unfiltered paper')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Program' }))
+    fireEvent.keyDown(
+      await screen.findByRole('option', { name: 'Tourism — School' }),
+      { key: 'Enter' },
+    )
+    expect(await screen.findByText('Tourism paper')).toBeInTheDocument()
+    expect(screen.queryByText('Unfiltered paper')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Program' }))
+    fireEvent.keyDown(
+      await screen.findByRole('option', { name: 'Psychology — School' }),
+      { key: 'Enter' },
+    )
+    expect(await screen.findByText('Psychology paper')).toBeInTheDocument()
+    expect(screen.queryByText('Tourism paper')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Since year'), {
+      target: { value: '2025' },
+    })
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/courseId=psychology.*yearFrom=2025/),
+        'test-token',
+      ),
+    )
+  })
+  it('suggests search terms and submits the selected term instead of opening a paper', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/search/term-suggestions'))
+        return { items: [{ term: 'Farm management', kind: 'keyword' }] }
       if (path === '/api/schools') return []
       return { items: [], page: 1, hasMore: false }
     })
@@ -62,14 +119,23 @@ describe('keyword search', () => {
     fireEvent.focus(input)
     fireEvent.change(input, { target: { value: 'farm' } })
     expect(
-      await screen.findByRole('option', { name: 'Farm study' }),
+      await screen.findByRole('option', {
+        name: 'Farm management · Author keyword',
+      }),
     ).toBeInTheDocument()
     fireEvent.keyDown(input, { key: 'ArrowDown' })
-    expect(input).toHaveAttribute('aria-activedescendant', 'title-suggestion-0')
-    fireEvent.keyDown(input, { key: 'Escape' })
-    expect(
-      screen.queryByRole('option', { name: 'Farm study' }),
-    ).not.toBeInTheDocument()
+    expect(input).toHaveAttribute(
+      'aria-activedescendant',
+      'search-suggestion-0',
+    )
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringContaining('q=Farm+management'),
+        'test-token',
+      ),
+    )
+    expect(input).toHaveValue('Farm management')
   })
   it('sends title scope and keeps title mode when submitting', async () => {
     vi.mocked(apiFetch).mockResolvedValue({
@@ -200,7 +266,6 @@ describe('keyword search', () => {
       screen.getByLabelText('Filter by author keyword (exact match)'),
       { target: { value: 'machine learning' } },
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
         expect.stringContaining('keyword=machine+learning'),

@@ -383,6 +383,68 @@ export function createApp(
   app.route('/api/bookmarks', bookmarkRoutes(requireAuth))
   app.route('/api/activity', activityRoutes(requireAuth))
 
+  // Suggestions are search terms, not paper titles or query-history tracking.
+  // Every suggested term must be attached to a record visible to this viewer.
+  app.get(
+    '/api/search/term-suggestions',
+    optionalAuth,
+    zValidator('query', z.object({ q: z.string().trim().min(3).max(200) })),
+    async (c) => {
+      const q = c.req.valid('query').q
+      const pattern = `${q.replace(/[\\%_]/g, '\\$&')}%`
+      const viewer = viewerRoleFor(c.get('profile')?.role ?? null)
+      const rows = await createDb(c.env.DATABASE_URL).execute(sql`
+      with visible as (
+        select r.id, s.course_id from research_records r
+        join submissions s on s.id = r.submission_id
+        where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
+          ), title_words as (
+            select r.title, regexp_split_to_array(btrim(r.title), '[^[:alnum:]]+') as words
+            from visible v join research_records r on r.id = v.id
+          ), terms as (
+        select distinct k.display_name as term, 'keyword'::text as kind
+        from visible v join research_keywords rk on rk.record_id = v.id
+        join keywords k on k.id = rk.keyword_id where k.display_name ilike ${pattern}
+        union
+        select distinct course.name as term, 'program'::text as kind
+            from visible v join courses course on course.id = v.course_id
+            where course.name ilike ${pattern}
+            union
+            select distinct concat_ws(' ', tw.words[i], tw.words[i + 1]) as term, 'topic'::text as kind
+            from title_words tw cross join lateral generate_subscripts(tw.words, 1) as positions(i)
+            where tw.words[i + 1] is not null and length(tw.words[i]) >= 3
+              and concat_ws(' ', tw.words[i], tw.words[i + 1]) ilike ${pattern}
+              and lower(concat_ws(' ', tw.words[i], tw.words[i + 1])) <> lower(btrim(tw.title))
+      ) select term, kind from terms order by lower(term), term, kind limit 5
+    `)
+      c.header('Cache-Control', 'private, no-store')
+      return c.json({ items: rows.rows })
+    },
+  )
+
+  // One recent, visible paper per program; no private counts or random ranking.
+  app.get('/api/search/program-highlights', optionalAuth, async (c) => {
+    const viewer = viewerRoleFor(c.get('profile')?.role ?? null)
+    const attempted = Boolean(c.req.header('authorization'))
+    const rows = await createDb(c.env.DATABASE_URL).execute(sql`
+      with ranked as (
+        select r.id, r.title, course.id as "courseId", course.name as "courseName",
+          school.name as "schoolName", r.year::text as year,
+          coalesce(authors.names, s.authors) as authors,
+          row_number() over (partition by course.id order by r.created_at desc, r.id) as rank
+        from research_records r join submissions s on s.id = r.submission_id
+        join courses course on course.id = s.course_id
+        left join schools school on school.id = s.school_id
+        left join lateral (select string_agg(a.name, ', ' order by a.position, a.id) as names from record_authors a where a.record_id = r.id) authors on true
+        where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
+      ) select id, title, "courseId", "courseName", "schoolName", year, authors from ranked
+      where rank = 1 order by lower("courseName"), "courseId" limit 50
+    `)
+    c.header('Cache-Control', cacheControlFor(viewer, attempted, 30))
+    c.header('Vary', 'Authorization')
+    return c.json({ items: rows.rows })
+  })
+
   app.get(
     '/api/search/suggestions',
     optionalAuth,

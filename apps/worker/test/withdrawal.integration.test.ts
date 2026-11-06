@@ -156,6 +156,26 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
       t.testEnv(),
     )
   it('withdraws without deletion or email, hides discovery, and fences old work even after reinstatement', async () => {
+    const termsBefore = (await (
+      await get('/api/search/term-suggestions?q=saf')
+    ).json()) as { items: { term: string; kind: string }[] }
+    expect(termsBefore.items).toContainEqual({
+      term: 'safety',
+      kind: 'keyword',
+    })
+    expect(termsBefore.items).toContainEqual({
+      term: 'safety fixture',
+      kind: 'topic',
+    })
+    expect(
+      termsBefore.items.every(
+        (item) => item.term !== 'Withdrawal safety fixture',
+      ),
+    ).toBe(true)
+    const programsBefore = (await (
+      await get('/api/search/program-highlights')
+    ).json()) as { items: { id: string }[] }
+    expect(programsBefore.items.some((item) => item.id === recordId)).toBe(true)
     await pg.query(
       'update research_records set abstract=$2, abstract_approved_at=now() where id=$1',
       [recordId, 'Retained abstract'],
@@ -184,6 +204,14 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
     expect((await patch(withdraw)).status).toBe(200)
     expect((await patch(withdraw)).status).toBe(409)
     expect((await get(`/api/records/${recordId}`)).status).toBe(404)
+    const termsAfter = (await (
+      await get('/api/search/term-suggestions?q=saf')
+    ).json()) as { items: { term: string }[] }
+    expect(termsAfter.items.some((item) => item.term === 'safety')).toBe(false)
+    const programsAfter = (await (
+      await get('/api/search/program-highlights')
+    ).json()) as { items: { id: string }[] }
+    expect(programsAfter.items.some((item) => item.id === recordId)).toBe(false)
     expect((await get(`/api/records/${recordId}`, manager)).status).toBe(404)
     expect(
       (await get(`/api/record-access/${recordId}/abstract`, manager)).status,
@@ -247,6 +275,28 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
     ).toBe(200)
     expect((await get(`/api/records/${recordId}`)).status).toBe(404)
     expect((await get(`/api/records/${recordId}`, manager)).status).toBe(200)
+    const restrictedTerms = (await (
+      await get('/api/search/term-suggestions?q=saf')
+    ).json()) as { items: { term: string }[] }
+    expect(restrictedTerms.items.some((item) => item.term === 'safety')).toBe(
+      false,
+    )
+    const managerTerms = (await (
+      await get('/api/search/term-suggestions?q=saf', manager)
+    ).json()) as { items: { term: string }[] }
+    expect(managerTerms.items.some((item) => item.term === 'safety')).toBe(true)
+    const restrictedPrograms = (await (
+      await get('/api/search/program-highlights')
+    ).json()) as { items: { id: string }[] }
+    expect(restrictedPrograms.items.some((item) => item.id === recordId)).toBe(
+      false,
+    )
+    const managerPrograms = (await (
+      await get('/api/search/program-highlights', manager)
+    ).json()) as { items: { id: string }[] }
+    expect(managerPrograms.items.some((item) => item.id === recordId)).toBe(
+      true,
+    )
     const stale = await t.app.request(
       `/api/internal/processing/${jobId}/result`,
       {

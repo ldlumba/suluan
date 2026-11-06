@@ -31,7 +31,7 @@ export function SearchResultCard({
   const keywords = item.keywords ?? []
 
   return (
-    <li className="space-y-3 border-t-2 border-[var(--primary)] bg-white p-5 sm:p-6">
+    <li className="space-y-3 border-t-2 border-[var(--primary)] bg-white p-5 transition-[border-color,box-shadow] duration-200 hover:border-[var(--accent)] hover:shadow-sm focus-within:border-[var(--accent)] sm:p-6">
       {mode === 'semantic' && (
         <p className="eyebrow text-[var(--impact)]">
           {groupKey === 'semantic'

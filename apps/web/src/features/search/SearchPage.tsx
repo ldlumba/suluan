@@ -74,13 +74,7 @@ const SEMANTIC_NOTICE: Record<string, string> = {
     'Sign in with your UA account to use semantic search. Showing keyword results instead.',
 }
 
-/**
- * Exact-match author-keyword filter. Deliberately NOT a <form>: it lives
- * inside the page next to the main search form, and nested forms submit
- * natively past React's onSubmit (observed live 2026-10-05 as a bare
- * `?kw=…` GET). A controlled input plus explicit Apply/Clear buttons has
- * no native-submit footgun.
- */
+/** Exact-match keyword filter, applied shortly after typing stops. */
 function KeywordFilter({
   initial,
   onApply,
@@ -88,7 +82,19 @@ function KeywordFilter({
   initial: string
   onApply: (next: string) => void
 }) {
-  const [draft, setDraft] = useState(initial)
+  const [state, setState] = useState({
+    draft: initial,
+    previousInitial: initial,
+  })
+  if (state.previousInitial !== initial) {
+    setState({ draft: initial, previousInitial: initial })
+  }
+  const draft = state.previousInitial === initial ? state.draft : initial
+  useEffect(() => {
+    if (draft.trim() === initial) return
+    const timer = window.setTimeout(() => onApply(draft.trim()), 350)
+    return () => window.clearTimeout(timer)
+  }, [draft, initial, onApply])
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
       <Label className="sm:whitespace-nowrap" htmlFor="search-keyword">
@@ -98,15 +104,17 @@ function KeywordFilter({
         <Input
           id="search-keyword"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) =>
+            setState({ draft: e.target.value, previousInitial: initial })
+          }
           onKeyDown={(e) => {
-            if (e.key === 'Enter') onApply(draft.trim())
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              onApply(draft.trim())
+            }
           }}
           placeholder="e.g. machine learning"
         />
-        <Button type="button" size="sm" onClick={() => onApply(draft.trim())}>
-          Apply
-        </Button>
       </div>
       {initial && (
         <Button
@@ -117,6 +125,54 @@ function KeywordFilter({
         >
           Clear keyword filter
         </Button>
+      )}
+    </div>
+  )
+}
+
+function YearFilter({
+  id,
+  label,
+  initial,
+  onApply,
+}: {
+  id: string
+  label: string
+  initial: string
+  onApply: (value: string) => void
+}) {
+  const [draft, setDraft] = useState(initial)
+  const valid =
+    draft === '' ||
+    (/^\d{4}$/.test(draft) && Number(draft) >= 1900 && Number(draft) <= 2100)
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type="number"
+        min="1900"
+        max="2100"
+        placeholder="2026"
+        value={draft}
+        aria-invalid={!valid}
+        aria-describedby={!valid ? `${id}-error` : undefined}
+        onChange={(e) => {
+          const value = e.target.value
+          setDraft(value)
+          if (
+            value === '' ||
+            (/^\d{4}$/.test(value) &&
+              Number(value) >= 1900 &&
+              Number(value) <= 2100)
+          )
+            onApply(value)
+        }}
+      />
+      {!valid && (
+        <p id={`${id}-error`} className="text-xs text-destructive">
+          Enter a year from 1900 to 2100.
+        </p>
       )}
     </div>
   )
@@ -206,21 +262,23 @@ export function SearchPage() {
   }, [formQuery])
   const suggestions = useQuery({
     queryKey: [
-      'title-suggestions',
+      'search-term-suggestions',
       profile?.id,
       profile?.role,
       suggestionQuery,
     ],
     enabled:
-      mode !== 'semantic' &&
+      mode === 'keyword' &&
       suggestionsOpen &&
       suggestionQuery.length >= 3 &&
       suggestionQuery.length <= 200 &&
       suggestionQuery === (formQuery ?? '').trim(),
     retry: false,
     queryFn: async () =>
-      apiFetch<{ items: { id: string; title: string }[] }>(
-        `/api/search/suggestions?${new URLSearchParams({ q: suggestionQuery })}`,
+      apiFetch<{
+        items: { term: string; kind: 'keyword' | 'program' | 'topic' }[]
+      }>(
+        `/api/search/term-suggestions?${new URLSearchParams({ q: suggestionQuery })}`,
         await getIdToken(),
       ),
   })
@@ -228,6 +286,15 @@ export function SearchPage() {
     suggestionQuery === (formQuery ?? '').trim()
       ? (suggestions.data?.items ?? [])
       : []
+  function chooseSuggestion(term: string) {
+    form.setValue('q', term)
+    setSuggestionsOpen(false)
+    setActiveSuggestion(-1)
+    const next = new URLSearchParams(params)
+    next.set('q', term)
+    next.set('page', '1')
+    setParams(next)
+  }
   const semantic = useQuery({
     queryKey: ['semantic-search', profile?.id, profile?.role, q, page],
     enabled:
@@ -259,6 +326,10 @@ export function SearchPage() {
       sort,
       keywordFilter,
       mode,
+      schoolId,
+      courseId,
+      yearFrom,
+      yearTo,
     ],
     // Enabled in keyword mode, and also once semantic has reported a downgrade:
     // the fallback query can only start AFTER the semantic answer arrives.
@@ -388,10 +459,10 @@ export function SearchPage() {
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded={suggestionsOpen && suggestionItems.length > 0}
-                aria-controls="title-suggestions"
+                aria-controls="search-suggestions"
                 aria-activedescendant={
                   activeSuggestion >= 0 && suggestionItems[activeSuggestion]
-                    ? `title-suggestion-${activeSuggestion}`
+                    ? `search-suggestion-${activeSuggestion}`
                     : undefined
                 }
                 onFocus={() => setSuggestionsOpen(true)}
@@ -418,28 +489,36 @@ export function SearchPage() {
                     suggestionItems[activeSuggestion]
                   ) {
                     e.preventDefault()
-                    navigate(`/records/${suggestionItems[activeSuggestion].id}`)
+                    chooseSuggestion(suggestionItems[activeSuggestion].term)
                   }
                 }}
               />
               {suggestionsOpen && suggestionItems.length > 0 && (
                 <ul
-                  id="title-suggestions"
+                  id="search-suggestions"
                   role="listbox"
-                  aria-label="Paper title suggestions"
+                  aria-label="Search suggestions"
                   className="absolute top-full z-20 mt-1 w-full rounded-md border border-border bg-white p-1 shadow-lg"
                 >
                   {suggestionItems.map((item, index) => (
                     <li
-                      id={`title-suggestion-${index}`}
+                      id={`search-suggestion-${index}`}
                       role="option"
                       aria-selected={index === activeSuggestion}
-                      key={item.id}
+                      key={`${item.kind}:${item.term}`}
                       className={`cursor-pointer rounded px-3 py-2 text-sm ${index === activeSuggestion ? 'bg-[var(--secondary)]' : 'hover:bg-[var(--secondary)]'}`}
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => navigate(`/records/${item.id}`)}
+                      onClick={() => chooseSuggestion(item.term)}
                     >
-                      {item.title}
+                      {item.term}{' '}
+                      <span className="text-muted-foreground">
+                        ·{' '}
+                        {item.kind === 'keyword'
+                          ? 'Author keyword'
+                          : item.kind === 'program'
+                            ? 'Program'
+                            : 'Words from paper titles'}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -624,34 +703,20 @@ export function SearchPage() {
                     School and program filters could not be loaded.
                   </p>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="search-year-from">Since year</Label>
-                  <Input
-                    id="search-year-from"
-                    type="number"
-                    min="1900"
-                    max="2100"
-                    placeholder="2026"
-                    value={yearFrom}
-                    onChange={(event) =>
-                      updateFilter('yearFrom', event.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="search-year-to">Through year</Label>
-                  <Input
-                    id="search-year-to"
-                    type="number"
-                    min="1900"
-                    max="2100"
-                    placeholder="2026"
-                    value={yearTo}
-                    onChange={(event) =>
-                      updateFilter('yearTo', event.target.value)
-                    }
-                  />
-                </div>
+                <YearFilter
+                  key={`from:${yearFrom}`}
+                  id="search-year-from"
+                  label="Since year"
+                  initial={yearFrom}
+                  onApply={(value) => updateFilter('yearFrom', value)}
+                />
+                <YearFilter
+                  key={`to:${yearTo}`}
+                  id="search-year-to"
+                  label="Through year"
+                  initial={yearTo}
+                  onApply={(value) => updateFilter('yearTo', value)}
+                />
                 <KeywordFilter
                   initial={keywordFilter}
                   onApply={(next) => updateFilter('keyword', next)}

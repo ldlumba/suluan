@@ -34,15 +34,19 @@ describe('repository home page', () => {
   })
 
   it('shows the six newest visibility-filtered papers', async () => {
-    vi.mocked(apiFetch).mockResolvedValue({
-      items: Array.from({ length: 7 }, (_, index) => ({
-        id: `paper-${index + 1}`,
-        title: `Recently accepted paper ${index + 1}`,
-        authors: `Author ${index + 1}`,
-        schoolName: 'School of Technological Studies',
-        courseName: 'BS Information Technology',
-      })),
-    })
+    vi.mocked(apiFetch).mockImplementation(async (path) =>
+      path === '/api/search/program-highlights'
+        ? { items: [] }
+        : {
+            items: Array.from({ length: 7 }, (_, index) => ({
+              id: `paper-${index + 1}`,
+              title: `Recently accepted paper ${index + 1}`,
+              authors: `Author ${index + 1}`,
+              schoolName: 'School of Technological Studies',
+              courseName: 'BS Information Technology',
+            })),
+          },
+    )
     renderPage()
 
     expect(
@@ -82,36 +86,77 @@ describe('repository home page', () => {
     ).toBeInTheDocument()
   })
 
-  it('loads only the chosen program using the visibility-aware search', async () => {
+  it('shows recent papers from different programs without requiring a selection', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => {
-      if (path === '/api/schools')
-        return [
-          {
-            id: 'school',
-            name: 'School',
-            courses: [{ id: 'program', name: 'Program' }],
-          },
-        ]
-      if (path.includes('courseId=program'))
+      if (path === '/api/search/program-highlights')
         return {
-          items: [{ id: 'chosen', title: 'Program paper', authors: null }],
+          items: [
+            {
+              id: 'chosen',
+              title: 'Program paper',
+              authors: null,
+              courseId: 'program',
+              courseName: 'Program',
+              schoolName: 'School',
+              year: '2026',
+            },
+            {
+              id: 'other',
+              title: 'Another program paper',
+              authors: null,
+              courseId: 'other',
+              courseName: 'Other program',
+              schoolName: 'School',
+              year: '2026',
+            },
+          ],
         }
       return { items: [] }
     })
     renderPage()
-    await screen.findByRole('option', { name: 'Program' })
-    fireEvent.change(screen.getByLabelText('Program'), {
-      target: { value: 'program' },
-    })
     expect(
       await screen.findByRole('link', { name: 'Program paper' }),
     ).toHaveAttribute('href', '/records/chosen')
     expect(apiFetch).toHaveBeenCalledWith(
-      '/api/search/records?q=&page=1&sort=newest&courseId=program',
+      '/api/search/program-highlights',
       null,
     )
     expect(
-      screen.getByRole('link', { name: 'See all papers in this program' }),
+      screen.getAllByRole('link', { name: 'More from this program' })[0],
     ).toHaveAttribute('href', '/search?sort=newest&courseId=program')
+    expect(
+      screen.getByRole('link', { name: 'Another program paper' }),
+    ).toBeInTheDocument()
+    const newest = screen.getByRole('heading', {
+      name: 'Newly accepted research.',
+    })
+    const programs = screen.getByRole('heading', { name: 'Browse by program.' })
+    const closing = screen.getByRole('heading', {
+      name: 'The collection is ready when you are.',
+    })
+    expect(
+      newest.compareDocumentPosition(programs) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      programs.compareDocumentPosition(closing) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    const rail = screen.getByRole('list', {
+      name: 'Recently accepted papers by program',
+    })
+    expect(rail).toHaveAttribute('tabindex', '0')
+    expect(rail.className).toContain('[scrollbar-width:none]')
+    expect(rail.className).toContain('motion-safe:scroll-smooth')
+    expect(rail.className).toContain('motion-reduce:scroll-auto')
+    expect(
+      rail.compareDocumentPosition(
+        screen.getByRole('button', { name: 'Next program papers' }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    const scrollBy = vi.fn()
+    Object.defineProperty(rail, 'scrollBy', { value: scrollBy })
+    fireEvent.click(screen.getByRole('button', { name: 'Next program papers' }))
+    expect(scrollBy).toHaveBeenCalledWith({ left: 320, behavior: 'auto' })
   })
 })

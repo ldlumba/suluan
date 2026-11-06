@@ -220,7 +220,7 @@ export function RootLayout() {
               {workspaceOpen && (
                 <div
                   id="workspace-menu"
-                  className="absolute right-0 top-full z-50 mt-3 w-56 rounded-[8px] border border-white/15 bg-[var(--primary)] p-2 shadow-lg"
+                  className="absolute right-0 top-full z-50 mt-3 w-56 rounded-[8px] border border-white/15 bg-[var(--primary)] p-2 shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 motion-safe:duration-150"
                   role="menu"
                 >
                   <WorkspaceLink to="/submit" onClick={closeWorkspace}>
