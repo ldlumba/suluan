@@ -14,6 +14,59 @@ vi.mock('@/lib/api', async (original) => ({
 }))
 
 describe('paper page', () => {
+  it('closes the reader while a download is pending without opening it later', async () => {
+    vi.mocked(apiDownload).mockClear()
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      getIdToken: async () => null,
+    } as never)
+    vi.mocked(apiFetch).mockResolvedValue({
+      id: 'paper',
+      title: 'Paper',
+      authors: null,
+      authorList: [],
+      publication: null,
+      schoolName: null,
+      courseName: null,
+      year: null,
+      visibility: 'PUBLIC',
+      fullTextStatus: 'READY',
+      keywords: [],
+    })
+    let resolve!: (file: { blob: Blob; fileName: string }) => void
+    vi.mocked(apiDownload).mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r
+        }),
+    )
+    const create = vi.spyOn(URL, 'createObjectURL')
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <MemoryRouter initialEntries={['/records/paper']}>
+          <Routes>
+            <Route path="/records/:id" element={<PaperPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Read paper' }))
+    await waitFor(() => expect(apiDownload).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: 'Close reader' }))
+    resolve({
+      blob: new Blob(['pdf'], { type: 'application/pdf' }),
+      fileName: 'paper.pdf',
+    })
+    await waitFor(() =>
+      expect(screen.queryByTitle('Paper PDF viewer')).not.toBeInTheDocument(),
+    )
+    expect(create).not.toHaveBeenCalled()
+    create.mockRestore()
+  })
   it('opens authorized PDF bytes in the reader and releases them on close', async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: null,
@@ -54,6 +107,9 @@ describe('paper page', () => {
       </QueryClientProvider>,
     )
     fireEvent.click(await screen.findByRole('button', { name: 'Read paper' }))
+    expect(
+      screen.getByRole('dialog', { name: 'Read paper' }),
+    ).toBeInTheDocument()
     expect(await screen.findByTitle('Paper PDF viewer')).toHaveAttribute(
       'src',
       'blob:paper',

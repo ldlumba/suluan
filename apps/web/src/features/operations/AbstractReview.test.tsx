@@ -9,6 +9,50 @@ vi.mock('@/features/auth/useAuth', () => ({ useAuth: vi.fn() }))
 vi.mock('@/lib/api', () => ({ apiFetch: vi.fn() }))
 
 describe('abstract review', () => {
+  it('offers optional local suggestions without saving or changing the original', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      getIdToken: async () => 'token',
+    } as never)
+    vi.mocked(apiFetch).mockReset()
+    vi.mocked(apiFetch).mockResolvedValue({
+      abstract: null,
+      candidate: 'This study\nreviews accountingfirmsinPampanga.',
+      approved: false,
+      updatedAt: '2026-11-05T00:00:00Z',
+      processingStatus: 'EXTRACTED',
+    })
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <AbstractReview
+          paper={{ id: 'paper', title: 'Paper' }}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByLabelText('Abstract')).toHaveValue(
+      'This study reviews accountingfirmsinPampanga.',
+    )
+    expect(
+      screen.getByText(/Possible split: accounting firms in Pampanga/),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Apply suggestion' }))
+    expect(screen.getByLabelText('Abstract')).toHaveValue(
+      'This study reviews accounting firms in Pampanga.',
+    )
+    fireEvent.click(screen.getByText('View original extracted text'))
+    expect(
+      screen.getByText(/reviews accountingfirmsinPampanga/),
+    ).toBeInTheDocument()
+    expect(
+      vi
+        .mocked(apiFetch)
+        .mock.calls.some(([, , options]) => options?.method === 'PATCH'),
+    ).toBe(false)
+  })
   it('shows a candidate for review and saves only after explicit approval', async () => {
     vi.mocked(useAuth).mockReturnValue({
       getIdToken: async () => 'token',

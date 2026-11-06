@@ -9,6 +9,13 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Button, buttonVariants } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { CiteSection } from '@/features/citations/CiteSection'
 import { apiDownload, apiFetch, ApiError } from '@/lib/api'
 import { useAuth } from '@/features/auth/useAuth'
@@ -47,6 +54,7 @@ function PaperDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [readerUrl, setReaderUrl] = useState<string | null>(null)
+  const [readerOpen, setReaderOpen] = useState(false)
   const [readerError, setReaderError] = useState('')
   const [readerLoading, setReaderLoading] = useState(false)
   const readerGeneration = useRef(0)
@@ -133,6 +141,7 @@ function PaperDetail() {
 
   async function openReader() {
     if (!id || readerLoading) return
+    setReaderOpen(true)
     setReaderError('')
     setReaderLoading(true)
     const generation = readerGeneration.current
@@ -155,6 +164,14 @@ function PaperDetail() {
     } finally {
       if (generation === readerGeneration.current) setReaderLoading(false)
     }
+  }
+
+  function closeReader() {
+    readerGeneration.current += 1
+    setReaderOpen(false)
+    setReaderLoading(false)
+    setReaderUrl(null)
+    setReaderError('')
   }
 
   if (paper.isPending) return <p role="status">Loading paper…</p>
@@ -302,11 +319,6 @@ function PaperDetail() {
           >
             {readerLoading ? 'Opening paper…' : 'Read paper'}
           </Button>
-          {readerError && (
-            <p role="alert" className="text-sm text-[var(--impact-red)]">
-              {readerError}
-            </p>
-          )}
           <Button
             className="h-12 w-full justify-center gap-2 bg-[var(--primary)] text-base hover:bg-[var(--accent)]"
             onClick={() => void download()}
@@ -325,26 +337,40 @@ function PaperDetail() {
           </Link>
         </aside>
       </div>
-      {readerUrl && (
-        <section className="border-t py-8" aria-labelledby="reader-heading">
-          <div className="flex items-center justify-between gap-4">
-            <h2 id="reader-heading" className="text-2xl font-semibold">
-              Read paper
-            </h2>
-            <Button variant="outline" onClick={() => setReaderUrl(null)}>
+      <Dialog
+        open={readerOpen}
+        onOpenChange={(open) => {
+          if (!open) closeReader()
+        }}
+      >
+        <DialogContent className="flex h-[90dvh] max-h-[90dvh] flex-col sm:max-w-5xl">
+          <DialogHeader className="pr-10">
+            <DialogTitle>Read paper</DialogTitle>
+            <DialogDescription>
+              {paper.data.title}. If the document does not display, download it
+              to read it.
+            </DialogDescription>
+          </DialogHeader>
+          {readerLoading && <p role="status">Opening paper…</p>}
+          {readerError && (
+            <p role="alert" className="text-[var(--impact-red)]">
+              {readerError}
+            </p>
+          )}
+          {readerUrl && (
+            <iframe
+              title="Paper PDF viewer"
+              src={readerUrl}
+              className="min-h-0 w-full flex-1 border"
+            />
+          )}
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={closeReader}>
               Close reader
             </Button>
           </div>
-          <p className="my-3 text-sm text-muted-foreground">
-            If the document does not display, download it to read it.
-          </p>
-          <iframe
-            title="Paper PDF viewer"
-            src={readerUrl}
-            className="h-[75vh] w-full border"
-          />
-        </section>
-      )}
+        </DialogContent>
+      </Dialog>
     </article>
   )
 }
