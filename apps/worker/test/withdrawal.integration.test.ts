@@ -62,8 +62,8 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
     const created = await createDirectSubmissionAtomic(testDb(), {
       submitterId: actor.id,
       idempotencyKey: crypto.randomUUID(),
-      title: 'Withdrawal safety fixture',
-      normalizedTitle: 'withdrawal safety fixture',
+      title: 'Withdrawal mental health fixture',
+      normalizedTitle: 'withdrawal mental health fixture',
       schoolId: catalog.school_id,
       courseId: catalog.id,
       r2Key: 'fixture',
@@ -157,21 +157,66 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
     )
   it('withdraws without deletion or email, hides discovery, and fences old work even after reinstatement', async () => {
     const termsBefore = (await (
-      await get('/api/search/term-suggestions?q=saf')
+      await get('/api/search/term-suggestions?q=mental')
     ).json()) as { items: { term: string; kind: string }[] }
     expect(termsBefore.items).toContainEqual({
-      term: 'safety',
-      kind: 'keyword',
-    })
-    expect(termsBefore.items).toContainEqual({
-      term: 'safety fixture',
+      term: 'mental health',
       kind: 'topic',
     })
     expect(
-      termsBefore.items.every(
-        (item) => item.term !== 'Withdrawal safety fixture',
-      ),
+      termsBefore.items.every((item) => item.term !== 'mental health fixture'),
     ).toBe(true)
+    const catalog = (
+      await pg.query<{ school_id: string; course_id: string; year: number }>(
+        'select s.school_id, s.course_id, r.year from research_records r join submissions s on s.id=r.submission_id where r.id=$1',
+        [recordId],
+      )
+    ).rows[0]
+    const filters = new URLSearchParams({
+      q: 'mental',
+      schoolId: catalog.school_id,
+      courseId: catalog.course_id,
+      yearFrom: String(catalog.year),
+      yearTo: String(catalog.year),
+      keyword: 'safety',
+    })
+    expect(
+      (
+        (await (
+          await get(`/api/search/term-suggestions?${filters}`)
+        ).json()) as { items: unknown[] }
+      ).items,
+    ).toHaveLength(1)
+    filters.set('keyword', 'other')
+    expect(
+      (
+        (await (
+          await get(`/api/search/term-suggestions?${filters}`)
+        ).json()) as { items: unknown[] }
+      ).items,
+    ).toHaveLength(0)
+    await pg.query(
+      "update research_records set visibility='RESTRICTED' where id=$1",
+      [recordId],
+    )
+    expect(
+      (
+        (await (await get('/api/search/term-suggestions?q=mental')).json()) as {
+          items: unknown[]
+        }
+      ).items,
+    ).toHaveLength(0)
+    expect(
+      (
+        (await (
+          await get('/api/search/term-suggestions?q=mental', manager)
+        ).json()) as { items: unknown[] }
+      ).items,
+    ).toHaveLength(1)
+    await pg.query(
+      "update research_records set visibility='PUBLIC' where id=$1",
+      [recordId],
+    )
     const programsBefore = (await (
       await get('/api/search/program-highlights')
     ).json()) as { items: { id: string }[] }
@@ -205,9 +250,11 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
     expect((await patch(withdraw)).status).toBe(409)
     expect((await get(`/api/records/${recordId}`)).status).toBe(404)
     const termsAfter = (await (
-      await get('/api/search/term-suggestions?q=saf')
+      await get('/api/search/term-suggestions?q=mental')
     ).json()) as { items: { term: string }[] }
-    expect(termsAfter.items.some((item) => item.term === 'safety')).toBe(false)
+    expect(termsAfter.items.some((item) => item.term === 'mental health')).toBe(
+      false,
+    )
     const programsAfter = (await (
       await get('/api/search/program-highlights')
     ).json()) as { items: { id: string }[] }
@@ -276,15 +323,17 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
     expect((await get(`/api/records/${recordId}`)).status).toBe(404)
     expect((await get(`/api/records/${recordId}`, manager)).status).toBe(200)
     const restrictedTerms = (await (
-      await get('/api/search/term-suggestions?q=saf')
+      await get('/api/search/term-suggestions?q=mental')
     ).json()) as { items: { term: string }[] }
-    expect(restrictedTerms.items.some((item) => item.term === 'safety')).toBe(
-      false,
-    )
+    expect(
+      restrictedTerms.items.some((item) => item.term === 'mental health'),
+    ).toBe(false)
     const managerTerms = (await (
-      await get('/api/search/term-suggestions?q=saf', manager)
+      await get('/api/search/term-suggestions?q=mental', manager)
     ).json()) as { items: { term: string }[] }
-    expect(managerTerms.items.some((item) => item.term === 'safety')).toBe(true)
+    expect(
+      managerTerms.items.some((item) => item.term === 'mental health'),
+    ).toBe(true)
     const restrictedPrograms = (await (
       await get('/api/search/program-highlights')
     ).json()) as { items: { id: string }[] }

@@ -110,7 +110,7 @@ describe('keyword search', () => {
   it('suggests search terms and submits the selected term instead of opening a paper', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
       if (path.startsWith('/api/search/term-suggestions'))
-        return { items: [{ term: 'Farm management', kind: 'keyword' }] }
+        return { items: [{ term: 'Farm management', kind: 'topic' }] }
       if (path === '/api/schools') return []
       return { items: [], page: 1, hasMore: false }
     })
@@ -120,7 +120,7 @@ describe('keyword search', () => {
     fireEvent.change(input, { target: { value: 'farm' } })
     expect(
       await screen.findByRole('option', {
-        name: 'Farm management · Author keyword',
+        name: 'Farm management · Suggested topic',
       }),
     ).toBeInTheDocument()
     fireEvent.keyDown(input, { key: 'ArrowDown' })
@@ -136,6 +136,39 @@ describe('keyword search', () => {
       ),
     )
     expect(input).toHaveValue('Farm management')
+  })
+  it('requests suggestions again with the active filters and handles no matches', async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/search/term-suggestions')) return { items: [] }
+      if (path === '/api/schools') return []
+      return { items: [], page: 1, hasMore: false }
+    })
+    renderPage('USER', '/search?keyword=safety&yearFrom=2025')
+    const input = screen.getByLabelText('Keywords, study title, or author')
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'mental' } })
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /term-suggestions\?q=mental.*yearFrom=2025.*keyword=safety/,
+        ),
+        'test-token',
+      ),
+    )
+    expect(
+      screen.queryByRole('option', { name: /suggested topic/i }),
+    ).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Since year'), {
+      target: { value: '2026' },
+    })
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /term-suggestions\?q=mental.*yearFrom=2026.*keyword=safety/,
+        ),
+        'test-token',
+      ),
+    )
   })
   it('sends title scope and keeps title mode when submitting', async () => {
     vi.mocked(apiFetch).mockResolvedValue({

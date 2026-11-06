@@ -266,6 +266,11 @@ export function SearchPage() {
       profile?.id,
       profile?.role,
       suggestionQuery,
+      schoolId,
+      courseId,
+      yearFrom,
+      yearTo,
+      keywordFilter,
     ],
     enabled:
       mode === 'keyword' &&
@@ -278,7 +283,7 @@ export function SearchPage() {
       apiFetch<{
         items: { term: string; kind: 'keyword' | 'program' | 'topic' }[]
       }>(
-        `/api/search/term-suggestions?${new URLSearchParams({ q: suggestionQuery })}`,
+        `/api/search/term-suggestions?${new URLSearchParams({ q: suggestionQuery, ...(schoolId ? { schoolId } : {}), ...(courseId ? { courseId } : {}), ...(yearFrom ? { yearFrom } : {}), ...(yearTo ? { yearTo } : {}), ...(keywordFilter ? { keyword: keywordFilter } : {}) })}`,
         await getIdToken(),
       ),
   })
@@ -517,7 +522,7 @@ export function SearchPage() {
                           ? 'Author keyword'
                           : item.kind === 'program'
                             ? 'Program'
-                            : 'Words from paper titles'}
+                            : 'Suggested topic'}
                       </span>
                     </li>
                   ))}

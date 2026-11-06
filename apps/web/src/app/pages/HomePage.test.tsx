@@ -127,6 +127,9 @@ describe('repository home page', () => {
     expect(
       screen.getByRole('link', { name: 'Another program paper' }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Explore all papers' }),
+    ).toHaveAttribute('href', '/search')
     const newest = screen.getByRole('heading', {
       name: 'Newly accepted research.',
     })

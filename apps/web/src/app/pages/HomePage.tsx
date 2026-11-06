@@ -363,11 +363,15 @@ function ProgramCarousel({
                 </li>
               ))}
             </ul>
-            {papers.length > 1 && (
-              <div className="mt-6 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-5">
-                <p className="text-sm text-[var(--ink-muted)]">
-                  Explore more programs
-                </p>
+            <div className="mt-6 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-5">
+              <Link
+                to="/search"
+                className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--primary)] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+              >
+                Explore all papers{' '}
+                <ArrowUpRight className="size-4" aria-hidden="true" />
+              </Link>
+              {papers.length > 1 && (
                 <div
                   className="flex items-center gap-2"
                   aria-label="Browse program papers controls"
@@ -391,8 +395,8 @@ function ProgramCarousel({
                     <ArrowRight className="size-5" aria-hidden="true" />
                   </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </>
         )}
       </div>

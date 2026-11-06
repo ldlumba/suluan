@@ -28,7 +28,7 @@ import {
   validateUploadFile,
 } from './uploads'
 import { decideSchema, submissionFormFieldsSchema } from './schemas'
-import { prepareSubmissionKeywords } from './keywords'
+import { normalizeKeyword, prepareSubmissionKeywords } from './keywords'
 import { normalizeTitle } from './titles'
 import { processingRoutes, serviceProcessingRoutes } from './processing'
 import { serviceEmbedRoutes } from './embed_claims'
@@ -36,6 +36,7 @@ import { searchRoutes } from './search'
 import { bookmarkRoutes } from './bookmarks'
 import { activityRoutes } from './activity'
 import { CHUNKER_VERSION } from './chunking'
+import { SEARCH_TOPICS } from './search-topics'
 import { graphRoutes } from './graph'
 import { recordAccessRoutes } from './record-access'
 import { assistantRoutes } from './assistant-routes'
@@ -383,39 +384,62 @@ export function createApp(
   app.route('/api/bookmarks', bookmarkRoutes(requireAuth))
   app.route('/api/activity', activityRoutes(requireAuth))
 
-  // Suggestions are search terms, not paper titles or query-history tracking.
-  // Every suggested term must be attached to a record visible to this viewer.
+  // A bounded starter set of search prompts, not user-history tracking or a
+  // controlled keyword vocabulary. Only return topics with a matching record
+  // under the same visibility and filter rules as keyword search.
   app.get(
     '/api/search/term-suggestions',
     optionalAuth,
-    zValidator('query', z.object({ q: z.string().trim().min(3).max(200) })),
+    zValidator(
+      'query',
+      z.object({
+        q: z.string().trim().min(3).max(200),
+        schoolId: z.string().uuid().optional(),
+        courseId: z.string().uuid().optional(),
+        yearFrom: z.coerce.number().int().min(1900).max(2100).optional(),
+        yearTo: z.coerce.number().int().min(1900).max(2100).optional(),
+        keyword: z.string().trim().max(100).default(''),
+      }),
+    ),
     async (c) => {
-      const q = c.req.valid('query').q
-      const pattern = `${q.replace(/[\\%_]/g, '\\$&')}%`
+      const { q, schoolId, courseId, yearFrom, yearTo, keyword } =
+        c.req.valid('query')
+      const candidates = SEARCH_TOPICS.filter((term) =>
+        term.startsWith(q.toLowerCase()),
+      ).slice(0, 12)
+      if (!candidates.length) {
+        c.header('Cache-Control', 'private, no-store')
+        return c.json({ items: [] })
+      }
       const viewer = viewerRoleFor(c.get('profile')?.role ?? null)
       const rows = await createDb(c.env.DATABASE_URL).execute(sql`
-      with visible as (
-        select r.id, s.course_id from research_records r
-        join submissions s on s.id = r.submission_id
-        where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
-          ), title_words as (
-            select r.title, regexp_split_to_array(btrim(r.title), '[^[:alnum:]]+') as words
-            from visible v join research_records r on r.id = v.id
-          ), terms as (
-        select distinct k.display_name as term, 'keyword'::text as kind
-        from visible v join research_keywords rk on rk.record_id = v.id
-        join keywords k on k.id = rk.keyword_id where k.display_name ilike ${pattern}
-        union
-        select distinct course.name as term, 'program'::text as kind
-            from visible v join courses course on course.id = v.course_id
-            where course.name ilike ${pattern}
-            union
-            select distinct concat_ws(' ', tw.words[i], tw.words[i + 1]) as term, 'topic'::text as kind
-            from title_words tw cross join lateral generate_subscripts(tw.words, 1) as positions(i)
-            where tw.words[i + 1] is not null and length(tw.words[i]) >= 3
-              and concat_ws(' ', tw.words[i], tw.words[i + 1]) ilike ${pattern}
-              and lower(concat_ws(' ', tw.words[i], tw.words[i + 1])) <> lower(btrim(tw.title))
-      ) select term, kind from terms order by lower(term), term, kind limit 5
+        with topics as (
+          select value as term, ordinal, websearch_to_tsquery('simple', value) as terms
+          from jsonb_array_elements_text(${JSON.stringify(candidates)}::jsonb) with ordinality as t(value, ordinal)
+        ), visible as (
+          select r.id, i.id as index_id,
+            to_tsvector('simple', r.title || ' ' || coalesce(authors.names, s.authors, '') || ' ' ||
+              coalesce(school.name, '') || ' ' || coalesce(course.name, '') || ' ' || r.year::text) as metadata
+          from research_records r join submissions s on s.id = r.submission_id
+          left join schools school on school.id = s.school_id
+          left join courses course on course.id = s.course_id
+          left join lateral (select string_agg(a.name, ', ' order by a.position, a.id) as names from record_authors a where a.record_id = r.id) authors on true
+          left join processing_jobs j on j.record_id = r.id
+          left join keyword_indexes i on i.record_id = r.id and i.extraction_claim_token = j.claim_token
+            and i.chunker_version = ${CHUNKER_VERSION} and j.status = 'EXTRACTED'
+          where s.status = 'ACCEPTED' and ${effectiveVisibility(viewer, 'r').rowVisible}
+            and (${schoolId ?? null}::uuid is null or s.school_id = ${schoolId ?? null}::uuid)
+            and (${courseId ?? null}::uuid is null or s.course_id = ${courseId ?? null}::uuid)
+            and (${yearFrom ?? null}::integer is null or r.year >= ${yearFrom ?? null}::integer)
+            and (${yearTo ?? null}::integer is null or r.year <= ${yearTo ?? null}::integer)
+            and (${normalizeKeyword(keyword)} = '' or exists (
+              select 1 from research_keywords rk join keywords k on k.id = rk.keyword_id
+              where rk.record_id = r.id and k.normalized_name = ${normalizeKeyword(keyword)}
+            ))
+        ) select t.term, 'topic'::text as kind from topics t
+        where exists (select 1 from visible v where v.metadata @@ t.terms or exists (
+          select 1 from document_chunks d where d.index_id = v.index_id and d.search_vector @@ t.terms
+        )) order by t.ordinal limit 5
     `)
       c.header('Cache-Control', 'private, no-store')
       return c.json({ items: rows.rows })
