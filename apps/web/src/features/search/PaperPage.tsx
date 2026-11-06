@@ -303,8 +303,7 @@ function PaperDetail() {
             </p>
           )}
           <Button
-            variant="outline"
-            className="h-12 w-full justify-center gap-2 text-base"
+            className="h-12 w-full justify-center gap-2 bg-[var(--highlight)] text-base text-[var(--foreground)] hover:bg-[var(--highlight)]/80"
             disabled={readerLoading}
             onClick={() => void openReader()}
           >

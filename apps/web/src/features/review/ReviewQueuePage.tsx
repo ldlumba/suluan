@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   CircleAlert,
   ClipboardCheck,
+  BookOpen,
   Download,
   FileText,
   RefreshCw,
@@ -70,6 +71,23 @@ export function ReviewQueuePage() {
   >(null)
   const [decideError, setDecideError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [reading, setReading] = useState<QueueItem | null>(null)
+  const [readerUrl, setReaderUrl] = useState<string | null>(null)
+  const [readerLoading, setReaderLoading] = useState(false)
+  const [readerError, setReaderError] = useState('')
+  const readerGeneration = useRef(0)
+  useEffect(
+    () => () => {
+      readerGeneration.current += 1
+    },
+    [],
+  )
+  useEffect(
+    () => () => {
+      if (readerUrl) URL.revokeObjectURL(readerUrl)
+    },
+    [readerUrl],
+  )
   // Visibility defaults to PUBLIC so accepting never silently hides a paper.
   const [visibility, setVisibility] = useState<
     'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
@@ -182,6 +200,41 @@ export function ReviewQueuePage() {
         err instanceof ApiError ? err.message : 'The download failed.',
       )
     }
+  }
+
+  async function openReader(item: QueueItem) {
+    if (readerLoading) return
+    setReading(item)
+    setReaderLoading(true)
+    setReaderError('')
+    const generation = readerGeneration.current
+    try {
+      const file = await apiDownload(
+        `/api/submissions/${item.id}/download`,
+        await getIdToken(),
+      )
+      if (generation !== readerGeneration.current) return
+      if (file.blob.type.split(';')[0].toLowerCase() !== 'application/pdf') {
+        setReaderError(
+          'This file cannot be read here. Please download it instead.',
+        )
+        return
+      }
+      setReaderUrl(URL.createObjectURL(file.blob))
+    } catch {
+      if (generation === readerGeneration.current)
+        setReaderError('The paper could not be opened. Please try again.')
+    } finally {
+      if (generation === readerGeneration.current) setReaderLoading(false)
+    }
+  }
+
+  function closeReader() {
+    readerGeneration.current += 1
+    setReading(null)
+    setReaderLoading(false)
+    setReaderUrl(null)
+    setReaderError('')
   }
 
   const items = queueQuery.data ?? []
@@ -318,6 +371,14 @@ export function ReviewQueuePage() {
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <Button
+                    size="sm"
+                    className="bg-[var(--highlight)] text-[var(--foreground)] hover:bg-[var(--highlight)]/80"
+                    onClick={() => void openReader(item)}
+                  >
+                    <BookOpen className="size-4" aria-hidden="true" /> Read
+                    paper
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     onClick={() => void download(item)}
@@ -340,6 +401,43 @@ export function ReviewQueuePage() {
           ))}
         </section>
       </div>
+
+      <Dialog
+        open={reading !== null}
+        onOpenChange={(open) => {
+          if (!open) closeReader()
+        }}
+      >
+        <DialogContent className="flex h-[96dvh] max-h-[96dvh] w-[96vw] max-w-none flex-col sm:max-w-[96vw]">
+          <DialogHeader className="pr-10">
+            <DialogTitle>Read paper</DialogTitle>
+            <DialogDescription className="sr-only">
+              {reading?.title}
+            </DialogDescription>
+          </DialogHeader>
+          {readerLoading && <p role="status">Opening paper…</p>}
+          {readerError && (
+            <p role="alert" className="text-destructive">
+              {readerError}
+            </p>
+          )}
+          {readerUrl && (
+            <iframe
+              title="Paper PDF viewer"
+              src={readerUrl}
+              className="min-h-0 w-full flex-1 border"
+            />
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              If the document does not display, download it to read it.
+            </p>
+            <Button variant="outline" onClick={closeReader}>
+              Close reader
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={deciding !== null}
