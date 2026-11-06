@@ -255,6 +255,9 @@ describe('paper page', () => {
       </QueryClientProvider>,
     )
     const cite = await screen.findByRole('heading', { name: 'Cite now' })
+    expect(
+      screen.queryByRole('heading', { name: 'Abstract' }),
+    ).not.toBeInTheDocument()
     const about = screen.getByRole('heading', { name: 'Author keywords' })
     expect(
       cite.compareDocumentPosition(about) & Node.DOCUMENT_POSITION_FOLLOWING,

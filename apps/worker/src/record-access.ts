@@ -6,7 +6,6 @@ import type { AppContext } from './app-context'
 import { createDb } from './db'
 import { effectiveVisibilityLevel } from './visibility'
 import { prepareSubmissionKeywords } from './keywords'
-import { findAbstractCandidate } from './abstract-candidate'
 
 const querySchema = z.object({
   q: z.string().trim().max(200).default(''),
@@ -42,16 +41,6 @@ const changeSchema = z
 const keywordsSchema = z
   .object({
     keywords: z.array(z.string()).max(5),
-    expectedUpdatedAt: z
-      .string()
-      .min(1)
-      .max(100)
-      .refine((v) => Number.isFinite(Date.parse(v))),
-  })
-  .strict()
-const abstractSchema = z
-  .object({
-    abstract: z.string().trim().min(1).max(10_000),
     expectedUpdatedAt: z
       .string()
       .min(1)
@@ -112,7 +101,7 @@ export function recordAccessRoutes(
     const rows = await createDb(c.env.DATABASE_URL).execute(sql`
       select r.id, r.title, r.year, r.visibility, r.embargo_until::text as "embargoUntil", r.withdrawn_at as "withdrawnAt",
         ${effectiveVisibilityLevel('r')} as "effectiveVisibility",
-        r.updated_at::text as "updatedAt", (r.abstract_approved_at is not null) as "abstractApproved", school.name as "schoolName", course.name as "courseName",
+        r.updated_at::text as "updatedAt", school.name as "schoolName", course.name as "courseName",
         coalesce((select array_agg(k.display_name order by rk.position, k.id)
           from research_keywords rk join keywords k on k.id = rk.keyword_id where rk.record_id = r.id), '{}'::text[]) as keywords
       from research_records r join submissions s on s.id = r.submission_id
@@ -129,68 +118,6 @@ export function recordAccessRoutes(
       hasMore: rows.rows.length > 20,
     })
   })
-  app.get(
-    '/:id/abstract',
-    zValidator('param', z.object({ id: z.string().uuid() })),
-    async (c) => {
-      const rows = await createDb(c.env.DATABASE_URL).execute(sql`
-      select r.abstract, (r.abstract_approved_at is not null) as approved,
-        r.updated_at::text as "updatedAt", j.status as "processingStatus",
-        case when j.status = 'EXTRACTED' then left(j.result->>'text', 50000) else null end as source
-      from research_records r join submissions s on s.id = r.submission_id
-      left join processing_jobs j on j.record_id = r.id
-      where r.id = ${c.req.valid('param').id}::uuid and s.status = 'ACCEPTED' and r.withdrawn_at is null
-    `)
-      if (!rows.rows.length) return c.json({ error: 'not_found' }, 404)
-      const row = rows.rows[0] as {
-        abstract: string | null
-        approved: boolean
-        updatedAt: string
-        processingStatus: string | null
-        source: string | null
-      }
-      return c.json({
-        abstract: row.abstract,
-        approved: row.approved,
-        updatedAt: row.updatedAt,
-        processingStatus: row.processingStatus,
-        candidate: row.approved
-          ? null
-          : findAbstractCandidate(row.source ?? ''),
-      })
-    },
-  )
-  app.patch(
-    '/:id/abstract',
-    zValidator('param', z.object({ id: z.string().uuid() })),
-    zValidator('json', abstractSchema),
-    async (c) => {
-      const body = c.req.valid('json')
-      const rows = await createDb(c.env.DATABASE_URL).execute(sql`
-      with target as materialized (
-        select r.id from research_records r join submissions s on s.id = r.submission_id
-        where r.id = ${c.req.valid('param').id}::uuid and s.status = 'ACCEPTED'
-          and r.withdrawn_at is null and r.updated_at = ${body.expectedUpdatedAt}::timestamptz
-        for update of r
-      ), changed as (
-        update research_records r set abstract = ${body.abstract}, abstract_approved_at = clock_timestamp(), updated_at = clock_timestamp()
-        from target t where r.id = t.id returning r.id
-      ), audited as (
-        insert into audit_events (actor_id, action, entity_type, entity_id)
-        select ${c.get('profile').id}::uuid, 'record.abstract_approved', 'research_record', id::text from changed returning id
-      ) select id from changed where exists (select 1 from audited)
-    `)
-      return rows.rows.length
-        ? c.json({ ok: true })
-        : c.json(
-            {
-              error: 'stale_record',
-              message: 'This paper changed. Refresh and try again.',
-            },
-            409,
-          )
-    },
-  )
   app.patch(
     '/:id/keywords',
     zValidator('param', z.object({ id: z.string().uuid() })),

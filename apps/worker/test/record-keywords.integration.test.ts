@@ -122,52 +122,34 @@ describe('accepted record keyword editing on in-memory PostgreSQL', () => {
       ).rows,
     ).toHaveLength(0)
   })
-  it('keeps extracted abstract candidates unapproved until a manager saves and audits them', async () => {
+  it('does not expose or modify retained abstract data through retired routes', async () => {
     const env = { DATABASE_URL: 'unused' } as never
-    const candidate =
-      'This study examines a community and reports findings from a detailed survey.'
     await pg.query(
-      "update processing_jobs set status='EXTRACTED', result=$2::jsonb where record_id=$1",
-      [
-        recordId,
-        JSON.stringify({
-          text: `Title\nAbstract\n${candidate}\nKeywords: community`,
-        }),
-      ],
+      'update research_records set abstract=$2, abstract_approved_at=now() where id=$1',
+      [recordId, 'Previously approved abstract'],
     )
-    const before = await app.request(`/access/${recordId}/abstract`, {}, env)
-    expect(before.status).toBe(200)
-    const data = (await before.json()) as {
-      candidate: string
-      approved: boolean
-      updatedAt: string
-    }
-    expect(data).toMatchObject({ candidate, approved: false })
-    const patch = () =>
-      app.request(
-        `/access/${recordId}/abstract`,
-        {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            abstract: 'Reviewed abstract',
-            expectedUpdatedAt: data.updatedAt,
-          }),
-        },
-        env,
-      )
-    expect((await patch()).status).toBe(200)
-    expect((await patch()).status).toBe(409)
+    expect(
+      (await app.request(`/access/${recordId}/abstract`, {}, env)).status,
+    ).toBe(404)
+    expect(
+      (
+        await app.request(
+          `/access/${recordId}/abstract`,
+          {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: '{}',
+          },
+          env,
+        )
+      ).status,
+    ).toBe(404)
     const record = (
-      await pg.query<{ abstract: string; approved: boolean }>(
-        'select abstract, abstract_approved_at is not null as approved from research_records where id=$1',
+      await pg.query<{ abstract: string }>(
+        'select abstract from research_records where id=$1',
         [recordId],
       )
     ).rows[0]
-    expect(record).toEqual({ abstract: 'Reviewed abstract', approved: true })
-    const audits = await pg.query<{ n: number }>(
-      "select count(*)::int as n from audit_events where action='record.abstract_approved'",
-    )
-    expect(audits.rows[0].n).toBe(1)
+    expect(record.abstract).toBe('Previously approved abstract')
   })
 })

@@ -23,7 +23,6 @@ import { useAuth } from '@/features/auth/useAuth'
 interface Paper {
   id: string
   title: string
-  abstract?: string | null
   authors: string | null
   authorList: string[]
   publication: {
@@ -228,14 +227,6 @@ function PaperDetail() {
       </div>
       <div className="grid gap-10 py-10 md:grid-cols-[1fr_16rem]">
         <div>
-          <section className="mb-8" aria-labelledby="abstract-heading">
-            <h2 id="abstract-heading" className="text-xl font-semibold">
-              Abstract
-            </h2>
-            <p className="mt-3 whitespace-pre-wrap leading-7">
-              {paper.data.abstract || 'Abstract not available.'}
-            </p>
-          </section>
           <CiteSection
             record={{
               title: paper.data.title,

@@ -17,7 +17,6 @@ import { useAuth } from '@/features/auth/useAuth'
 import { ApiError, apiFetch } from '@/lib/api'
 import { NotFoundPage } from '@/app/pages/NotFoundPage'
 import { KeywordInput } from '@/features/submissions/KeywordInput'
-import { AbstractReview } from './AbstractReview'
 
 type Visibility = 'PUBLIC' | 'UA_ONLY' | 'RESTRICTED'
 interface Paper {
@@ -32,7 +31,6 @@ interface Paper {
   courseName: string | null
   keywords: string[]
   withdrawnAt: string | null
-  abstractApproved: boolean
 }
 interface School {
   id: string
@@ -89,7 +87,6 @@ export function RecordAccessPage() {
   const [reason, setReason] = useState('')
   const [editing, setEditing] = useState<Paper | null>(null)
   const [keywordPaper, setKeywordPaper] = useState<Paper | null>(null)
-  const [abstractPaper, setAbstractPaper] = useState<Paper | null>(null)
   const [keywords, setKeywords] = useState<string[]>([])
   const [confirmKeywords, setConfirmKeywords] = useState(false)
   const [visibility, setVisibility] = useState<Visibility>('PUBLIC')
@@ -376,14 +373,6 @@ export function RecordAccessPage() {
               {!paper.withdrawnAt && (
                 <Button
                   variant="outline"
-                  onClick={() => setAbstractPaper(paper)}
-                >
-                  {paper.abstractApproved ? 'Edit abstract' : 'Review abstract'}
-                </Button>
-              )}
-              {!paper.withdrawnAt && (
-                <Button
-                  variant="outline"
                   onClick={() => {
                     setEditing(paper)
                     setVisibility(paper.visibility)
@@ -423,12 +412,6 @@ export function RecordAccessPage() {
           </article>
         ))}
       </div>
-      {abstractPaper && (
-        <AbstractReview
-          paper={abstractPaper}
-          onClose={() => setAbstractPaper(null)}
-        />
-      )}
       <Dialog
         open={lifecyclePaper !== null}
         onOpenChange={(open) => {

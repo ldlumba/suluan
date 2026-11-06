@@ -11,7 +11,6 @@ interface RecentPaper {
   authors: string | null
   schoolName: string | null
   courseName: string | null
-  abstractPreview?: string | null
 }
 
 interface RecentPapersResponse {
@@ -175,12 +174,6 @@ export function HomePage() {
                     >
                       {paper.title}
                     </Link>
-                    {paper.abstractPreview && (
-                      <p className="mt-3 line-clamp-4 text-sm text-muted-foreground">
-                        <strong>Abstract: </strong>
-                        {paper.abstractPreview}
-                      </p>
-                    )}
                     <p className="mt-3 text-sm text-muted-foreground">
                       {paper.authors || 'Authors not listed'}
                     </p>

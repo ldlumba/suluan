@@ -156,55 +156,20 @@ describe('withdrawal lifecycle on in-memory PostgreSQL', () => {
       t.testEnv(),
     )
   it('withdraws without deletion or email, hides discovery, and fences old work even after reinstatement', async () => {
-    await pg.query('update research_records set abstract=$2 where id=$1', [
-      recordId,
-      'Unapproved legacy abstract',
-    ])
-    const beforeApproval = (await (
+    await pg.query(
+      'update research_records set abstract=$2, abstract_approved_at=now() where id=$1',
+      [recordId, 'Retained abstract'],
+    )
+    const details = (await (
       await get(`/api/records/${recordId}`)
-    ).json()) as { abstract: string | null }
-    expect(beforeApproval.abstract).toBeNull()
-    const searchBefore = (await (
+    ).json()) as Record<string, unknown>
+    expect(details).not.toHaveProperty('abstract')
+    const results = (await (
       await get('/api/search/records?q=withdrawal')
-    ).json()) as { items: { id: string; abstractPreview: string | null }[] }
+    ).json()) as { items: Record<string, unknown>[] }
     expect(
-      searchBefore.items.find((item) => item.id === recordId)?.abstractPreview,
-    ).toBeNull()
-    const review = (await (
-      await get(`/api/record-access/${recordId}/abstract`, manager)
-    ).json()) as { updatedAt: string }
-    const approvalBody = {
-      abstract: 'Approved abstract',
-      expectedUpdatedAt: review.updatedAt,
-    }
-    const approve = (token: string) =>
-      t.app.request(
-        `/api/record-access/${recordId}/abstract`,
-        {
-          method: 'PATCH',
-          headers: {
-            authorization: `Bearer ${token}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify(approvalBody),
-        },
-        t.testEnv(),
-      )
-    expect((await approve(user)).status).toBe(403)
-    expect((await approve(manager)).status).toBe(200)
-    expect(
-      (
-        (await (await get(`/api/records/${recordId}`)).json()) as {
-          abstract: string
-        }
-      ).abstract,
-    ).toBe('Approved abstract')
-    const searchAfter = (await (
-      await get('/api/search/records?q=withdrawal')
-    ).json()) as { items: { id: string; abstractPreview: string | null }[] }
-    expect(
-      searchAfter.items.find((item) => item.id === recordId)?.abstractPreview,
-    ).toBe('Approved abstract')
+      results.items.find((item) => item.id === recordId),
+    ).not.toHaveProperty('abstractPreview')
     expect((await get(`/api/records/${recordId}`)).status).toBe(200)
     const active = (await (
       await get('/api/record-access', manager)

@@ -197,9 +197,6 @@ export async function semanticSearchByVector(
       from ranked join research_records r on r.id = ranked.record_id
     )
     select r.id, r.title, r.submission_id as "submissionId",
-      case when r.abstract_approved_at is null then null
-        when char_length(r.abstract) > 300 then left(r.abstract, 300) || '…'
-        else r.abstract end as "abstractPreview",
       coalesce(authors.names, s.authors) as authors,
       school.name as "schoolName", course.name as "courseName",
       r.year::text as year,
@@ -272,9 +269,6 @@ async function keywordCandidatesByQuery(
     with query as (select websearch_to_tsquery('simple', ${q}) as terms),
     eligible as (
       select r.id, r.title, r.submission_id,
-        case when r.abstract_approved_at is null then null
-          when char_length(r.abstract) > 300 then left(r.abstract, 300) || '…'
-          else r.abstract end as abstract_preview,
         coalesce(authors.names, s.authors) as authors,
         school.name as school_name, course.name as course_name,
         r.year, i.id as index_id,
@@ -296,7 +290,7 @@ async function keywordCandidatesByQuery(
         and i.chunker_version = ${CHUNKER_VERSION} and j.status = 'EXTRACTED'
       where s.status = 'ACCEPTED' and ${visibilityPredicate(viewer)}
     )
-    select e.id, e.title, e.submission_id as "submissionId", e.authors, e.abstract_preview as "abstractPreview",
+    select e.id, e.title, e.submission_id as "submissionId", e.authors,
       e.school_name as "schoolName", e.course_name as "courseName",
       e.year::text as year, e.visibility, 'READY' as "fullTextStatus",
       case
@@ -360,9 +354,6 @@ export function searchRoutes(
         with query as (select websearch_to_tsquery('simple', ${q}) as terms),
         eligible as (
           select r.id, r.title, r.submission_id,
-            case when r.abstract_approved_at is null then null
-              when char_length(r.abstract) > 300 then left(r.abstract, 300) || '…'
-              else r.abstract end as abstract_preview,
             coalesce(authors.names, s.authors) as authors,
             school.name as school_name, course.name as course_name,
             r.year, r.created_at, i.id as index_id,
@@ -426,7 +417,7 @@ export function searchRoutes(
         )
         select e.id, e.title, e.submission_id as "submissionId", e.authors,
           e.school_name as "schoolName", e.course_name as "courseName",
-          e.year::text as year, e.keywords, e.abstract_preview as "abstractPreview",
+          e.year::text as year, e.keywords,
           e.visibility, e.full_text_status as "fullTextStatus",
           case
             when ${q} = '' or e.content is null then null

@@ -118,6 +118,9 @@ describe('repository access review', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText('Accepted paper')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /abstract/i }),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('Public')).toHaveClass('text-emerald-900')
     fireEvent.change(screen.getByLabelText('Sort by'), {
       target: { value: 'newest' },
