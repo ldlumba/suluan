@@ -33,6 +33,15 @@ describe('repository home page', () => {
     } as never)
   })
 
+  it('scrolls to the top when opening search from the bottom call to action', () => {
+    vi.mocked(apiFetch).mockResolvedValue({ items: [] })
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    renderPage()
+    fireEvent.click(screen.getByRole('link', { name: 'Search SULUAN' }))
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' })
+    scrollTo.mockRestore()
+  })
+
   it('shows the six newest visibility-filtered papers', async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) =>
       path === '/api/search/program-highlights'

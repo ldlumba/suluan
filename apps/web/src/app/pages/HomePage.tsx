@@ -249,6 +249,16 @@ export function HomePage() {
           </div>
           <Link
             to="/search"
+            onClick={(event) => {
+              if (
+                !event.metaKey &&
+                !event.ctrlKey &&
+                !event.shiftKey &&
+                !event.altKey &&
+                event.button === 0
+              )
+                window.scrollTo({ top: 0, behavior: 'instant' })
+            }}
             className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-[6px] bg-[var(--primary)] px-6 text-sm font-semibold text-white transition-colors hover:bg-[var(--highlight)] hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
           >
             Search SULUAN <ArrowUpRight className="size-4" aria-hidden="true" />

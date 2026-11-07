@@ -548,7 +548,7 @@ export function SearchPage() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="absolute top-1/2 right-1 size-8 -translate-y-1/2"
+                  className="absolute top-1/2 right-1 size-8 -translate-y-1/2 active:not-aria-[haspopup]:-translate-y-1/2"
                   aria-label="Clear search"
                   onClick={() => {
                     form.setValue('q', '')

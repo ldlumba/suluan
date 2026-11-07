@@ -289,6 +289,9 @@ describe('keyword search', () => {
     })
     renderPage('USER', '/search?q=solar+power')
     await waitFor(() => expect(apiFetch).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: 'Clear search' })).toHaveClass(
+      'active:not-aria-[haspopup]:-translate-y-1/2',
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith(
